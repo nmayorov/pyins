@@ -36,4 +36,4 @@ Then append the path to the directory to PYTHONPATH.
 Documentation
 *************
 
-Documentation is available `here <link to the doc>`_.
+Documentation is available `here <pyins.readthedocs.io>`_.
