@@ -21,7 +21,7 @@ The package is developed for Python 3 only. It has the following dependencies:
 Installation
 ------------
 
-Currenly you need to install from source, you will need a C compiler suiable
+Currently you need to install from source, you will need a C compiler suitable
 for your version of Python. To install::
 
     python setup.py install
