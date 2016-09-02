@@ -18,7 +18,7 @@ setup_options = dict(
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 3",
     ],
-    requires=["numpy", "scipy", "pandas"],
+    requires=["numpy", "scipy", "pandas", "Cython"],
     ext_modules=cythonize(["pyins/_integrate.pyx"])
 )
 
