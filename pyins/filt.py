@@ -790,7 +790,7 @@ class FeedforwardFilter:
         self.gyro_model = gyro_model
         self.accel_model = accel_model
 
-    def run(self, traj=None, measurements=[], gain_factor=None, max_step=1,
+    def run(self, traj=None, observations=[], gain_factor=None, max_step=1,
             record_stamps=None):
         """Run the filter.
 
@@ -799,8 +799,8 @@ class FeedforwardFilter:
         traj : DataFrame or None
             Trajectory computed by INS of which to estimate the errors.
             If None (default), use `traj_ref` from the constructor.
-        measurements : list of `Observation`
-            Measurements which will be processed. Empty by default.
+        observations : list of `Observation`
+            Observations which will be processed. Empty by default.
         gain_factor : array_like with shape (n_states,) or None
             Factor for Kalman gain for each filter state. It might be
             beneficial in some practical situations to set factors less than 1
@@ -837,12 +837,13 @@ class FeedforwardFilter:
             raise ValueError("Time stamps of reference and computed "
                              "trajectories don't match.")
 
-        if measurements is None:
-            measurements = []
+        if observations is None:
+            observations = []
 
         stamps = pd.Index([])
-        for m in measurements:
-            stamps = stamps.union(m.data.index)
+        for obs in observations:
+            obs.reset()
+            stamps = stamps.union(obs.data.index)
 
         start = traj.index[0]
         end = traj.index[-1]
@@ -879,14 +880,14 @@ class FeedforwardFilter:
             stamp = stamps[i]
             ind = inds[i]
             next_ind = inds[i + 1]
-            for m in measurements:
-                ret = m.compute_obs(stamp, traj.loc[stamp])
+            for obs in observations:
+                ret = obs.compute_obs(stamp, traj.loc[stamp])
                 if ret is not None:
                     z, H, R = ret
                     H_max[:H.shape[0], :N_BASE_STATES] = H
                     res = _kalman_correct(xc, Pc, z, H_max[:H.shape[0]], R,
-                                          gain_factor, m.gain_curve)
-                    m.add_residual(stamp, res)
+                                          gain_factor, obs.gain_curve)
+                    obs.add_residual(stamp, res)
 
             if record_stamps[i_save] == stamp:
                 x[i_save] = xc
@@ -1064,7 +1065,7 @@ class FeedbackFilter:
         self.gyro_model = gyro_model
         self.accel_model = accel_model
 
-    def run(self, integrator, theta, dv, measurements=[], gain_factor=None,
+    def run(self, integrator, theta, dv, observations=[], gain_factor=None,
             max_step=1, feedback_period=500, record_stamps=None):
         """Run the filter.
 
@@ -1077,7 +1078,7 @@ class FeedbackFilter:
             Rotation vectors and velocity increments computed from gyro and
             accelerometer readings after applying coning and sculling
             corrections.
-        measurements : list of `Observation`
+        observations : list of `Observation`
             Measurements which will be processed. Empty by default.
         gain_factor : array_like with shape (n_states,) or None, optional
             Factor for Kalman gain for each filter's state. It might be
@@ -1111,9 +1112,9 @@ class FeedbackFilter:
                 raise ValueError("`gain_factor` must contain positive values.")
 
         stamps = pd.Index([])
-        for m in measurements:
-            m.reset()
-            stamps = stamps.union(m.data.index)
+        for obs in observations:
+            obs.reset()
+            stamps = stamps.union(obs.data.index)
 
         integrator.reset()
 
@@ -1215,15 +1216,15 @@ class FeedbackFilter:
                 stamp_next = stamps[i_stamp + 1]
                 delta_i = stamp_next - stamp
                 i_next = i + delta_i
-                for m in measurements:
-                    ret = m.compute_obs(stamp, traj_b.iloc[i])
+                for obs in observations:
+                    ret = obs.compute_obs(stamp, traj_b.iloc[i])
                     if ret is not None:
                         z, H, R = ret
                         H_max[:H.shape[0], :N_BASE_STATES] = H
                         res = _kalman_correct(xc, Pc, z,
                                               H_max[:H.shape[0]], R,
-                                              gain_factor, m.gain_curve)
-                        m.add_residual(stamp, res)
+                                              gain_factor, obs.gain_curve)
+                        obs.add_residual(stamp, res)
 
                 if record_stamps[i_save] == stamp:
                     x[i_save] = xc.copy()
@@ -1380,4 +1381,3 @@ def correct_traj(traj, error):
     traj_corr['r'] -= error.r
 
     return traj_corr.dropna()
-

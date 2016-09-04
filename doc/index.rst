@@ -15,8 +15,8 @@ The main features currently available:
     - State of the art algorithm for integrating inertial readings.
     - Linear model for INS errors propagation.
     - Feedforward and feedback Kalman filters on top of the INS error model. 
-      Any number of external measurement sources can be considered and users can
-      easily define their own measurement models.
+      Any number of external aiding sources can be considered and users
+      can easily define their own observation models.
     - Convenient class for representing errors of an Inertial Measurement Unit 
       in the Kalman filter. It includes bias, scale factor, random walk,
       white and time correlated noises.
