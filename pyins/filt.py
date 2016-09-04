@@ -310,7 +310,7 @@ class Observation:
 
 
 class LatLonObs(Observation):
-    """Observation of a latitude and a longitude (from GPS or other source).
+    """Observation of latitude and longitude (from GPS or any other source).
 
     Parameters
     ----------
@@ -362,8 +362,8 @@ class LatLonObs(Observation):
         return z, self.H, self.R
 
 
-class VelocityGFrameObs(Observation):
-    """Observation of a velocity in a local North-pointing frame.
+class VeVnObs(Observation):
+    """Observation of East and North velocity (from GPS or any other source).
 
     Parameters
     ----------
@@ -389,7 +389,7 @@ class VelocityGFrameObs(Observation):
         If None (default), the standard Kalman correction will be used.
     """
     def __init__(self, data, sd, gain_curve=None):
-        super(VelocityGFrameObs, self).__init__(data, gain_curve)
+        super(VeVnObs, self).__init__(data, gain_curve)
         self.R = np.diag([sd, sd]) ** 2
 
     def compute_obs(self, stamp, traj_point):
