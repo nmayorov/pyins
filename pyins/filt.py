@@ -217,18 +217,10 @@ class Observation:
 
         If None (default), the standard Kalman correction will be used.
 
-    Attributes
-    ----------
-    residuals : DataFrame
-        Normalized measurement residuals sequence.
-
-        Index contains time stamps. Number of columns matches the number of
-        components in the observation.
-
     See Also
     --------
     LatLonObs
-    VelocityGFrameObs
+    VeVnObs
     """
     def __init__(self, data, gain_curve=None):
         if callable(gain_curve):
@@ -608,7 +600,6 @@ def _refine_stamps(stamps, max_step):
                 ds_new.append(left)
         else:
             ds_new.append(d)
-
     ds_new = np.hstack(ds_new)
     stamps_new = stamps[0] + np.cumsum(ds_new)
     return np.hstack((stamps[0], stamps_new))
@@ -790,6 +781,162 @@ class FeedforwardFilter:
         self.gyro_model = gyro_model
         self.accel_model = accel_model
 
+    def _validate_parameters(self, traj, observations, gain_factor,
+                             max_step, record_stamps):
+        if traj is None:
+            traj = self.traj_ref
+
+        if not np.all(traj.index == self.traj_ref.index):
+            raise ValueError("Time stamps of reference and computed "
+                             "trajectories don't match.")
+
+        if gain_factor is not None:
+            gain_factor = np.asarray(gain_factor)
+            if gain_factor.shape != (self.n_states,):
+                raise ValueError("`gain_factor` is expected to have shape {}, "
+                                 "but actually has {}."
+                                 .format((self.n_states,), gain_factor.shape))
+            if np.any(gain_factor < 0):
+                raise ValueError("`gain_factor` must contain positive values.")
+
+        if observations is None:
+            observations = []
+
+        obs_stamps = pd.Index([])
+        for obs in observations:
+            obs.reset()
+            obs_stamps = obs_stamps.union(obs.data.index)
+
+        start, end = traj.index[0], traj.index[-1]
+        stamps = pd.Index([start, end])
+        stamps = stamps.union(obs_stamps)
+
+        if record_stamps is not None:
+            end = min(end, record_stamps[-1])
+            record_stamps = record_stamps[(record_stamps >= start) &
+                                          (record_stamps <= end)]
+            stamps = stamps.union(pd.Index(record_stamps))
+
+        stamps = stamps[(stamps >= start) & (stamps <= end)]
+
+        max_step = max(1, int(np.floor(max_step / self.dt)))
+        stamps = _refine_stamps(stamps, max_step)
+
+        if record_stamps is None:
+            record_stamps = stamps
+
+        return traj, observations, stamps, record_stamps, obs_stamps
+
+    def _compute_output_errors(self, traj, x, P, output_stamps):
+        T = _errors_transform_matrix(traj.loc[output_stamps])
+        y = util.mv_prod(T, x[:, :N_BASE_STATES])
+        Py = util.mm_prod(T, P[:, :N_BASE_STATES, :N_BASE_STATES])
+        Py = util.mm_prod(Py, T, bt=True)
+        sd = np.diagonal(Py, axis1=1, axis2=2) ** 0.5
+
+        self.traj_err = pd.DataFrame(index=output_stamps)
+        self.traj_err['lat'] = y[:, DRN]
+        self.traj_err['lon'] = y[:, DRE]
+        self.traj_err['VE'] = y[:, DVE]
+        self.traj_err['VN'] = y[:, DVN]
+        self.traj_err['h'] = np.rad2deg(y[:, DH])
+        self.traj_err['p'] = np.rad2deg(y[:, DP])
+        self.traj_err['r'] = np.rad2deg(y[:, DR])
+
+        self.traj_sd = pd.DataFrame(index=output_stamps)
+        self.traj_sd['lat'] = sd[:, DRN]
+        self.traj_sd['lon'] = sd[:, DRE]
+        self.traj_sd['VE'] = sd[:, DVE]
+        self.traj_sd['VN'] = sd[:, DVN]
+        self.traj_sd['h'] = np.rad2deg(sd[:, DH])
+        self.traj_sd['p'] = np.rad2deg(sd[:, DP])
+        self.traj_sd['r'] = np.rad2deg(sd[:, DR])
+
+        self.gyro_err = pd.DataFrame(index=output_stamps)
+        self.gyro_sd = pd.DataFrame(index=output_stamps)
+        n = N_BASE_STATES
+        for i, name in enumerate(self.gyro_model.states):
+            self.gyro_err[name] = x[:, n + i]
+            self.gyro_sd[name] = P[:, n + i, n + i] ** 0.5
+
+        self.accel_err = pd.DataFrame(index=output_stamps)
+        self.accel_sd = pd.DataFrame(index=output_stamps)
+        ng = self.gyro_model.n_states
+        for i, name in enumerate(self.accel_model.states):
+            self.accel_err[name] = x[:, n + ng + i]
+            self.accel_sd[name] = P[:, n + ng + i, n + ng + i] ** 0.5
+
+    def _forward_pass(self, traj, observations, gain_factor, stamps,
+                      record_stamps, data_for_backward=False):
+        inds = stamps - stamps[0]
+
+        if data_for_backward:
+            n_stamps = stamps.shape[0]
+            x = np.empty((n_stamps, self.n_states))
+            P = np.empty((n_stamps, self.n_states, self.n_states))
+            xa = x.copy()
+            Pa = P.copy()
+            Phi_arr = np.empty((n_stamps - 1, self.n_states, self.n_states))
+            record_stamps = stamps
+        else:
+            n_stamps = record_stamps.shape[0]
+            x = np.empty((n_stamps, self.n_states))
+            P = np.empty((n_stamps, self.n_states, self.n_states))
+            xa = None
+            Pa = None
+            Phi_arr = None
+
+        xc = np.zeros(self.n_states)
+        Pc = self.P0.copy()
+        i_save = 0
+
+        H_max = np.zeros((10, self.n_states))
+
+        for i in range(stamps.shape[0] - 1):
+            stamp = stamps[i]
+            ind = inds[i]
+            next_ind = inds[i + 1]
+
+            if data_for_backward and record_stamps[i_save] == stamp:
+                xa[i_save] = xc
+                Pa[i_save] = Pc
+
+            for obs in observations:
+                ret = obs.compute_obs(stamp, traj.loc[stamp])
+                if ret is not None:
+                    z, H, R = ret
+                    H_max[:H.shape[0], :N_BASE_STATES] = H
+                    res = _kalman_correct(xc, Pc, z, H_max[:H.shape[0]], R,
+                                          gain_factor, obs.gain_curve)
+                    obs.add_residual(stamp, res)
+
+            if record_stamps[i_save] == stamp:
+                x[i_save] = xc
+                P[i_save] = Pc
+                i_save += 1
+
+            dt = self.dt * (next_ind - ind)
+            Phi = 0.5 * (self.F[ind] + self.F[next_ind]) * dt
+            Phi[np.diag_indices_from(Phi)] += 1
+            Qd = 0.5 * (self.G[ind] + self.G[next_ind])
+            Qd *= self.q
+            Qd = np.dot(Qd, Qd.T) * dt
+
+            if data_for_backward:
+                Phi_arr[i] = Phi
+
+            xc = Phi.dot(xc)
+            Pc = Phi.dot(Pc).dot(Phi.T) + Qd
+
+        x[-1] = xc
+        P[-1] = Pc
+
+        if data_for_backward:
+            xa[-1] = xc
+            Pa[-1] = Pc
+
+        return x, P, xa, Pa, Phi_arr
+
     def run(self, traj=None, observations=[], gain_factor=None, max_step=1,
             record_stamps=None):
         """Run the filter.
@@ -821,132 +968,86 @@ class FeedforwardFilter:
             Trajectory corrected by estimated errors. It will only contain
             stamps presented in `record_stamps`.
         """
-        if gain_factor is not None:
-            gain_factor = np.asarray(gain_factor)
-            if gain_factor.shape != (self.n_states,):
-                raise ValueError("`gain_factor` is expected to have shape {}, "
-                                 "but actually has {}."
-                                 .format((self.n_states,), gain_factor.shape))
-            if np.any(gain_factor < 0):
-                raise ValueError("`gain_factor` must contain positive values.")
+        traj, observations, stamps, record_stamps, _ = \
+            self._validate_parameters(traj, observations, gain_factor,
+                                      max_step, record_stamps)
 
-        if traj is None:
-            traj = self.traj_ref
+        self.x, self.P, _, _, _ = self._forward_pass(
+            traj, observations, gain_factor, stamps, record_stamps)
 
-        if not np.all(traj.index == self.traj_ref.index):
-            raise ValueError("Time stamps of reference and computed "
-                             "trajectories don't match.")
+        self._compute_output_errors(self.traj_ref, self.x, self.P,
+                                    record_stamps)
 
-        if observations is None:
-            observations = []
+        return correct_traj(traj, self.traj_err)
 
-        stamps = pd.Index([])
-        for obs in observations:
-            obs.reset()
-            stamps = stamps.union(obs.data.index)
+    def run_smoother(self, traj=None, observations=[], gain_factor=None,
+                     max_step=1, record_stamps=None):
+        """Run the smoother.
 
-        start = traj.index[0]
-        end = traj.index[-1]
+        It means that observations during the whole time is used to estimate
+        the errors at each moment of time (i.e. it is not real time). The
+        Rauch-Tung-Striebel two pass recursion is used [1]_.
 
-        if record_stamps is not None:
-            end = min(end, record_stamps[-1])
-            record_stamps = record_stamps[(record_stamps >= start) &
-                                          (record_stamps <= end)]
-            stamps = stamps.union(pd.Index(record_stamps))
+        Parameters
+        ----------
+        traj : DataFrame or None
+            Trajectory computed by INS of which to estimate the errors.
+            If None (default), use `traj_ref` from the constructor.
+        observations : list of `Observation`
+            Observations which will be processed. Empty by default.
+        gain_factor : array_like with shape (n_states,) or None
+            Factor for Kalman gain for each filter state. It might be
+            beneficial in some practical situations to set factors less than 1
+            in order to decrease influence of measurements on some states.
+            Setting values higher than 1 is unlikely to be reasonable. If None
+            (default), use standard optimal Kalman gain.
+        max_step : float, optional
+            Maximum allowed time step in seconds for errors propagation.
+            Default is 1 second. Set to 0 if you desire the smallest possible
+            step.
+        record_stamps : array_like or None
+            Stamps at which record estimated errors. If None (default), errors
+            will be saved at each stamp used internally in the filter.
 
-        stamps = stamps[(stamps >= start) & (stamps <= end)]
-        stamps = stamps.union(pd.Index([start, end]))
+        Returns
+        -------
+        traj_corr : DataFrame
+            Trajectory corrected by estimated errors. It will only contain
+            stamps presented in `record_stamps`.
 
-        max_step = max(1, int(np.floor(max_step / self.dt)))
+        References
+        ----------
+        .. [1] H. E. Rauch, F. Tung and C.T. Striebel, "Maximum Likelihood
+               Estimates of Linear Dynamic Systems", AIAA Journal, Vol. 3,
+               No. 8, August 1965.
+        """
+        traj, observations, stamps, record_stamps, _ = \
+            self._validate_parameters(traj, observations, gain_factor,
+                                      max_step, record_stamps)
 
-        stamps = _refine_stamps(stamps, max_step)
-        inds = stamps - stamps[0]
+        x, P, xa, Pa, Phi_arr = self._forward_pass(
+            traj, observations, gain_factor, stamps, record_stamps,
+            data_for_backward=True)
 
-        if record_stamps is None:
-            record_stamps = stamps
+        I = np.identity(self.n_states)
+        for i in reversed(range(x.shape[0] - 1)):
+            L = cholesky(Pa[i + 1], check_finite=False)
+            PaI = cho_solve((L, False), I, check_finite=False)
 
-        n_stamps = record_stamps.shape[0]
+            C = P[i].dot(Phi_arr[i].T).dot(PaI)
 
-        x = np.empty((n_stamps, self.n_states))
-        P = np.empty((n_stamps, self.n_states, self.n_states))
+            x[i] += C.dot(x[i + 1] - xa[i + 1])
+            P[i] += C.dot(P[i + 1] - Pa[i + 1]).dot(C.T)
 
-        xc = np.zeros(self.n_states)
-        Pc = self.P0.copy()
-        i_save = 0
-
-        H_max = np.zeros((10, self.n_states))
-
-        for i in range(stamps.shape[0] - 1):
-            stamp = stamps[i]
-            ind = inds[i]
-            next_ind = inds[i + 1]
-            for obs in observations:
-                ret = obs.compute_obs(stamp, traj.loc[stamp])
-                if ret is not None:
-                    z, H, R = ret
-                    H_max[:H.shape[0], :N_BASE_STATES] = H
-                    res = _kalman_correct(xc, Pc, z, H_max[:H.shape[0]], R,
-                                          gain_factor, obs.gain_curve)
-                    obs.add_residual(stamp, res)
-
-            if record_stamps[i_save] == stamp:
-                x[i_save] = xc
-                P[i_save] = Pc
-                i_save += 1
-
-            dt = self.dt * (next_ind - ind)
-            Phi = 0.5 * (self.F[ind] + self.F[next_ind]) * dt
-            Phi[np.diag_indices_from(Phi)] += 1
-            Qd = 0.5 * (self.G[ind] + self.G[next_ind])
-            Qd *= self.q
-            Qd = np.dot(Qd, Qd.T) * dt
-
-            xc = Phi.dot(xc)
-            Pc = Phi.dot(Pc).dot(Phi.T) + Qd
-
-        x[-1] = xc
-        P[-1] = Pc
+        ind = np.searchsorted(stamps, record_stamps)
+        x = x[ind]
+        P = P[ind]
 
         self.x = x
         self.P = P
 
-        T = _errors_transform_matrix(self.traj_ref.loc[record_stamps])
-        y = util.mv_prod(T, x[:, :N_BASE_STATES])
-        Py = util.mm_prod(T, P[:, :N_BASE_STATES, :N_BASE_STATES])
-        Py = util.mm_prod(Py, T, bt=True)
-        sd = np.diagonal(Py, axis1=1, axis2=2) ** 0.5
-
-        self.traj_err = pd.DataFrame(index=record_stamps)
-        self.traj_err['lat'] = y[:, DRN]
-        self.traj_err['lon'] = y[:, DRE]
-        self.traj_err['VE'] = y[:, DVE]
-        self.traj_err['VN'] = y[:, DVN]
-        self.traj_err['h'] = np.rad2deg(y[:, DH])
-        self.traj_err['p'] = np.rad2deg(y[:, DP])
-        self.traj_err['r'] = np.rad2deg(y[:, DR])
-
-        self.traj_sd = pd.DataFrame(index=record_stamps)
-        self.traj_sd['lat'] = sd[:, DRN]
-        self.traj_sd['lon'] = sd[:, DRE]
-        self.traj_sd['VE'] = sd[:, DVE]
-        self.traj_sd['VN'] = sd[:, DVN]
-        self.traj_sd['h'] = np.rad2deg(sd[:, DH])
-        self.traj_sd['p'] = np.rad2deg(sd[:, DP])
-        self.traj_sd['r'] = np.rad2deg(sd[:, DR])
-
-        self.gyro_err = pd.DataFrame(index=record_stamps)
-        self.gyro_sd = pd.DataFrame(index=record_stamps)
-        n = N_BASE_STATES
-        for i, name in enumerate(self.gyro_model.states):
-            self.gyro_err[name] = x[:, n + i]
-            self.gyro_sd[name] = P[:, n + i, n + i] ** 0.5
-
-        self.accel_err = pd.DataFrame(index=record_stamps)
-        self.accel_sd = pd.DataFrame(index=record_stamps)
-        ng = self.gyro_model.n_states
-        for i, name in enumerate(self.accel_model.states):
-            self.accel_err[name] = x[:, n + ng + i]
-            self.accel_sd[name] = P[:, n + ng + i, n + ng + i] ** 0.5
+        self._compute_output_errors(self.traj_ref, self.x, self.P,
+                                    record_stamps)
 
         return correct_traj(traj, self.traj_err)
 
