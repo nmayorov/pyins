@@ -132,6 +132,7 @@ class InertialSensor:
 
         self.n_states = n_states
         self.n_noises = n_noises
+        self.states = states
         self.bias = bias
         self.noise = noise
         self.bias_walk = bias_walk
@@ -144,7 +145,6 @@ class InertialSensor:
         self.F = F
         self.G = G
         self._H = H
-        self.states = states
 
     @staticmethod
     def _verify_param(param, name, only_positive=False):
@@ -171,17 +171,24 @@ class InertialSensor:
                              "`self.scale` is set.")
 
         if self.scale is not None:
-            n_readings = readings.shape[0]
-            H = np.zeros((n_readings, 3, self.n_states))
-            H[:] = self._H
-            i1 = self.states['SCALE_1']
-            i2 = self.states['SCALE_3'] + 1
+            readings = np.asarray(readings)
+            if readings.ndim == 1:
+                H = self._H.copy()
+                i1 = self.states['SCALE_1']
+                i2 = self.states['SCALE_3'] + 1
+                H[:, i1: i2] = np.diag(readings)
+            else:
+                n_readings = readings.shape[0]
+                H = np.zeros((n_readings, 3, self.n_states))
+                H[:] = self._H
+                i1 = self.states['SCALE_1']
+                i2 = self.states['SCALE_3'] + 1
 
-            I1 = np.repeat(np.arange(n_readings), 3)
-            I2 = np.tile(np.arange(3), n_readings)
+                I1 = np.repeat(np.arange(n_readings), 3)
+                I2 = np.tile(np.arange(3), n_readings)
 
-            H_view = H[:, :, i1: i2]
-            H_view[I1, I2, I2] = readings.ravel()
+                H_view = H[:, :, i1: i2]
+                H_view[I1, I2, I2] = readings.ravel()
             return H
         else:
             return self._H
