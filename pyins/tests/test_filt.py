@@ -2,7 +2,7 @@ from numpy.testing import (assert_allclose, run_module_suite, assert_equal,
                            assert_)
 import numpy as np
 import pandas as pd
-from pyins.filt import InertialSensor, LatLonObs
+from pyins.filt import InertialSensor, LatLonObs, VeVnObs
 from pyins import earth
 
 
@@ -108,6 +108,30 @@ def test_LatLonObs():
                         [0, 1, 0, 0, 0, 0, 0]])
 
     assert_allclose(R, [[100, 0], [0, 100]])
+
+
+def test_VeVnObs():
+    traj_point = pd.Series(data={
+        'lat': 40,
+        'lon': 30,
+        'VE': 4,
+        'VN': -3,
+        'h': 15,
+        'p': 0,
+        'r': 0
+    })
+    obs_data = pd.DataFrame(index=[50])
+    obs_data['VE'] = [3]
+    obs_data['VN'] = [-2]
+    obs = VeVnObs(obs_data, 10)
+
+    ret = obs.compute_obs(55, traj_point)
+    assert_(ret is None)
+
+    z, H, R = obs.compute_obs(50, traj_point)
+    assert_allclose(z, [1, -1])
+    assert_allclose(H, [[0, 0, 1, 0, 0, 0, -2],
+                        [0, 0, 0, 1, 0, 0, -3]])
 
 
 if __name__ == '__main__':
