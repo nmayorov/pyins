@@ -1,6 +1,9 @@
-from numpy.testing import assert_allclose, run_module_suite, assert_equal
+from numpy.testing import (assert_allclose, run_module_suite, assert_equal,
+                           assert_)
 import numpy as np
-from pyins.filt import InertialSensor
+import pandas as pd
+from pyins.filt import InertialSensor, LatLonObs
+from pyins import earth
 
 
 def test_InertialSensor():
@@ -76,6 +79,35 @@ def test_InertialSensor():
     assert_allclose(H[1], [[1, 0, 0, -1, 0, 0, 1, 0, 0],
                            [0, 1, 0, 0, 2, 0, 0, 1, 0],
                            [0, 0, 1, 0, 0, 0.5, 0, 0, 1]])
+
+
+def test_LatLonObs():
+    traj_point = pd.Series(data={
+        'lat': 40,
+        'lon': 30,
+        'VE': 4,
+        'VN': -3,
+        'h': 15,
+        'p': 0,
+        'r': 0
+    })
+    obs_data = pd.DataFrame(index=[50])
+    obs_data['lat'] = [40.0001]
+    obs_data['lon'] = [30.0002]
+    obs = LatLonObs(obs_data, 10)
+
+    ret = obs.compute_obs(55, traj_point)
+    assert_(ret is None)
+
+    z, H, R = obs.compute_obs(50, traj_point)
+    z_true = [np.deg2rad(-0.0002) * earth.R0 * np.cos(np.deg2rad(40)),
+              np.deg2rad(-0.0001) * earth.R0]
+    assert_allclose(z, z_true, rtol=1e-5)
+
+    assert_allclose(H, [[1, 0, 0, 0, 0, 0, 0],
+                        [0, 1, 0, 0, 0, 0, 0]])
+
+    assert_allclose(R, [[100, 0], [0, 100]])
 
 
 if __name__ == '__main__':
