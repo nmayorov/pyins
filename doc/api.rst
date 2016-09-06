@@ -109,7 +109,7 @@ Navigation Kalman Filters
     filt.InertialSensor
     filt.Observation
     filt.LatLonObs
-    filt.VelocityGFrameObs
+    filt.VeVnObs
     filt.FeedforwardFilter
     filt.FeedbackFilter
 

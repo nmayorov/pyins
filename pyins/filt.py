@@ -207,7 +207,7 @@ class Observation:
     Parameters
     ----------
     data : DataFrame
-        Measured values as a DataFrame. Index must contain time stamps.
+        Observed values as a DataFrame. Index must contain time stamps.
     gain_curve : None, callable or 3-tuple
         Kalman correction gain curve. It determines the proportionality of
         a state correction and a normalized measurement residual (by its
@@ -224,6 +224,12 @@ class Observation:
 
         If None (default), the standard Kalman correction will be used.
 
+    Attributes
+    ----------
+    residuals
+    data : DataFrame
+        Data saved from the constructor.
+
     See Also
     --------
     LatLonObs
@@ -238,10 +244,6 @@ class Observation:
             self.gain_curve = None
 
         self.data = data
-        self.H = None
-        self.R = None
-        self.z = None
-
         self.res = []
         self.stamps = []
 
@@ -333,6 +335,12 @@ class LatLonObs(Observation):
             * IF q >= C: the measurement is rejected completely.
 
         If None (default), the standard Kalman correction will be used.
+
+    Attributes
+    ----------
+    residuals
+    data : DataFrame
+        Data saved from the constructor.
     """
     def __init__(self, data, sd, gain_curve=None):
         super(LatLonObs, self).__init__(data, gain_curve)
@@ -386,6 +394,12 @@ class VeVnObs(Observation):
             * IF q >= C: the measurement is rejected completely.
 
         If None (default), the standard Kalman correction will be used.
+
+    Attributes
+    ----------
+    residuals
+    data : DataFrame
+        Data saved from the constructor.
     """
     def __init__(self, data, sd, gain_curve=None):
         super(VeVnObs, self).__init__(data, gain_curve)
