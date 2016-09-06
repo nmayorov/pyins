@@ -1,10 +1,13 @@
-from numpy.testing import (assert_allclose, run_module_suite, assert_equal,
-                           assert_)
+from numpy.testing import (assert_, assert_allclose, run_module_suite,
+                           assert_equal)
 import numpy as np
 import pandas as pd
-from pyins.filt import (InertialSensor, LatLonObs, VeVnObs,
-                        _refine_stamps, _kalman_correct)
+from pyins.filt import (InertialSensor, LatLonObs, VeVnObs, propagate_errors,
+                        traj_diff, _refine_stamps, _kalman_correct)
 from pyins import earth
+from pyins import sim
+from pyins.integrate import integrate, coning_sculling
+from pyins.coord import perturb_ll
 
 
 def test_InertialSensor():
@@ -202,6 +205,58 @@ def test_kalman_correct():
 
     assert_allclose(x, [K1 * z[0], K2 * z[1]])
     assert_allclose(P, P_true)
+
+
+def test_propagate_errors():
+    # This test is complex and hardly a unit test, but it is strong.
+    # I believe it's better than a formal test.
+    lat = [50, 50]
+    lon = [60, 60]
+    h = [10, 10]
+    r = [-5, -5]
+    p = [3, 3]
+    t = [0, 6 * 3600]
+    dt = 0.5
+
+    traj, gyro, accel = sim.from_position(dt, lat, lon, t, h, p, r)
+
+    gyro_bias = np.array([1e-8, -2e-8, 3e-8])
+    accel_bias = np.array([3e-3, -4e-3, 2e-3])
+
+    gyro += gyro_bias * dt
+    accel += accel_bias * dt
+    theta, dv = coning_sculling(gyro, accel)
+
+    d_lat = 100
+    d_lon = -200
+    d_VE = 1
+    d_VN = -2
+    d_h = 0.01
+    d_p = -0.02
+    d_r = 0.03
+
+    lat0, lon0 = perturb_ll(traj.lat[0], traj.lon[0], d_lat, d_lon)
+    VE0 = traj.VE[0] + d_VE
+    VN0 = traj.VN[0] + d_VN
+    h0 = traj.h[0] + d_h
+    p0 = traj.p[0] + d_p
+    r0 = traj.r[0] + d_r
+
+    traj_c = integrate(dt, lat0, lon0, VE0, VN0, h0, p0, r0, theta, dv)
+    error_true = traj_diff(traj_c, traj)
+    error_linear = propagate_errors(dt, traj, d_lat, d_lon, d_VE, d_VN, d_h,
+                                    d_p, d_r, gyro_bias, accel_bias)
+
+    error_scale = np.mean(np.abs(error_true))
+    rel_diff = (error_linear - error_true) / error_scale
+
+    assert_allclose(rel_diff.lat, 0, atol=0.1)
+    assert_allclose(rel_diff.lon, 0, atol=0.1)
+    assert_allclose(rel_diff.VE, 0, atol=0.1)
+    assert_allclose(rel_diff.VN, 0, atol=0.1)
+    assert_allclose(rel_diff.h, 0, atol=0.1)
+    assert_allclose(rel_diff.p, 0, atol=0.1)
+    assert_allclose(rel_diff.r, 0, atol=0.1)
 
 
 if __name__ == '__main__':
