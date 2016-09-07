@@ -85,14 +85,14 @@ def from_position(dt, lat, lon, t=None, h=None, p=None, r=None, alt=None):
     compute_attitude = test == 3
 
     if t is None:
-        t = np.arange(lat.shape[0])
+        t = np.arange(lat.shape[0]) * dt
+        t_out = t
     else:
         t = np.asarray(t)
+        t_out = np.arange(t[0], t[-1], dt)
 
     if np.any(np.diff(t) <= 0):
         raise ValueError("`t` must be strictly increasing.")
-
-    t_out = np.arange(t[0], t[-1], dt)
 
     if alt is None:
         alt = np.zeros_like(t_out)
