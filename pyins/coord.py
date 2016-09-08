@@ -55,7 +55,11 @@ def perturb_ll(lat, lon, d_lat, d_lon):
     lat_new, lon_new
         Perturbed latitude and longitude.
     """
-    lat_new = lat + np.rad2deg(d_lat / earth.R0)
-    lon_new = lon + np.rad2deg(d_lon / (earth.R0 * np.cos(np.deg2rad(lat))))
+    slat = np.sin(np.deg2rad(lat))
+    clat = (1 - slat**2) ** 0.5
+    re, rn = earth.principal_radii(slat)
+
+    lat_new = lat + np.rad2deg(d_lat / rn)
+    lon_new = lon + np.rad2deg(d_lon / (re * clat))
 
     return lat_new, lon_new
