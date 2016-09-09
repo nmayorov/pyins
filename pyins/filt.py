@@ -607,6 +607,49 @@ def _refine_stamps(stamps, max_step):
     return np.hstack((stamps[0], stamps_new))
 
 
+def _compute_output_errors(traj, x, P, output_stamps,
+                           gyro_model, accel_model):
+    T = _errors_transform_matrix(traj.loc[output_stamps])
+    y = util.mv_prod(T, x[:, :N_BASE_STATES])
+    Py = util.mm_prod(T, P[:, :N_BASE_STATES, :N_BASE_STATES])
+    Py = util.mm_prod(Py, T, bt=True)
+    sd_y = np.diagonal(Py, axis1=1, axis2=2) ** 0.5
+
+    err = pd.DataFrame(index=output_stamps)
+    err['lat'] = y[:, DRN]
+    err['lon'] = y[:, DRE]
+    err['VE'] = y[:, DVE]
+    err['VN'] = y[:, DVN]
+    err['h'] = np.rad2deg(y[:, DH])
+    err['p'] = np.rad2deg(y[:, DP])
+    err['r'] = np.rad2deg(y[:, DR])
+
+    sd = pd.DataFrame(index=output_stamps)
+    sd['lat'] = sd_y[:, DRN]
+    sd['lon'] = sd_y[:, DRE]
+    sd['VE'] = sd_y[:, DVE]
+    sd['VN'] = sd_y[:, DVN]
+    sd['h'] = np.rad2deg(sd_y[:, DH])
+    sd['p'] = np.rad2deg(sd_y[:, DP])
+    sd['r'] = np.rad2deg(sd_y[:, DR])
+
+    gyro_err = pd.DataFrame(index=output_stamps)
+    gyro_sd = pd.DataFrame(index=output_stamps)
+    n = N_BASE_STATES
+    for i, name in enumerate(gyro_model.states):
+        gyro_err[name] = x[:, n + i]
+        gyro_sd[name] = P[:, n + i, n + i] ** 0.5
+
+    accel_err = pd.DataFrame(index=output_stamps)
+    accel_sd = pd.DataFrame(index=output_stamps)
+    ng = gyro_model.n_states
+    for i, name in enumerate(accel_model.states):
+        accel_err[name] = x[:, n + ng + i]
+        accel_sd[name] = P[:, n + ng + i, n + ng + i] ** 0.5
+
+    return err, sd, gyro_err, gyro_sd, accel_err, accel_sd
+
+
 class FeedforwardFilter:
     """INS Kalman filter in a feedforward form.
 
@@ -785,13 +828,12 @@ class FeedforwardFilter:
         if observations is None:
             observations = []
 
-        obs_stamps = pd.Index([])
+        stamps = pd.Index([])
         for obs in observations:
-            obs_stamps = obs_stamps.union(obs.data.index)
+            stamps = stamps.union(obs.data.index)
 
         start, end = traj.index[0], traj.index[-1]
-        stamps = pd.Index([start, end])
-        stamps = stamps.union(obs_stamps)
+        stamps = stamps.union(pd.Index([start, end]))
 
         if record_stamps is not None:
             end = min(end, record_stamps[-1])
@@ -807,48 +849,7 @@ class FeedforwardFilter:
         if record_stamps is None:
             record_stamps = stamps
 
-        return traj, observations, stamps, record_stamps, obs_stamps
-
-    def _compute_output_errors(self, traj, x, P, output_stamps):
-        T = _errors_transform_matrix(traj.loc[output_stamps])
-        y = util.mv_prod(T, x[:, :N_BASE_STATES])
-        Py = util.mm_prod(T, P[:, :N_BASE_STATES, :N_BASE_STATES])
-        Py = util.mm_prod(Py, T, bt=True)
-        sd_y = np.diagonal(Py, axis1=1, axis2=2) ** 0.5
-
-        err = pd.DataFrame(index=output_stamps)
-        err['lat'] = y[:, DRN]
-        err['lon'] = y[:, DRE]
-        err['VE'] = y[:, DVE]
-        err['VN'] = y[:, DVN]
-        err['h'] = np.rad2deg(y[:, DH])
-        err['p'] = np.rad2deg(y[:, DP])
-        err['r'] = np.rad2deg(y[:, DR])
-
-        sd = pd.DataFrame(index=output_stamps)
-        sd['lat'] = sd_y[:, DRN]
-        sd['lon'] = sd_y[:, DRE]
-        sd['VE'] = sd_y[:, DVE]
-        sd['VN'] = sd_y[:, DVN]
-        sd['h'] = np.rad2deg(sd_y[:, DH])
-        sd['p'] = np.rad2deg(sd_y[:, DP])
-        sd['r'] = np.rad2deg(sd_y[:, DR])
-
-        gyro_err = pd.DataFrame(index=output_stamps)
-        gyro_sd = pd.DataFrame(index=output_stamps)
-        n = N_BASE_STATES
-        for i, name in enumerate(self.gyro_model.states):
-            gyro_err[name] = x[:, n + i]
-            gyro_sd[name] = P[:, n + i, n + i] ** 0.5
-
-        accel_err = pd.DataFrame(index=output_stamps)
-        accel_sd = pd.DataFrame(index=output_stamps)
-        ng = self.gyro_model.n_states
-        for i, name in enumerate(self.accel_model.states):
-            accel_err[name] = x[:, n + ng + i]
-            accel_sd[name] = P[:, n + ng + i, n + ng + i] ** 0.5
-
-        return err, sd, gyro_err, gyro_sd, accel_err, accel_sd
+        return traj, observations, stamps, record_stamps, gain_factor
 
     def _forward_pass(self, traj, observations, gain_factor, stamps,
                       record_stamps, data_for_backward=False):
@@ -971,7 +972,7 @@ class FeedforwardFilter:
         P : ndarray, shape (n_points, n_states, n_states)
             History of the filter covariance.
         """
-        traj, observations, stamps, record_stamps, _ = \
+        traj, observations, stamps, record_stamps, gain_factor = \
             self._validate_parameters(traj, observations, gain_factor,
                                       max_step, record_stamps)
 
@@ -979,7 +980,8 @@ class FeedforwardFilter:
             traj, observations, gain_factor, stamps, record_stamps)
 
         err, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
-            self._compute_output_errors(self.traj_ref, x, P, record_stamps)
+            _compute_output_errors(self.traj_ref, x, P, record_stamps,
+                                   self.gyro_model, self.accel_model)
 
         traj_corr = correct_traj(traj, err)
 
@@ -1040,7 +1042,7 @@ class FeedforwardFilter:
                Estimates of Linear Dynamic Systems", AIAA Journal, Vol. 3,
                No. 8, August 1965.
         """
-        traj, observations, stamps, record_stamps, _ = \
+        traj, observations, stamps, record_stamps, gain_factor = \
             self._validate_parameters(traj, observations, gain_factor,
                                       max_step, record_stamps)
 
@@ -1063,7 +1065,8 @@ class FeedforwardFilter:
         P = P[ind]
 
         err, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
-            self._compute_output_errors(self.traj_ref, x, P, record_stamps)
+            _compute_output_errors(self.traj_ref, x, P, record_stamps,
+                                   self.gyro_model, self.accel_model)
 
         traj_corr = correct_traj(traj, err)
 
@@ -1167,57 +1170,9 @@ class FeedbackFilter:
         self.gyro_model = gyro_model
         self.accel_model = accel_model
 
-    def run(self, integrator, theta, dv, observations=[], gain_factor=None,
-            max_step=1, feedback_period=500, record_stamps=None):
-        """Run the filter.
-
-        Parameters
-        ----------
-        integrator : `pyins.integrate.Integrator` instance
-            Integrator to use for INS state propagation.
-        theta, dv : ndarray, shape (n_readings, 3)
-            Rotation vectors and velocity increments computed from gyro and
-            accelerometer readings after applying coning and sculling
-            corrections.
-        observations : list of `Observation`
-            Measurements which will be processed. Empty by default.
-        gain_factor : array_like with shape (n_states,) or None, optional
-            Factor for Kalman gain for each filter's state. It might be
-            beneficial in some practical situations to set factors less than 1
-            in order to decrease influence of measurements on some states.
-            Setting values higher than 1 is unlikely to be reasonable. If None
-            (default), use standard optimal Kalman gain.
-        max_step : float, optional
-            Maximum allowed time step. Default is 1 second. Set to 0 if you
-            desire the smallest possible step.
-        feedback_period : float
-            Time after which INS state will be corrected by the estimated
-            errors. Default is 500 seconds.
-        record_stamps : array_like or None
-            At which stamps record estimated errors. If None (default), errors
-            will be saved at each stamp used internally in the filter.
-
-        Returns
-        -------
-        Bunch object with the fields listed below. Note that all data frames
-        contain stamps only presented in `record_stamps`.
-        traj : DataFrame
-            Trajectory corrected by estimated errors. It will only contain
-            stamps presented in `record_stamps`.
-        err, sd : DataFrame
-            Estimated trajectory errors and their standard deviations.
-        gyro_err, gyro_sd : DataFrame
-            Estimated gyro error and their standard deviations.
-        accel_err, accel_sd : DataFrame
-            Estimated accelerometer errors and their standard deviations.
-        x : ndarray, shape (n_points, n_states)
-            History of the filter states.
-        P : ndarray, shape (n_points, n_states, n_states)
-            History of the filter covariance.
-        residuals : list of DataFrame
-            Each element is DataFrame with index being measurement time stamps
-            and columns containing normalized measurement residuals.
-        """
+    def _validate_parameters(self, integrator, theta, dv, observations,
+                             gain_factor, max_step, record_stamps,
+                             feedback_period):
         if gain_factor is not None:
             gain_factor = np.asarray(gain_factor)
             if gain_factor.shape != (self.n_states,):
@@ -1264,10 +1219,28 @@ class FeedbackFilter:
         if record_stamps is None:
             record_stamps = stamps
 
-        n_stamps = record_stamps.shape[0]
+        return theta, dv, observations, stamps, record_stamps, gain_factor
 
-        x = np.empty((n_stamps, self.n_states))
-        P = np.empty((n_stamps, self.n_states, self.n_states))
+    def _forward_pass(self, integrator, theta, dv, observations, gain_factor,
+                      stamps, record_stamps, feedback_period,
+                      data_for_backward=False):
+        start = integrator.traj.index[0]
+
+        if data_for_backward:
+            n_stamps = stamps.shape[0]
+            x = np.empty((n_stamps, self.n_states))
+            P = np.empty((n_stamps, self.n_states, self.n_states))
+            xa = x.copy()
+            Pa = P.copy()
+            Phi_arr = np.empty((n_stamps - 1, self.n_states, self.n_states))
+            record_stamps = stamps
+        else:
+            n_stamps = record_stamps.shape[0]
+            x = np.empty((n_stamps, self.n_states))
+            P = np.empty((n_stamps, self.n_states, self.n_states))
+            xa = None
+            Pa = None
+            Phi_arr = None
 
         xc = np.zeros(self.n_states)
         Pc = self.P0.copy()
@@ -1321,6 +1294,7 @@ class FeedbackFilter:
         obs_stamps = [[] for _ in range(len(observations))]
         obs_residuals = [[] for _ in range(len(observations))]
 
+        n_readings = theta.shape[0]
         while i_reading < n_readings:
             theta_b = theta[i_reading: i_reading + feedback_period]
             dv_b = dv[i_reading: i_reading + feedback_period]
@@ -1334,6 +1308,11 @@ class FeedbackFilter:
                 stamp_next = stamps[i_stamp + 1]
                 delta_i = stamp_next - stamp
                 i_next = i + delta_i
+
+                if data_for_backward and record_stamps[i_save] == stamp:
+                    xa[i_save] = xc
+                    Pa[i_save] = Pc
+
                 for i_obs, obs in enumerate(observations):
                     ret = obs.compute_obs(stamp, traj_b.iloc[i])
                     if ret is not None:
@@ -1346,8 +1325,8 @@ class FeedbackFilter:
                         obs_residuals[i_obs].append(res)
 
                 if record_stamps[i_save] == stamp:
-                    x[i_save] = xc.copy()
-                    P[i_save] = Pc.copy()
+                    x[i_save] = xc
+                    P[i_save] = Pc
                     i_save += 1
 
                 dt = self.dt * delta_i
@@ -1392,6 +1371,9 @@ class FeedbackFilter:
                 xc = Phi.dot(xc)
                 Pc = Phi.dot(Pc).dot(Phi.T) + Qd
 
+                if data_for_backward:
+                    Phi_arr[i_save] = Phi
+
                 i = i_next
                 i_stamp += 1
 
@@ -1402,50 +1384,84 @@ class FeedbackFilter:
         if record_stamps[i_save] == stamps[i_stamp]:
             x[i_save] = xc
             P[i_save] = Pc
-    
-        T = _errors_transform_matrix(integrator.traj.loc[record_stamps])
-        y = util.mv_prod(T, x[:, :N_BASE_STATES])
-        Py = util.mm_prod(T, P[:, :N_BASE_STATES, :N_BASE_STATES])
-        Py = util.mm_prod(Py, T, bt=True)
-        sd_y = np.diagonal(Py, axis1=1, axis2=2) ** 0.5
 
-        err = pd.DataFrame(index=record_stamps)
-        err['lat'] = y[:, DRN]
-        err['lon'] = y[:, DRE]
-        err['VE'] = y[:, DVE]
-        err['VN'] = y[:, DVN]
-        err['h'] = np.rad2deg(y[:, DH])
-        err['p'] = np.rad2deg(y[:, DP])
-        err['r'] = np.rad2deg(y[:, DR])
-
-        sd = pd.DataFrame(index=record_stamps)
-        sd['lat'] = sd_y[:, DRN]
-        sd['lon'] = sd_y[:, DRE]
-        sd['VE'] = sd_y[:, DVE]
-        sd['VN'] = sd_y[:, DVN]
-        sd['h'] = np.rad2deg(sd_y[:, DH])
-        sd['p'] = np.rad2deg(sd_y[:, DP])
-        sd['r'] = np.rad2deg(sd_y[:, DR])
-
-        gyro_err = pd.DataFrame(index=record_stamps)
-        gyro_sd = pd.DataFrame(index=record_stamps)
-        n = N_BASE_STATES
-        for i, name in enumerate(self.gyro_model.states):
-            gyro_err[name] = x[:, n + i]
-            gyro_sd[name] = P[:, n + i, n + i] ** 0.5
-
-        accel_err = pd.DataFrame(index=record_stamps)
-        accel_sd = pd.DataFrame(index=record_stamps)
-        ng = self.gyro_model.n_states
-        for i, name in enumerate(self.accel_model.states):
-            accel_err[name] = x[:, n + ng + i]
-            accel_sd[name] = P[:, n + ng + i, n + ng + i] ** 0.5
-
-        traj_corr = correct_traj(integrator.traj, err)
+            if data_for_backward:
+                xa[i_save] = xc
+                Pa[i_save] = Pc
 
         residuals = []
         for s, r in zip(obs_stamps, obs_residuals):
             residuals.append(pd.DataFrame(index=s, data=np.asarray(r)))
+
+        return x, P, xa, Pa, residuals
+
+    def run(self, integrator, theta, dv, observations=[], gain_factor=None,
+            max_step=1, feedback_period=500, record_stamps=None):
+        """Run the filter.
+
+        Parameters
+        ----------
+        integrator : `pyins.integrate.Integrator` instance
+            Integrator to use for INS state propagation.
+        theta, dv : ndarray, shape (n_readings, 3)
+            Rotation vectors and velocity increments computed from gyro and
+            accelerometer readings after applying coning and sculling
+            corrections.
+        observations : list of `Observation`
+            Measurements which will be processed. Empty by default.
+        gain_factor : array_like with shape (n_states,) or None, optional
+            Factor for Kalman gain for each filter's state. It might be
+            beneficial in some practical situations to set factors less than 1
+            in order to decrease influence of measurements on some states.
+            Setting values higher than 1 is unlikely to be reasonable. If None
+            (default), use standard optimal Kalman gain.
+        max_step : float, optional
+            Maximum allowed time step. Default is 1 second. Set to 0 if you
+            desire the smallest possible step.
+        feedback_period : float
+            Time after which INS state will be corrected by the estimated
+            errors. Default is 500 seconds.
+        record_stamps : array_like or None
+            At which stamps record estimated errors. If None (default), errors
+            will be saved at each stamp used internally in the filter.
+
+        Returns
+        -------
+        Bunch object with the fields listed below. Note that all data frames
+        contain stamps only presented in `record_stamps`.
+        traj : DataFrame
+            Trajectory corrected by estimated errors. It will only contain
+            stamps presented in `record_stamps`.
+        err, sd : DataFrame
+            Estimated trajectory errors and their standard deviations.
+        gyro_err, gyro_sd : DataFrame
+            Estimated gyro error and their standard deviations.
+        accel_err, accel_sd : DataFrame
+            Estimated accelerometer errors and their standard deviations.
+        x : ndarray, shape (n_points, n_states)
+            History of the filter states.
+        P : ndarray, shape (n_points, n_states, n_states)
+            History of the filter covariance.
+        residuals : list of DataFrame
+            Each element is DataFrame with index being measurement time stamps
+            and columns containing normalized measurement residuals.
+        """
+        theta, dv, observations, stamps, record_stamps, gain_factor = \
+            self._validate_parameters(integrator, theta, dv, observations,
+                                      gain_factor, max_step, record_stamps,
+                                      feedback_period)
+
+        x, P, xa, Pa, residuals = \
+            self._forward_pass(integrator, theta, dv, observations,
+                               gain_factor, stamps, record_stamps,
+                               feedback_period)
+
+        err, sd, accel_err, accel_sd, gyro_err, gyro_sd = \
+            _compute_output_errors(integrator.traj.loc[record_stamps],
+                                   x, P, record_stamps, self.gyro_model,
+                                   self.accel_model)
+
+        traj_corr = correct_traj(integrator.traj, err)
 
         return FiltResult(traj=traj_corr, err=err, sd=sd, gyro_err=gyro_err,
                           gyro_sd=gyro_sd, accel_err=accel_err,

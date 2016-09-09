@@ -272,7 +272,7 @@ def test_FeedforwardFilter():
     traj['p'] = 0
     traj['r'] = 0
 
-    np.random.rand(0)
+    np.random.seed(1)
     obs_data = pd.DataFrame(
         index=traj.index[::10],
         data={
@@ -346,7 +346,7 @@ def test_FeedbackFilter():
                                        p=traj.p, r=traj.r)
     theta, dv = coning_sculling(gyro, accel)
 
-    np.random.rand(0)
+    np.random.seed(0)
     obs_data = pd.DataFrame(
         index=traj.index[::10],
         data={
