@@ -3,7 +3,8 @@ from numpy.testing import (assert_, assert_allclose, run_module_suite,
 import numpy as np
 import pandas as pd
 from pyins.filt import (InertialSensor, LatLonObs, VeVnObs, propagate_errors,
-                        traj_diff, _refine_stamps, _kalman_correct)
+                        FeedforwardFilter, traj_diff, _refine_stamps,
+                        _kalman_correct, correct_traj)
 from pyins import earth
 from pyins import sim
 from pyins.integrate import integrate, coning_sculling
@@ -259,5 +260,74 @@ def test_propagate_errors():
     assert_allclose(rel_diff.r, 0, atol=0.1)
 
 
+def test_FeedforwardFilter():
+    # Test that the results are reasonable on a static bench.
+    dt = 1
+    traj = pd.DataFrame(index=np.arange(1 * 3600))
+    traj['lat'] = 50
+    traj['lon'] = 60
+    traj['VE'] = 0
+    traj['VN'] = 0
+    traj['h'] = 0
+    traj['p'] = 0
+    traj['r'] = 0
+
+    obs_data = pd.DataFrame(
+        index=traj.index[::10],
+        data={
+            'lat': traj.lat[::10],
+            'lon': traj.lon[::10]
+        }
+    )
+    obs_data['lat'], obs_data['lon'] = perturb_ll(
+        obs_data.lat, obs_data.lon,
+        10 * np.random.randn(obs_data.shape[0]),
+        10 * np.random.randn(obs_data.shape[0]))
+
+    obs = LatLonObs(obs_data, 10)
+
+    d_lat = 5
+    d_lon = -3
+    d_VE = 1
+    d_VN = -1
+    d_h = 0.1
+    d_p = 0.03
+    d_r = -0.02
+
+    errors = propagate_errors(dt, traj, d_lat, d_lon, d_VE, d_VN,
+                              d_h, d_p, d_r)
+    traj_error = correct_traj(traj, -errors)
+
+    f = FeedforwardFilter(dt, traj, 5, 1, 0.2, 0.05)
+    res = f.run(traj_error, [obs])
+
+    x = errors.loc[3000:]
+    y = res.err.loc[3000:]
+
+    assert_allclose(x.lat, y.lat, rtol=0, atol=10)
+    assert_allclose(x.lon, y.lon, rtol=0, atol=10)
+    assert_allclose(x.VE, y.VE, rtol=0, atol=1e-2)
+    assert_allclose(x.VE, y.VE, rtol=0, atol=1e-2)
+    assert_allclose(x.h, y.h, rtol=0, atol=1e-3)
+    assert_allclose(x.p, y.p, rtol=0, atol=1e-4)
+    assert_allclose(x.r, y.r, rtol=0, atol=1e-4)
+
+    res = f.run_smoother(traj_error, [obs])
+
+    # This smoother we don't need to wait until the filter converges,
+    # the estimation accuracy is also improved some
+    x = errors
+    y = res.err
+
+    assert_allclose(x.lat, y.lat, rtol=0, atol=10)
+    assert_allclose(x.lon, y.lon, rtol=0, atol=10)
+    assert_allclose(x.VE, y.VE, rtol=0, atol=1e-2)
+    assert_allclose(x.VE, y.VE, rtol=0, atol=1e-2)
+    assert_allclose(x.h, y.h, rtol=0, atol=1e-3)
+    assert_allclose(x.p, y.p, rtol=0, atol=1e-4)
+    assert_allclose(x.r, y.r, rtol=0, atol=1e-4)
+
+
 if __name__ == '__main__':
     run_module_suite()
+    
