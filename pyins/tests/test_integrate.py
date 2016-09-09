@@ -50,9 +50,7 @@ def test_integrate():
     assert_allclose(traj.r, 60, rtol=1e-12)
 
     Integrator.INITIAL_SIZE = 50
-    I = Integrator(dt)
-    I.INITIAL_SIZE = 50
-    I.init(45, 50, 0, 0, 45, -30, 60)
+    I = Integrator(dt, 45, 50, 0, 0, 45, -30, 60)
     I.integrate(theta[:n//2], dv[:n//2])
     I.integrate(theta[n//2:], dv[n//2:])
 

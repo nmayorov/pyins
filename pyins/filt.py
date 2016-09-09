@@ -1174,8 +1174,7 @@ class FeedbackFilter:
         Parameters
         ----------
         integrator : `pyins.integrate.Integrator` instance
-            Integrator to use for INS state propagation. It must be
-            initialized.
+            Integrator to use for INS state propagation.
         theta, dv : ndarray, shape (n_readings, 3)
             Rotation vectors and velocity increments computed from gyro and
             accelerometer readings after applying coning and sculling

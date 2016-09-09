@@ -138,6 +138,14 @@ class Integrator:
     ----------
     dt : float
         Sampling period.
+    lat, lon : float
+        Initial latitude and longitude.
+    VE, VN : float
+        Initial East and North velocity.
+    h, p, r : float
+        Initial heading, pitch and roll.
+    stamp : int, optional
+        Time stamp of the initial point. Default is 0.
 
     Attributes
     ----------
@@ -159,31 +167,15 @@ class Integrator:
     """
     INITIAL_SIZE = 10000
 
-    def __init__(self, dt):
+    def __init__(self, dt, lat, lon, VE, VN, h, p, r, stamp=0):
         self.dt = dt
-        self.traj = pd.DataFrame(
-            index=pd.Index([], name='stamp'),
-            columns=['lat', 'lon', 'VE', 'VN', 'h', 'p', 'r'])
+
         self.lat_arr = np.empty(self.INITIAL_SIZE)
         self.lon_arr = np.empty(self.INITIAL_SIZE)
         self.VE_arr = np.empty(self.INITIAL_SIZE)
         self.VN_arr = np.empty(self.INITIAL_SIZE)
         self.Cnb_arr = np.empty((self.INITIAL_SIZE, 3, 3))
 
-    def init(self, lat, lon, VE, VN, h, p, r, stamp=0):
-        """Initialize a trajectory.
-
-        Parameters
-        ----------
-        lat, lon : float
-            Initial latitude and longitude.
-        VE, VN : float
-            Initial East and North velocity.
-        h, p, r : float
-            Initial heading, pitch and roll.
-        stamp : int, optional
-            Time stamp of the initial point. Default is 0.
-        """
         self.lat_arr[0] = np.deg2rad(lat)
         self.lon_arr[0] = np.deg2rad(lon)
         self.VE_arr[0] = VE
