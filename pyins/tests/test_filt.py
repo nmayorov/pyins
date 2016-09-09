@@ -272,6 +272,7 @@ def test_FeedforwardFilter():
     traj['p'] = 0
     traj['r'] = 0
 
+    np.random.rand(0)
     obs_data = pd.DataFrame(
         index=traj.index[::10],
         data={
@@ -308,9 +309,10 @@ def test_FeedforwardFilter():
     assert_allclose(x.lon, y.lon, rtol=0, atol=10)
     assert_allclose(x.VE, y.VE, rtol=0, atol=1e-2)
     assert_allclose(x.VE, y.VE, rtol=0, atol=1e-2)
-    assert_allclose(x.h, y.h, rtol=0, atol=1e-3)
+    assert_allclose(x.h, y.h, rtol=0, atol=1.5e-3)
     assert_allclose(x.p, y.p, rtol=0, atol=1e-4)
     assert_allclose(x.r, y.r, rtol=0, atol=1e-4)
+    assert_(np.all(np.abs(res.residuals[0] < 4)))
 
     res = f.run_smoother(traj_error, [obs])
 
@@ -326,8 +328,8 @@ def test_FeedforwardFilter():
     assert_allclose(x.h, y.h, rtol=0, atol=1e-3)
     assert_allclose(x.p, y.p, rtol=0, atol=1e-4)
     assert_allclose(x.r, y.r, rtol=0, atol=1e-4)
+    assert_(np.all(np.abs(res.residuals[0] < 4)))
 
 
 if __name__ == '__main__':
     run_module_suite()
-    

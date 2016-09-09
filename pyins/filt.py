@@ -787,7 +787,6 @@ class FeedforwardFilter:
 
         obs_stamps = pd.Index([])
         for obs in observations:
-            obs.reset()
             obs_stamps = obs_stamps.union(obs.data.index)
 
         start, end = traj.index[0], traj.index[-1]
@@ -1231,7 +1230,6 @@ class FeedbackFilter:
 
         stamps = pd.Index([])
         for obs in observations:
-            obs.reset()
             stamps = stamps.union(obs.data.index)
 
         integrator.reset()
