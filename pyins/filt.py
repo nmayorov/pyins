@@ -231,7 +231,6 @@ class Observation:
 
     Attributes
     ----------
-    residuals
     data : DataFrame
         Data saved from the constructor.
 
@@ -249,8 +248,6 @@ class Observation:
             self.gain_curve = None
 
         self.data = data
-        self.res = []
-        self.stamps = []
 
     @staticmethod
     def _create_gain_curve(params):
@@ -267,25 +264,6 @@ class Observation:
                 return q
 
         return gain_curve
-
-    @property
-    def residuals(self):
-        """Normalized measurement residuals sequence.
-
-        Index contains time stamps. Number of columns matches the number of
-        components in the observation.
-        """
-        return pd.DataFrame(index=self.stamps, data=self.res)
-
-    def add_residual(self, stamp, res):
-        """Add a normalized residual value of the observation."""
-        self.stamps.append(stamp)
-        self.res.append(res)
-
-    def reset(self):
-        """Reset the class for new processing."""
-        self.res = []
-        self.stamps = []
 
     def compute_obs(self, stamp, traj_point):
         """Compute ingredients for a single linearized observation.
@@ -304,8 +282,8 @@ class Observation:
         Returns
         -------
         z : ndarray, shape (n_obs,)
-            Observation vector. A difference between a measured value and
-            a corresponding value provided by INS.
+            Observation vector. A difference between an INS corresponding
+            value and an observed value.
         H : ndarray, shape (n_obs, 7)
             Observation model matrix. It relates the vector `z` to the
             INS error states.
@@ -343,7 +321,6 @@ class LatLonObs(Observation):
 
     Attributes
     ----------
-    residuals
     data : DataFrame
         Data saved from the constructor.
     """
@@ -402,7 +379,6 @@ class VeVnObs(Observation):
 
     Attributes
     ----------
-    residuals
     data : DataFrame
         Data saved from the constructor.
     """
@@ -901,6 +877,9 @@ class FeedforwardFilter:
 
         H_max = np.zeros((10, self.n_states))
 
+        obs_stamps = [[] for _ in range(len(observations))]
+        obs_residuals = [[] for _ in range(len(observations))]
+
         for i in range(stamps.shape[0] - 1):
             stamp = stamps[i]
             ind = inds[i]
@@ -910,14 +889,15 @@ class FeedforwardFilter:
                 xa[i_save] = xc
                 Pa[i_save] = Pc
 
-            for obs in observations:
+            for i_obs, obs in enumerate(observations):
                 ret = obs.compute_obs(stamp, traj.loc[stamp])
                 if ret is not None:
                     z, H, R = ret
                     H_max[:H.shape[0], :N_BASE_STATES] = H
                     res = _kalman_correct(xc, Pc, z, H_max[:H.shape[0]], R,
                                           gain_factor, obs.gain_curve)
-                    obs.add_residual(stamp, res)
+                    obs_stamps[i_obs].append(stamp)
+                    obs_residuals[i_obs].append(res)
 
             if record_stamps[i_save] == stamp:
                 x[i_save] = xc
@@ -944,7 +924,11 @@ class FeedforwardFilter:
             xa[-1] = xc
             Pa[-1] = Pc
 
-        return x, P, xa, Pa, Phi_arr
+        residuals = []
+        for s, r in zip(obs_stamps, obs_residuals):
+            residuals.append(pd.DataFrame(index=s, data=np.asarray(r)))
+
+        return x, P, xa, Pa, Phi_arr, residuals
 
     def run(self, traj=None, observations=[], gain_factor=None, max_step=1,
             record_stamps=None):
@@ -992,7 +976,7 @@ class FeedforwardFilter:
             self._validate_parameters(traj, observations, gain_factor,
                                       max_step, record_stamps)
 
-        x, P, _, _, _ = self._forward_pass(
+        x, P, _, _, _, residuals = self._forward_pass(
             traj, observations, gain_factor, stamps, record_stamps)
 
         err, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
@@ -1002,7 +986,7 @@ class FeedforwardFilter:
 
         return FiltResult(traj=traj_corr, err=err, sd=sd, gyro_err=gyro_err,
                           gyro_sd=gyro_sd, accel_err=accel_err,
-                          accel_sd=accel_sd)
+                          accel_sd=accel_sd, residuals=residuals)
 
     def run_smoother(self, traj=None, observations=[], gain_factor=None,
                      max_step=1, record_stamps=None):
@@ -1061,7 +1045,7 @@ class FeedforwardFilter:
             self._validate_parameters(traj, observations, gain_factor,
                                       max_step, record_stamps)
 
-        x, P, xa, Pa, Phi_arr = self._forward_pass(
+        x, P, xa, Pa, Phi_arr, residuals = self._forward_pass(
             traj, observations, gain_factor, stamps, record_stamps,
             data_for_backward=True)
 
@@ -1086,7 +1070,7 @@ class FeedforwardFilter:
 
         return FiltResult(traj=traj_corr, err=err, sd=sd, gyro_err=gyro_err,
                           gyro_sd=gyro_sd, accel_err=accel_err,
-                          accel_sd=accel_sd)
+                          accel_sd=accel_sd, residuals=residuals)
 
 
 class FeedbackFilter:
@@ -1232,6 +1216,9 @@ class FeedbackFilter:
             History of the filter states.
         P : ndarray, shape (n_points, n_states, n_states)
             History of the filter covariance.
+        residuals : list of DataFrame
+            Each element is DataFrame with index being measurement time stamps
+            and columns containing normalized measurement residuals.
         """
         if gain_factor is not None:
             gain_factor = np.asarray(gain_factor)
@@ -1334,6 +1321,9 @@ class FeedbackFilter:
         G1 = G
         G2 = G.copy()
 
+        obs_stamps = [[] for _ in range(len(observations))]
+        obs_residuals = [[] for _ in range(len(observations))]
+
         while i_reading < n_readings:
             theta_b = theta[i_reading: i_reading + feedback_period]
             dv_b = dv[i_reading: i_reading + feedback_period]
@@ -1347,7 +1337,7 @@ class FeedbackFilter:
                 stamp_next = stamps[i_stamp + 1]
                 delta_i = stamp_next - stamp
                 i_next = i + delta_i
-                for obs in observations:
+                for i_obs, obs in enumerate(observations):
                     ret = obs.compute_obs(stamp, traj_b.iloc[i])
                     if ret is not None:
                         z, H, R = ret
@@ -1355,7 +1345,8 @@ class FeedbackFilter:
                         res = _kalman_correct(xc, Pc, z,
                                               H_max[:H.shape[0]], R,
                                               gain_factor, obs.gain_curve)
-                        obs.add_residual(stamp, res)
+                        obs_stamps[i_obs].append(stamp)
+                        obs_residuals[i_obs].append(res)
 
                 if record_stamps[i_save] == stamp:
                     x[i_save] = xc.copy()
@@ -1455,9 +1446,13 @@ class FeedbackFilter:
 
         traj_corr = correct_traj(integrator.traj, err)
 
+        residuals = []
+        for s, r in zip(obs_stamps, obs_residuals):
+            residuals.append(pd.DataFrame(index=s, data=np.asarray(r)))
+
         return FiltResult(traj=traj_corr, err=err, sd=sd, gyro_err=gyro_err,
                           gyro_sd=gyro_sd, accel_err=accel_err,
-                          accel_sd=accel_sd)
+                          accel_sd=accel_sd, residuals=residuals)
 
 
 def traj_diff(t1, t2):
