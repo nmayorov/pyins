@@ -24,6 +24,11 @@ DP = 5
 DR = 6
 
 
+class FiltResult:
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+
+
 class InertialSensor:
     """Inertial sensor triad description.
 
@@ -660,16 +665,6 @@ class FeedforwardFilter:
         Number of noise sources.
     states : OrderedDict
         Dictionary mapping state names to their indices.
-    x : ndarray, shape (n_points, n_states)
-        History of the filter states.
-    P : ndarray, shape (n_points, n_states, n_states)
-        History of the filter covariance.
-    traj_err, traj_sd : DataFrame
-        Estimated trajectory errors and their standard deviations.
-    gyro_err, gyro_sd : DataFrame
-        Estimated gyro error and their standard deviations.
-    accel_err, accel_sd : DataFrame
-        Estimated accelerometer errors and their standard deviations.
     """
     def __init__(self, dt, traj_ref, pos_sd, vel_sd, azimuth_sd, level_sd,
                  gyro_model=None, accel_model=None, gyro=None, accel=None):
@@ -769,8 +764,6 @@ class FeedforwardFilter:
         self.F = F
         self.q = q
         self.G = G
-        self.x = None
-        self.P = None
 
         states = OrderedDict((
             ('DR1', DR1),
@@ -791,13 +784,6 @@ class FeedforwardFilter:
         self.n_states = n_states
         self.n_noises = n_noises
         self.states = states
-        self.traj_err = None
-        self.traj_sd = None
-
-        self.gyro_err = None
-        self.gyro_sd = None
-        self.accel_err = None
-        self.accel_sd = None
 
         self.gyro_model = gyro_model
         self.accel_model = accel_model
@@ -853,39 +839,41 @@ class FeedforwardFilter:
         y = util.mv_prod(T, x[:, :N_BASE_STATES])
         Py = util.mm_prod(T, P[:, :N_BASE_STATES, :N_BASE_STATES])
         Py = util.mm_prod(Py, T, bt=True)
-        sd = np.diagonal(Py, axis1=1, axis2=2) ** 0.5
+        sd_y = np.diagonal(Py, axis1=1, axis2=2) ** 0.5
 
-        self.traj_err = pd.DataFrame(index=output_stamps)
-        self.traj_err['lat'] = y[:, DRN]
-        self.traj_err['lon'] = y[:, DRE]
-        self.traj_err['VE'] = y[:, DVE]
-        self.traj_err['VN'] = y[:, DVN]
-        self.traj_err['h'] = np.rad2deg(y[:, DH])
-        self.traj_err['p'] = np.rad2deg(y[:, DP])
-        self.traj_err['r'] = np.rad2deg(y[:, DR])
+        err = pd.DataFrame(index=output_stamps)
+        err['lat'] = y[:, DRN]
+        err['lon'] = y[:, DRE]
+        err['VE'] = y[:, DVE]
+        err['VN'] = y[:, DVN]
+        err['h'] = np.rad2deg(y[:, DH])
+        err['p'] = np.rad2deg(y[:, DP])
+        err['r'] = np.rad2deg(y[:, DR])
 
-        self.traj_sd = pd.DataFrame(index=output_stamps)
-        self.traj_sd['lat'] = sd[:, DRN]
-        self.traj_sd['lon'] = sd[:, DRE]
-        self.traj_sd['VE'] = sd[:, DVE]
-        self.traj_sd['VN'] = sd[:, DVN]
-        self.traj_sd['h'] = np.rad2deg(sd[:, DH])
-        self.traj_sd['p'] = np.rad2deg(sd[:, DP])
-        self.traj_sd['r'] = np.rad2deg(sd[:, DR])
+        sd = pd.DataFrame(index=output_stamps)
+        sd['lat'] = sd_y[:, DRN]
+        sd['lon'] = sd_y[:, DRE]
+        sd['VE'] = sd_y[:, DVE]
+        sd['VN'] = sd_y[:, DVN]
+        sd['h'] = np.rad2deg(sd_y[:, DH])
+        sd['p'] = np.rad2deg(sd_y[:, DP])
+        sd['r'] = np.rad2deg(sd_y[:, DR])
 
-        self.gyro_err = pd.DataFrame(index=output_stamps)
-        self.gyro_sd = pd.DataFrame(index=output_stamps)
+        gyro_err = pd.DataFrame(index=output_stamps)
+        gyro_sd = pd.DataFrame(index=output_stamps)
         n = N_BASE_STATES
         for i, name in enumerate(self.gyro_model.states):
-            self.gyro_err[name] = x[:, n + i]
-            self.gyro_sd[name] = P[:, n + i, n + i] ** 0.5
+            gyro_err[name] = x[:, n + i]
+            gyro_sd[name] = P[:, n + i, n + i] ** 0.5
 
-        self.accel_err = pd.DataFrame(index=output_stamps)
-        self.accel_sd = pd.DataFrame(index=output_stamps)
+        accel_err = pd.DataFrame(index=output_stamps)
+        accel_sd = pd.DataFrame(index=output_stamps)
         ng = self.gyro_model.n_states
         for i, name in enumerate(self.accel_model.states):
-            self.accel_err[name] = x[:, n + ng + i]
-            self.accel_sd[name] = P[:, n + ng + i, n + ng + i] ** 0.5
+            accel_err[name] = x[:, n + ng + i]
+            accel_sd[name] = P[:, n + ng + i, n + ng + i] ** 0.5
+
+        return err, sd, gyro_err, gyro_sd, accel_err, accel_sd
 
     def _forward_pass(self, traj, observations, gain_factor, stamps,
                       record_stamps, data_for_backward=False):
@@ -985,21 +973,36 @@ class FeedforwardFilter:
 
         Returns
         -------
-        traj_corr : DataFrame
-            Trajectory corrected by estimated errors. It will only contain
-            stamps presented in `record_stamps`.
+        Bunch object with the fields listed below. Note that all data frames
+        contain stamps only presented in `record_stamps`.
+        traj : DataFrame
+            Trajectory corrected by estimated errors.
+        err, sd : DataFrame
+            Estimated trajectory errors and their standard deviations.
+        gyro_err, gyro_sd : DataFrame
+            Estimated gyro error and their standard deviations.
+        accel_err, accel_sd : DataFrame
+            Estimated accelerometer errors and their standard deviations.
+        x : ndarray, shape (n_points, n_states)
+            History of the filter states.
+        P : ndarray, shape (n_points, n_states, n_states)
+            History of the filter covariance.
         """
         traj, observations, stamps, record_stamps, _ = \
             self._validate_parameters(traj, observations, gain_factor,
                                       max_step, record_stamps)
 
-        self.x, self.P, _, _, _ = self._forward_pass(
+        x, P, _, _, _ = self._forward_pass(
             traj, observations, gain_factor, stamps, record_stamps)
 
-        self._compute_output_errors(self.traj_ref, self.x, self.P,
-                                    record_stamps)
+        err, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
+            self._compute_output_errors(self.traj_ref, x, P, record_stamps)
 
-        return correct_traj(traj, self.traj_err)
+        traj_corr = correct_traj(traj, err)
+
+        return FiltResult(traj=traj_corr, err=err, sd=sd, gyro_err=gyro_err,
+                          gyro_sd=gyro_sd, accel_err=accel_err,
+                          accel_sd=accel_sd)
 
     def run_smoother(self, traj=None, observations=[], gain_factor=None,
                      max_step=1, record_stamps=None):
@@ -1032,9 +1035,21 @@ class FeedforwardFilter:
 
         Returns
         -------
-        traj_corr : DataFrame
+        Bunch object with the fields listed below. Note that all data frames
+        contain stamps only presented in `record_stamps`.
+        traj : DataFrame
             Trajectory corrected by estimated errors. It will only contain
             stamps presented in `record_stamps`.
+        err, sd : DataFrame
+            Estimated trajectory errors and their standard deviations.
+        gyro_err, gyro_sd : DataFrame
+            Estimated gyro error and their standard deviations.
+        accel_err, accel_sd : DataFrame
+            Estimated accelerometer errors and their standard deviations.
+        x : ndarray, shape (n_points, n_states)
+            History of the filter states.
+        P : ndarray, shape (n_points, n_states, n_states)
+            History of the filter covariance.
 
         References
         ----------
@@ -1053,9 +1068,9 @@ class FeedforwardFilter:
         I = np.identity(self.n_states)
         for i in reversed(range(x.shape[0] - 1)):
             L = cholesky(Pa[i + 1], check_finite=False)
-            PaI = cho_solve((L, False), I, check_finite=False)
+            Pa_inv = cho_solve((L, False), I, check_finite=False)
 
-            C = P[i].dot(Phi_arr[i].T).dot(PaI)
+            C = P[i].dot(Phi_arr[i].T).dot(Pa_inv)
 
             x[i] += C.dot(x[i + 1] - xa[i + 1])
             P[i] += C.dot(P[i + 1] - Pa[i + 1]).dot(C.T)
@@ -1064,13 +1079,14 @@ class FeedforwardFilter:
         x = x[ind]
         P = P[ind]
 
-        self.x = x
-        self.P = P
+        err, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
+            self._compute_output_errors(self.traj_ref, x, P, record_stamps)
 
-        self._compute_output_errors(self.traj_ref, self.x, self.P,
-                                    record_stamps)
+        traj_corr = correct_traj(traj, err)
 
-        return correct_traj(traj, self.traj_err)
+        return FiltResult(traj=traj_corr, err=err, sd=sd, gyro_err=gyro_err,
+                          gyro_sd=gyro_sd, accel_err=accel_err,
+                          accel_sd=accel_sd)
 
 
 class FeedbackFilter:
@@ -1100,16 +1116,6 @@ class FeedbackFilter:
         Number of noise sources.
     states : OrderedDict
         Dictionary mapping state names to their indices.
-    x : ndarray, shape (n_points, n_states)
-        Computed states of the filter.
-    P : ndarray, shape (n_points, n_states, n_states)
-        Computed covariance matrices of the filter.
-    traj_err, traj_sd : DataFrame
-        Estimated trajectory errors and their standard deviations.
-    gyro_err, gyro_sd : DataFrame
-        Estimated gyro error and their standard deviations.
-    accel_err, accel_sd : DataFrame
-        Estimated accelerometer errors and their standard deviations.
     """
     def __init__(self, dt, pos_sd, vel_sd, azimuth_sd, level_sd,
                  gyro_model=None, accel_model=None):
@@ -1155,8 +1161,6 @@ class FeedbackFilter:
         q[s + s1: s + s1 + s2] = accel_model.q
 
         self.q = q
-        self.x = None
-        self.P = None
 
         states = OrderedDict((
             ('DR1', DR1),
@@ -1176,13 +1180,6 @@ class FeedbackFilter:
         self.n_states = n_states
         self.n_noises = n_noises
         self.states = states
-        self.traj_err = None
-        self.traj_sd = None
-
-        self.gyro_err = None
-        self.gyro_sd = None
-        self.accel_err = None
-        self.accel_sd = None
 
         self.gyro_model = gyro_model
         self.accel_model = accel_model
@@ -1220,9 +1217,21 @@ class FeedbackFilter:
 
         Returns
         -------
-        traj_corr : DataFrame
+        Bunch object with the fields listed below. Note that all data frames
+        contain stamps only presented in `record_stamps`.
+        traj : DataFrame
             Trajectory corrected by estimated errors. It will only contain
             stamps presented in `record_stamps`.
+        err, sd : DataFrame
+            Estimated trajectory errors and their standard deviations.
+        gyro_err, gyro_sd : DataFrame
+            Estimated gyro error and their standard deviations.
+        accel_err, accel_sd : DataFrame
+            Estimated accelerometer errors and their standard deviations.
+        x : ndarray, shape (n_points, n_states)
+            History of the filter states.
+        P : ndarray, shape (n_points, n_states, n_states)
+            History of the filter covariance.
         """
         if gain_factor is not None:
             gain_factor = np.asarray(gain_factor)
@@ -1405,49 +1414,50 @@ class FeedbackFilter:
         if record_stamps[i_save] == stamps[i_stamp]:
             x[i_save] = xc
             P[i_save] = Pc
-
-        self.x = x
-        self.P = P
-
+    
         T = _errors_transform_matrix(integrator.traj.loc[record_stamps])
         y = util.mv_prod(T, x[:, :N_BASE_STATES])
         Py = util.mm_prod(T, P[:, :N_BASE_STATES, :N_BASE_STATES])
         Py = util.mm_prod(Py, T, bt=True)
-        sd = np.diagonal(Py, axis1=1, axis2=2) ** 0.5
+        sd_y = np.diagonal(Py, axis1=1, axis2=2) ** 0.5
 
-        self.traj_err = pd.DataFrame(index=record_stamps)
-        self.traj_err['lat'] = y[:, DRN]
-        self.traj_err['lon'] = y[:, DRE]
-        self.traj_err['VE'] = y[:, DVE]
-        self.traj_err['VN'] = y[:, DVN]
-        self.traj_err['h'] = np.rad2deg(y[:, DH])
-        self.traj_err['p'] = np.rad2deg(y[:, DP])
-        self.traj_err['r'] = np.rad2deg(y[:, DR])
+        err = pd.DataFrame(index=record_stamps)
+        err['lat'] = y[:, DRN]
+        err['lon'] = y[:, DRE]
+        err['VE'] = y[:, DVE]
+        err['VN'] = y[:, DVN]
+        err['h'] = np.rad2deg(y[:, DH])
+        err['p'] = np.rad2deg(y[:, DP])
+        err['r'] = np.rad2deg(y[:, DR])
 
-        self.traj_sd = pd.DataFrame(index=record_stamps)
-        self.traj_sd['lat'] = sd[:, DRN]
-        self.traj_sd['lon'] = sd[:, DRE]
-        self.traj_sd['VE'] = sd[:, DVE]
-        self.traj_sd['VN'] = sd[:, DVN]
-        self.traj_sd['h'] = np.rad2deg(sd[:, DH])
-        self.traj_sd['p'] = np.rad2deg(sd[:, DP])
-        self.traj_sd['r'] = np.rad2deg(sd[:, DR])
+        sd = pd.DataFrame(index=record_stamps)
+        sd['lat'] = sd_y[:, DRN]
+        sd['lon'] = sd_y[:, DRE]
+        sd['VE'] = sd_y[:, DVE]
+        sd['VN'] = sd_y[:, DVN]
+        sd['h'] = np.rad2deg(sd_y[:, DH])
+        sd['p'] = np.rad2deg(sd_y[:, DP])
+        sd['r'] = np.rad2deg(sd_y[:, DR])
 
-        self.gyro_err = pd.DataFrame(index=record_stamps)
-        self.gyro_sd = pd.DataFrame(index=record_stamps)
+        gyro_err = pd.DataFrame(index=record_stamps)
+        gyro_sd = pd.DataFrame(index=record_stamps)
         n = N_BASE_STATES
         for i, name in enumerate(self.gyro_model.states):
-            self.gyro_err[name] = x[:, n + i]
-            self.gyro_sd[name] = P[:, n + i, n + i] ** 0.5
+            gyro_err[name] = x[:, n + i]
+            gyro_sd[name] = P[:, n + i, n + i] ** 0.5
 
-        self.accel_err = pd.DataFrame(index=record_stamps)
-        self.accel_sd = pd.DataFrame(index=record_stamps)
+        accel_err = pd.DataFrame(index=record_stamps)
+        accel_sd = pd.DataFrame(index=record_stamps)
         ng = self.gyro_model.n_states
         for i, name in enumerate(self.accel_model.states):
-            self.accel_err[name] = x[:, n + ng + i]
-            self.accel_sd[name] = P[:, n + ng + i, n + ng + i] ** 0.5
+            accel_err[name] = x[:, n + ng + i]
+            accel_sd[name] = P[:, n + ng + i, n + ng + i] ** 0.5
 
-        return correct_traj(integrator.traj, self.traj_err)
+        traj_corr = correct_traj(integrator.traj, err)
+
+        return FiltResult(traj=traj_corr, err=err, sd=sd, gyro_err=gyro_err,
+                          gyro_sd=gyro_sd, accel_err=accel_err,
+                          accel_sd=accel_sd)
 
 
 def traj_diff(t1, t2):
