@@ -14,15 +14,15 @@ def align_wahba(dt, theta, dv, lat, VE=None, VN=None):
     cosine matrix A (originally formulated in [1]_)::
 
         L = sum(||A r_i - b_i||^2, i=1, ..., m) -> min A,
-        s. t. A being right orthogonal matrix.
+        s. t. A being a right orthogonal matrix.
 
     Here ``(r_i, b_i)`` are measurements of the same unit vectors in two
     frames.
 
     The application of this method to self alignment of INS is explained in
-    [2]_. In this case the vectors ``(r_i, b_i)`` are normalized velocity
+    [2]_. In this problem the vectors ``(r_i, b_i)`` are normalized velocity
     increments due to gravity. It is applicable to dynamic conditions as well,
-    but in this case a full accuracy will be achieved only if velocity is
+    but in this case a full accuracy can be achieved only if velocity is
     provided.
 
     The optimization problem is solved using the most straightforward method
@@ -31,7 +31,7 @@ def align_wahba(dt, theta, dv, lat, VE=None, VN=None):
     Parameters
     ----------
     dt : double
-        Sensor sampling period.
+        Sensors sampling period.
     theta, dv : array_like, shape (n_samples, 3)
         Rotation vectors and velocity increments computed from gyro and
         accelerometer readings after applying coning and sculling
