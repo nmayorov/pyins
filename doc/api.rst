@@ -15,10 +15,10 @@ Direction Cosine Matrices
 
     dcm.from_rv
     dcm.to_rv
-    dcm.to_hpr
     dcm.from_hpr
-    dcm.to_llw
+    dcm.to_hpr
     dcm.from_llw
+    dcm.to_llw
 
 
 Earth Surface and Gravity Models

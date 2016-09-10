@@ -64,8 +64,8 @@ def _from_rotvec_array(rv):
 def from_rv(rv):
     """Create a direction cosine matrix from a rotation vector.
 
-    The direction of a rotation vector gives the axis of rotation and its
-    magnitude gives the angle of rotation.
+    The direction of a rotation vector determines the axis of rotation and its
+    magnitude determines the angle of rotation.
 
     The returned DCM projects a vector from the rotated frame to the original
     frame.
@@ -251,7 +251,7 @@ def from_hpr(h, p, r):
 
     Parameters
     ----------
-    h, p, r : array_like, shape (3,) or (n, 3)
+    h, p, r : float or array_like with shape (n,)
         Heading, pitch and roll.
 
     Returns
@@ -342,11 +342,11 @@ def to_hpr(dcm):
     Parameters
     ----------
     dcm : array_like, shape (3, 3) or (n, 3, 3)
-        Direction dosine matrices.
+        Direction cosine matrices.
 
     Returns
     -------
-    h, p, r : ndarray with shape (n,) or float
+    h, p, r : float or ndarray with shape (n,)
         Heading, pitch and roll.
     """
     dcm = np.asarray(dcm)
@@ -378,14 +378,14 @@ def from_llw(lat, lon, wan=0):
 
     Parameters
     ----------
-    lat, lon : array_like
+    lat, lon : float or array_like with shape (n,)
         Latitude and longitude.
-    wan : array_like, optional
+    wan : float or array_like with shape (n,), optional
         Wander angle. Default is 0.
 
     Returns
     -------
-    dcm : ndarray, shape (3,) or (n, 3)
+    dcm : ndarray, shape (3, 3) or (n, 3, 3)
         Direction Cosine Matrices.
     """
     lat = np.deg2rad(lat)
@@ -458,7 +458,7 @@ def _to_llw_array(dcm):
 def to_llw(dcm):
     """Convert a direction cosine matrix to latitude, longitude and wander.
 
-    The latitude is withing [-90, 90], the longitude and the wander are
+    The latitude is within [-90, 90], the longitude and the wander are
     within [-180, 180].
 
     If ``90 - abs(latitude) < np.rad2deg(1e-3)`` then the longitude is set to
@@ -471,7 +471,7 @@ def to_llw(dcm):
 
     Returns
     -------
-    lat, lon, wan : ndarray with shape (n,) or float
+    lat, lon, wan : float or ndarray with shape (n,)
         Latitude, longitude and wander. Note that `wan` is always returned
         even though it can be known to be equal 0.
     """
