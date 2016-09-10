@@ -7,7 +7,7 @@ from ._integrate import integrate_fast
 
 
 def coning_sculling(gyro, accel):
-    """Apply coning and sculling compensations to inertial readings.
+    """Apply coning and sculling corrections to inertial readings.
 
     Currently the two simplest methods described in [1]_ and [2]_ are
     implemented. The accelerometer readings are also corrected for body frame
@@ -58,7 +58,7 @@ def integrate(dt, lat, lon, VE, VN, h, p, r, theta, dv, stamp=0):
     Parameters
     ----------
     dt : float
-        Sampling period.
+        Sensors sampling period.
     lat, lon : float
         Initial latitude and longitude.
     VE, VN : float
@@ -79,7 +79,7 @@ def integrate(dt, lat, lon, VE, VN, h, p, r, theta, dv, stamp=0):
 
     See Also
     --------
-    coning_sculling : Apply coning and sculling compensations.
+    coning_sculling : Apply coning and sculling corrections.
 
     References
     ----------
@@ -137,7 +137,7 @@ class Integrator:
     Parameters
     ----------
     dt : float
-        Sampling period.
+        Sensors sampling period.
     lat, lon : float
         Initial latitude and longitude.
     VE, VN : float
@@ -154,7 +154,7 @@ class Integrator:
 
     See Also
     --------
-    coning_sculling : Apply coning and sculling compensations.
+    coning_sculling : Apply coning and sculling corrections.
 
     References
     ----------
