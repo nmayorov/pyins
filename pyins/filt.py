@@ -1439,8 +1439,8 @@ class FeedbackFilter:
         traj : DataFrame
             Trajectory corrected by estimated errors. It will only contain
             stamps presented in `record_stamps`.
-        err, sd : DataFrame
-            Estimated trajectory errors and their standard deviations.
+        sd : DataFrame
+            Estimated standard deviations of trajectory errors.
         gyro_err, gyro_sd : DataFrame
             Estimated gyro error and their standard deviations.
         accel_err, accel_sd : DataFrame
@@ -1452,6 +1452,12 @@ class FeedbackFilter:
         residuals : list of DataFrame
             Each element is DataFrame with index being measurement time stamps
             and columns containing normalized measurement residuals.
+
+        Notes
+        -----
+        Estimated trajectory errors are not returned because they are splitted
+        among INS and Kalman filter states during computations and are not
+        useful for interpretation.
         """
         theta, dv, observations, stamps, record_stamps, gain_factor = \
             self._validate_parameters(integrator, theta, dv, observations,
@@ -1470,7 +1476,7 @@ class FeedbackFilter:
 
         traj_corr = correct_traj(integrator.traj, err)
 
-        return FiltResult(traj=traj_corr, err=err, sd=sd, gyro_err=gyro_err,
+        return FiltResult(traj=traj_corr, sd=sd, gyro_err=gyro_err,
                           gyro_sd=gyro_sd, accel_err=accel_err,
                           accel_sd=accel_sd, residuals=residuals)
 
@@ -1516,7 +1522,7 @@ class FeedbackFilter:
         traj : DataFrame
             Trajectory corrected by estimated errors. It will only contain
             stamps presented in `record_stamps`.
-        err, sd : DataFrame
+        sd : DataFrame
             Estimated trajectory errors and their standard deviations.
         gyro_err, gyro_sd : DataFrame
             Estimated gyro error and their standard deviations.
@@ -1529,6 +1535,12 @@ class FeedbackFilter:
         residuals : list of DataFrame
             Each element is DataFrame with index being measurement time stamps
             and columns containing normalized measurement residuals.
+
+        Notes
+        -----
+        Estimated trajectory errors are not returned because they are splitted
+        among INS and Kalman filter states during computations and are not
+        useful for interpretation.
         """
         theta, dv, observations, stamps, record_stamps, gain_factor = \
             self._validate_parameters(integrator, theta, dv, observations,
