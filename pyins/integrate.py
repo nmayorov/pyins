@@ -175,6 +175,14 @@ class Integrator:
         self.VE_arr = np.empty(self.INITIAL_SIZE)
         self.VN_arr = np.empty(self.INITIAL_SIZE)
         self.Cnb_arr = np.empty((self.INITIAL_SIZE, 3, 3))
+        self.traj = None
+
+        self._init_values = [lat, lon, VE, VN, h, p, r, stamp]
+        self.reset()
+
+    def reset(self):
+        """Clear computed trajectory except the initial point."""
+        lat, lon, VE, VN, h, p, r, stamp = self._init_values
 
         self.lat_arr[0] = np.deg2rad(lat)
         self.lon_arr[0] = np.deg2rad(lon)
@@ -190,10 +198,6 @@ class Integrator:
         self.traj['h'] = [h]
         self.traj['p'] = [p]
         self.traj['r'] = [r]
-
-    def reset(self):
-        """Clear computed trajectory except the initial point."""
-        self.traj = self.traj.iloc[:1]
 
     def integrate(self, theta, dv):
         """Integrate inertial readings.
