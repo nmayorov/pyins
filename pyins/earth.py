@@ -29,19 +29,19 @@ def set_model(model='WGS84'):
         1. WGS84 which is used in GPS.
         2. PZ90 which is used in GLONASS.
 
-    All parameters were taken from official datums.
+    All parameters are taken from official datums.
 
     Earth ellipsoid is defined by its major semi axis ``R0`` and the square of
     eccentricity ``E2``.
 
     The vector of gravity is assumed to be orthogonal to the surface of Earth
-    ellipsoid, its magnitude depends on the latitude. The scaling with an
+    ellipsoid, its magnitude depends on a latitude. The scaling with an
     altitude is computed as ``g0 * (1 - 2 * alt / R0)``, where ``g0`` is the
     gravity on the surface and  ``alt`` is the altitude.
 
     The value of ``g0`` depends on a latitude according to Somigliana formula
     [1]_ (p. 70). It is determined by semi major and semi minor axes and
-    values of the gravity at the equator and the pole (which are given in
+    values of the gravity at the equator and the pole (which are given in the
     datums).
 
     Parameters
@@ -76,7 +76,7 @@ def set_model(model='WGS84'):
 def principal_radii(slat):
     """Compute the principal radii of curvature of Earth ellipsoid.
 
-    See [1] (p. 41) for the definition and formulas.
+    See [1]_ (p. 41) for the definition and formulas.
 
     Parameters
     ----------
@@ -96,9 +96,9 @@ def principal_radii(slat):
         1. The radii depend only on the sine of a latitude (namely on its
            square).
         2. The sine of a latitude can be conveniently extracted from a DCM
-           related ECEF and local navigation frame. So this implementation
+           related ECEF and local navigation frames. So this implementation
            is more convenient when coordinates are computed in a DCM (including
-           usage of the wander-azimuth frame), even though it is not currently
+           usage of a wander-azimuth frame), even though it is not currently
            presented in the package.
 
     References
@@ -132,7 +132,7 @@ def gravity(slat, alt=0):
     Returns
     -------
     g : ndarray
-        Value of gravity.
+        Magnitude of the gravity.
 
     Notes
     -----
@@ -142,7 +142,7 @@ def gravity(slat, alt=0):
         1. The gravity depends only on the sine of a latitude (namely on its
            square).
         2. The sine of a latitude can be conveniently extracted from a DCM
-           related ECEF and local navigation frame. So this implementation
+           related ECEF and local navigation frames. So this implementation
            is more convenient for DCM coordinates mechanization (including
            usage of a wander-azimuth frame), even though it is not currently
            presented in the package.
@@ -159,9 +159,9 @@ def gravity(slat, alt=0):
 
 
 def gravitation_ecef(lat, lon, alt=0):
-    """Compute gravitation in ECEF frame.
+    """Compute a vector of the gravitational force in ECEF frame.
 
-    Gravitation accounts only for Earth' mass attraction. It is computed from
+    It accounts only for Earth mass attraction. It is computed from
     `gravity` model by eliminating the centrifugal force.
 
     Parameters
@@ -174,7 +174,7 @@ def gravitation_ecef(lat, lon, alt=0):
     Returns
     -------
     g0_e: ndarray, shape (3,) or (n, 3)
-        Vectors of gravitation expressed in ECEF frame.
+        Vectors of the gravitational force expressed in ECEF frame.
     """
 
     slat, clat = np.sin(np.deg2rad(lat)), np.cos(np.deg2rad(lat))
