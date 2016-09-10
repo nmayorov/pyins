@@ -650,6 +650,21 @@ def _compute_output_errors(traj, x, P, output_stamps,
     return err, sd, gyro_err, gyro_sd, accel_err, accel_sd
 
 
+def _rts_pass(x, P, xa, Pa, Phi):
+    n_points, n_states = x.shape
+    I = np.identity(n_states)
+    for i in reversed(range(n_points - 1)):
+        L = cholesky(Pa[i + 1], check_finite=False)
+        Pa_inv = cho_solve((L, False), I, check_finite=False)
+
+        C = P[i].dot(Phi[i].T).dot(Pa_inv)
+
+        x[i] += C.dot(x[i + 1] - xa[i + 1])
+        P[i] += C.dot(P[i + 1] - Pa[i + 1]).dot(C.T)
+
+    return x, P
+
+
 class FeedforwardFilter:
     """INS Kalman filter in a feedforward form.
 
@@ -1050,15 +1065,7 @@ class FeedforwardFilter:
             traj, observations, gain_factor, stamps, record_stamps,
             data_for_backward=True)
 
-        I = np.identity(self.n_states)
-        for i in reversed(range(x.shape[0] - 1)):
-            L = cholesky(Pa[i + 1], check_finite=False)
-            Pa_inv = cho_solve((L, False), I, check_finite=False)
-
-            C = P[i].dot(Phi_arr[i].T).dot(Pa_inv)
-
-            x[i] += C.dot(x[i + 1] - xa[i + 1])
-            P[i] += C.dot(P[i + 1] - Pa[i + 1]).dot(C.T)
+        x, P = _rts_pass(x, P, xa, Pa, Phi_arr)
 
         ind = np.searchsorted(stamps, record_stamps)
         x = x[ind]
@@ -1372,7 +1379,7 @@ class FeedbackFilter:
                 Pc = Phi.dot(Pc).dot(Phi.T) + Qd
 
                 if data_for_backward:
-                    Phi_arr[i_save] = Phi
+                    Phi_arr[i_save - 1] = Phi
 
                 i = i_next
                 i_stamp += 1
@@ -1393,7 +1400,7 @@ class FeedbackFilter:
         for s, r in zip(obs_stamps, obs_residuals):
             residuals.append(pd.DataFrame(index=s, data=np.asarray(r)))
 
-        return x, P, xa, Pa, residuals
+        return x, P, xa, Pa, Phi_arr, residuals
 
     def run(self, integrator, theta, dv, observations=[], gain_factor=None,
             max_step=1, feedback_period=500, record_stamps=None):
@@ -1451,19 +1458,111 @@ class FeedbackFilter:
                                       gain_factor, max_step, record_stamps,
                                       feedback_period)
 
-        x, P, xa, Pa, residuals = \
+        x, P, _, _, _, residuals = \
             self._forward_pass(integrator, theta, dv, observations,
                                gain_factor, stamps, record_stamps,
                                feedback_period)
 
+        traj = integrator.traj.loc[record_stamps]
         err, sd, accel_err, accel_sd, gyro_err, gyro_sd = \
-            _compute_output_errors(integrator.traj.loc[record_stamps],
-                                   x, P, record_stamps, self.gyro_model,
+            _compute_output_errors(traj, x, P, record_stamps, self.gyro_model,
                                    self.accel_model)
 
         traj_corr = correct_traj(integrator.traj, err)
 
         return FiltResult(traj=traj_corr, err=err, sd=sd, gyro_err=gyro_err,
+                          gyro_sd=gyro_sd, accel_err=accel_err,
+                          accel_sd=accel_sd, residuals=residuals)
+
+    def run_smoother(self, integrator, theta, dv, observations=[],
+                     gain_factor=None, max_step=1, feedback_period=500,
+                     record_stamps=None):
+        """Run the smoother.
+
+        It means that observations during the whole time is used to estimate
+        the errors at each moment of time (i.e. it is not real time). The
+        Rauch-Tung-Striebel two pass recursion is used [1]_.
+
+        Parameters
+        ----------
+        integrator : `pyins.integrate.Integrator` instance
+            Integrator to use for INS state propagation.
+        theta, dv : ndarray, shape (n_readings, 3)
+            Rotation vectors and velocity increments computed from gyro and
+            accelerometer readings after applying coning and sculling
+            corrections.
+        observations : list of `Observation`
+            Measurements which will be processed. Empty by default.
+        gain_factor : array_like with shape (n_states,) or None, optional
+            Factor for Kalman gain for each filter's state. It might be
+            beneficial in some practical situations to set factors less than 1
+            in order to decrease influence of measurements on some states.
+            Setting values higher than 1 is unlikely to be reasonable. If None
+            (default), use standard optimal Kalman gain.
+        max_step : float, optional
+            Maximum allowed time step. Default is 1 second. Set to 0 if you
+            desire the smallest possible step.
+        feedback_period : float
+            Time after which INS state will be corrected by the estimated
+            errors. Default is 500 seconds.
+        record_stamps : array_like or None
+            At which stamps record estimated errors. If None (default), errors
+            will be saved at each stamp used internally in the filter.
+
+        Returns
+        -------
+        Bunch object with the fields listed below. Note that all data frames
+        contain stamps only presented in `record_stamps`.
+        traj : DataFrame
+            Trajectory corrected by estimated errors. It will only contain
+            stamps presented in `record_stamps`.
+        err, sd : DataFrame
+            Estimated trajectory errors and their standard deviations.
+        gyro_err, gyro_sd : DataFrame
+            Estimated gyro error and their standard deviations.
+        accel_err, accel_sd : DataFrame
+            Estimated accelerometer errors and their standard deviations.
+        x : ndarray, shape (n_points, n_states)
+            History of the filter states.
+        P : ndarray, shape (n_points, n_states, n_states)
+            History of the filter covariance.
+        residuals : list of DataFrame
+            Each element is DataFrame with index being measurement time stamps
+            and columns containing normalized measurement residuals.
+        """
+        theta, dv, observations, stamps, record_stamps, gain_factor = \
+            self._validate_parameters(integrator, theta, dv, observations,
+                                      gain_factor, max_step, record_stamps,
+                                      feedback_period)
+
+        x, P, xa, Pa, Phi_arr, residuals = \
+            self._forward_pass(integrator, theta, dv, observations,
+                               gain_factor, stamps, record_stamps,
+                               feedback_period, data_for_backward=True)
+
+        traj = integrator.traj.loc[record_stamps]
+        err, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
+            _compute_output_errors(traj, x, P, record_stamps,
+                                   self.gyro_model, self.accel_model)
+
+        traj = correct_traj(traj, err)
+        xa[:, :N_BASE_STATES] -= x[:, :N_BASE_STATES]
+        x[:, :N_BASE_STATES] = 0
+
+        x, P = _rts_pass(x, P, xa, Pa, Phi_arr)
+
+        ind = np.searchsorted(stamps, record_stamps)
+        x = x[ind]
+        P = P[ind]
+        traj = traj.iloc[ind]
+
+        err, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
+            _compute_output_errors(traj, x, P, record_stamps[ind],
+                                   self.gyro_model, self.accel_model)
+
+        traj = correct_traj(traj, err)
+
+        return FiltResult(traj=traj, sd=sd, gyro_err=gyro_err,
                           gyro_sd=gyro_sd, accel_err=accel_err,
                           accel_sd=accel_sd, residuals=residuals)
 

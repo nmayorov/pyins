@@ -386,6 +386,17 @@ def test_FeedbackFilter():
     assert_allclose(error.r, 0, rtol=0, atol=1e-4)
     assert_(np.all(np.abs(res.residuals[0] < 4)))
 
+    res = f.run_smoother(integrator, theta, dv, [obs])
+    error = traj_diff(res.traj, traj)
+    assert_allclose(error.lat, 0, rtol=0, atol=10)
+    assert_allclose(error.lon, 0, rtol=0, atol=10)
+    assert_allclose(error.VE, 0, rtol=0, atol=1e-2)
+    assert_allclose(error.VN, 0, rtol=0, atol=1e-2)
+    assert_allclose(error.h, 0, rtol=0, atol=1.5e-3)
+    assert_allclose(error.p, 0, rtol=0, atol=1e-4)
+    assert_allclose(error.r, 0, rtol=0, atol=1e-4)
+    assert_(np.all(np.abs(res.residuals[0] < 4)))
+
 
 if __name__ == '__main__':
     run_module_suite()
