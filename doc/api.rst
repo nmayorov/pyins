@@ -45,7 +45,7 @@ Earth Surface and Gravity Models
     earth.gravitation_ecef
 
 
-Coordinates Transformation
+Coordinate Transformations
 --------------------------
 
 .. automodule:: pyins.coord

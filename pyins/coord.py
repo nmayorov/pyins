@@ -30,14 +30,15 @@ def lla_to_ecef(lat, lon, alt=0):
     r_e[1] = (re + alt) * clat * slon
     r_e[2] = ((1 - earth.E2) * re + alt) * slat
     r_e = r_e.T
+
     return r_e
 
 
 def perturb_ll(lat, lon, d_lat, d_lon):
     """Perturb latitude and longitude.
 
-    This function recomputes linear displacement in meters to changes in a
-    latitude and a longitude considering the curvature radius of Earth.
+    This function recomputes linear displacements in meters to changes in a
+    latitude and longitude considering Earth curvature.
 
     Note that this computation is approximate in nature and makes a good
     sense only if displacements are significantly less than Earth radius.
@@ -47,13 +48,14 @@ def perturb_ll(lat, lon, d_lat, d_lon):
     lat, lon : array_like
         Latitude and longitude.
     d_lat, d_lon : array_like
-        Adjustment to `lat` and `lon` respectively in *meters*. It is assumed
-        that `d_lat` and `d_lon` are significantly less than Earth radius.
+        Perturbations to `lat` and `lon` respectively in *meters*. It is
+        assumed that `d_lat` and `d_lon` are significantly less than Earth
+        radius.
 
     Returns
     -------
     lat_new, lon_new
-        Perturbed latitude and longitude.
+        Perturbed values of latitude and longitude.
     """
     slat = np.sin(np.deg2rad(lat))
     clat = (1 - slat**2) ** 0.5
