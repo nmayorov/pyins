@@ -983,6 +983,11 @@ class FeedforwardFilter:
             History of the filter states.
         P : ndarray, shape (n_points, n_states, n_states)
             History of the filter covariance.
+        residuals : list of DataFrame
+            Each DataFrame corresponds to an observation from `observations`.
+            Its index is observation time stamps and columns contain normalized
+            observations residuals for each component of the observation
+            vector `z`.
         """
         traj, observations, stamps, record_stamps, gain_factor = \
             self._validate_parameters(traj, observations, gain_factor,
@@ -1047,6 +1052,11 @@ class FeedforwardFilter:
             History of the filter states.
         P : ndarray, shape (n_points, n_states, n_states)
             History of the filter covariance.
+        residuals : list of DataFrame
+            Each DataFrame corresponds to an observation from `observations`.
+            Its index is observation time stamps and columns contain normalized
+            observations residuals for each component of the observation
+            vector `z`.
 
         References
         ----------
@@ -1446,8 +1456,10 @@ class FeedbackFilter:
         P : ndarray, shape (n_points, n_states, n_states)
             History of the filter covariance.
         residuals : list of DataFrame
-            Each element is DataFrame with index being measurement time stamps
-            and columns containing normalized measurement residuals.
+            Each DataFrame corresponds to an observation from `observations`.
+            Its index is observation time stamps and columns contain normalized
+            observations residuals for each component of the observation
+            vector `z`.
 
         Notes
         -----
@@ -1528,8 +1540,10 @@ class FeedbackFilter:
         P : ndarray, shape (n_points, n_states, n_states)
             History of the filter covariance.
         residuals : list of DataFrame
-            Each element is DataFrame with index being measurement time stamps
-            and columns containing normalized measurement residuals.
+            Each DataFrame corresponds to an observation from `observations`.
+            Its index is observation time stamps and columns contain normalized
+            observations residuals for each component of the observation
+            vector `z`.
 
         Notes
         -----
