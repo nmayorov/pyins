@@ -206,9 +206,6 @@ class Observation:
     model. All you need to do is to implement `compute_obs` function. See Also
     section contains links to already implemented models.
 
-    Other methods are generally of no interest for a user, they are called by
-    other classes.
-
     Parameters
     ----------
     data : DataFrame
@@ -979,9 +976,9 @@ class FeedforwardFilter:
         err, sd : DataFrame
             Estimated trajectory errors and their standard deviations.
         gyro_err, gyro_sd : DataFrame
-            Estimated gyro error and their standard deviations.
+            Estimated gyro error states and their standard deviations.
         accel_err, accel_sd : DataFrame
-            Estimated accelerometer errors and their standard deviations.
+            Estimated accelerometer error states and their standard deviations.
         x : ndarray, shape (n_points, n_states)
             History of the filter states.
         P : ndarray, shape (n_points, n_states, n_states)
@@ -1043,9 +1040,9 @@ class FeedforwardFilter:
         err, sd : DataFrame
             Estimated trajectory errors and their standard deviations.
         gyro_err, gyro_sd : DataFrame
-            Estimated gyro error and their standard deviations.
+            Estimated gyro error states and their standard deviations.
         accel_err, accel_sd : DataFrame
-            Estimated accelerometer errors and their standard deviations.
+            Estimated accelerometer error states and their standard deviations.
         x : ndarray, shape (n_points, n_states)
             History of the filter states.
         P : ndarray, shape (n_points, n_states, n_states)
@@ -1409,7 +1406,8 @@ class FeedbackFilter:
         Parameters
         ----------
         integrator : `pyins.integrate.Integrator` instance
-            Integrator to use for INS state propagation.
+            Integrator to use for INS state propagation. It will be reset
+            before the filter start.
         theta, dv : ndarray, shape (n_readings, 3)
             Rotation vectors and velocity increments computed from gyro and
             accelerometer readings after applying coning and sculling
@@ -1442,9 +1440,9 @@ class FeedbackFilter:
         sd : DataFrame
             Estimated standard deviations of trajectory errors.
         gyro_err, gyro_sd : DataFrame
-            Estimated gyro error and their standard deviations.
+            Estimated gyro error states and their standard deviations.
         accel_err, accel_sd : DataFrame
-            Estimated accelerometer errors and their standard deviations.
+            Estimated accelerometer error states and their standard deviations.
         x : ndarray, shape (n_points, n_states)
             History of the filter states.
         P : ndarray, shape (n_points, n_states, n_states)
@@ -1492,7 +1490,8 @@ class FeedbackFilter:
         Parameters
         ----------
         integrator : `pyins.integrate.Integrator` instance
-            Integrator to use for INS state propagation.
+            Integrator to use for INS state propagation. It will be reset
+            before the filter start.
         theta, dv : ndarray, shape (n_readings, 3)
             Rotation vectors and velocity increments computed from gyro and
             accelerometer readings after applying coning and sculling
@@ -1525,9 +1524,9 @@ class FeedbackFilter:
         sd : DataFrame
             Estimated trajectory errors and their standard deviations.
         gyro_err, gyro_sd : DataFrame
-            Estimated gyro error and their standard deviations.
+            Estimated gyro error states and their standard deviations.
         accel_err, accel_sd : DataFrame
-            Estimated accelerometer errors and their standard deviations.
+            Estimated accelerometer error states and their standard deviations.
         x : ndarray, shape (n_points, n_states)
             History of the filter states.
         P : ndarray, shape (n_points, n_states, n_states)
