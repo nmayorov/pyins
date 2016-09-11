@@ -1443,8 +1443,6 @@ class FeedbackFilter:
             Estimated gyro error states and their standard deviations.
         accel_err, accel_sd : DataFrame
             Estimated accelerometer error states and their standard deviations.
-        x : ndarray, shape (n_points, n_states)
-            History of the filter states.
         P : ndarray, shape (n_points, n_states, n_states)
             History of the filter covariance.
         residuals : list of DataFrame
@@ -1453,9 +1451,9 @@ class FeedbackFilter:
 
         Notes
         -----
-        Estimated trajectory errors are not returned because they are splitted
-        among INS and Kalman filter states during computations and are not
-        useful for interpretation.
+        Estimated trajectory errors and a history of the filter states are not
+        returned because they are computed relative to partially corrected
+        trajectory and are not useful for interpretation.
         """
         theta, dv, observations, stamps, record_stamps, gain_factor = \
             self._validate_parameters(integrator, theta, dv, observations,
@@ -1527,8 +1525,6 @@ class FeedbackFilter:
             Estimated gyro error states and their standard deviations.
         accel_err, accel_sd : DataFrame
             Estimated accelerometer error states and their standard deviations.
-        x : ndarray, shape (n_points, n_states)
-            History of the filter states.
         P : ndarray, shape (n_points, n_states, n_states)
             History of the filter covariance.
         residuals : list of DataFrame
@@ -1537,9 +1533,9 @@ class FeedbackFilter:
 
         Notes
         -----
-        Estimated trajectory errors are not returned because they are splitted
-        among INS and Kalman filter states during computations and are not
-        useful for interpretation.
+        Estimated trajectory errors and a history of the filter states are not
+        returned because they are computed relative to partially corrected
+        trajectory and are not useful for interpretation.
         """
         theta, dv, observations, stamps, record_stamps, gain_factor = \
             self._validate_parameters(integrator, theta, dv, observations,
