@@ -73,7 +73,7 @@ INS Self Alignment
 .. autosummary::
     :toctree: generated/
 
-        align.align_wahba
+    align.align_wahba
 
 
 
@@ -112,10 +112,12 @@ Navigation Kalman Filters
     filt.VeVnObs
     filt.FeedforwardFilter
     filt.FeedbackFilter
+    filt.traj_diff
+    filt.correct_traj
 
 
 Strapdown Sensors Simulator
-------------------------
+---------------------------
 
 .. automodule:: pyins.sim
     :no-members:
