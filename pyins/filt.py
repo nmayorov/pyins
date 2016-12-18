@@ -1014,7 +1014,7 @@ class FeedforwardFilter:
 
         return FiltResult(traj=traj_corr, err=err, sd=sd, gyro_err=gyro_err,
                           gyro_sd=gyro_sd, accel_err=accel_err,
-                          accel_sd=accel_sd, residuals=residuals)
+                          accel_sd=accel_sd, x=x, P=P, residuals=residuals)
 
     def run_smoother(self, traj=None, observations=[], gain_factor=None,
                      max_step=1, record_stamps=None):
@@ -1096,7 +1096,7 @@ class FeedforwardFilter:
 
         return FiltResult(traj=traj_corr, err=err, sd=sd, gyro_err=gyro_err,
                           gyro_sd=gyro_sd, accel_err=accel_err,
-                          accel_sd=accel_sd, residuals=residuals)
+                          accel_sd=accel_sd, x=x, P=P, residuals=residuals)
 
 
 class FeedbackFilter:
@@ -1496,7 +1496,7 @@ class FeedbackFilter:
 
         return FiltResult(traj=traj_corr, sd=sd, gyro_err=gyro_err,
                           gyro_sd=gyro_sd, accel_err=accel_err,
-                          accel_sd=accel_sd, residuals=residuals)
+                          accel_sd=accel_sd, P=P, residuals=residuals)
 
     def run_smoother(self, integrator, theta, dv, observations=[],
                      gain_factor=None, max_step=1, feedback_period=500,
@@ -1595,7 +1595,7 @@ class FeedbackFilter:
 
         return FiltResult(traj=traj, sd=sd, gyro_err=gyro_err,
                           gyro_sd=gyro_sd, accel_err=accel_err,
-                          accel_sd=accel_sd, residuals=residuals)
+                          accel_sd=accel_sd, P=P, residuals=residuals)
 
 
 def traj_diff(t1, t2):
