@@ -28,6 +28,16 @@ class FiltResult:
     def __init__(self, **kwargs):
         self.__dict__.update(kwargs)
 
+    def __repr__(self):
+        keys = list(self.__dict__.keys())
+        items = self.__dict__.items()
+        if keys:
+            m = max(map(len, keys)) + 1
+            return '\n'.join(["{} : {}".format(k.rjust(m), type(v))
+                              for k, v in sorted(items)])
+        else:
+            return self.__class__.__name__ + "()"
+
 
 class InertialSensor:
     """Inertial sensor triad description.
