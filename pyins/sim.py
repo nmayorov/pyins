@@ -145,22 +145,24 @@ def _generate_sensors(dt, lat, lon, alt, h, p, r):
     gyros += dt ** 4 / 4 * np.cross(phi_s.c[0], phi_s.c[2])
     gyros += dt ** 5 / 10 * np.cross(phi_s.c[0], phi_s.c[1])
 
-    accels = mv_prod(Cib[:-1], v[1:] - v[:-1], at=True)
-    for i in range(3):
-        v_s.c[i] = mv_prod(Cib[:-1], v_s.c[i], at=True)
-
-    accels -= dt ** 2 / 2 * np.cross(phi_s.c[2], v_s.c[1])
-    accels -= dt ** 3 / 4 * (np.cross(phi_s.c[1], v_s.c[1]) +
-                             2 * np.cross(phi_s.c[2], v_s.c[0]))
-    accels -= dt ** 4 / 4 * (np.cross(phi_s.c[0], v_s.c[1]) +
-                             2 * np.cross(phi_s.c[1], v_s.c[0]))
-    accels -= 2 * dt ** 5 / 5 * np.cross(phi_s.c[0], v_s.c[0])
-
     g = earth.gravitation_ecef(lat_inertial, lon_inertial)
-    g = mv_prod(Cib[:-1], 0.5 * (g[:-1] + g[1:]), at=True)
-    phi_int = (dt ** 4 / 4 * phi_s.c[0] + dt ** 3 / 3 * phi_s.c[1] +
-               dt ** 2 / 2 * phi_s.c[2])
-    accels -= g * dt - np.cross(phi_int, g)
+    a_s = v_s.derivative()
+    f_coeff_0 = a_s.c[1]
+    f_coeff_1 = a_s.c[0]
+
+    f_coeff_0 -= g[:-1]
+    f_coeff_1 -= np.diff(g, axis=0) / dt
+
+    f_coeff_0 = mv_prod(Cib[:-1], f_coeff_0, at=True)
+    f_coeff_1 = mv_prod(Cib[:-1], f_coeff_1, at=True)
+
+    accels = f_coeff_0 * dt + f_coeff_1 * dt**2 / 2
+    accels -= dt ** 2 / 2 * np.cross(phi_s.c[2], f_coeff_0)
+    accels -= dt ** 3 / 3 * (np.cross(phi_s.c[1], f_coeff_0) +
+                             np.cross(phi_s.c[2], f_coeff_1))
+    accels -= dt ** 4 / 4 * (np.cross(phi_s.c[0], f_coeff_0) +
+                             np.cross(phi_s.c[1], f_coeff_1))
+    accels -= dt ** 5 / 5 * np.cross(phi_s.c[0], f_coeff_1)
 
     traj = pd.DataFrame(index=np.arange(time.shape[0]))
     traj['lat'] = lat
