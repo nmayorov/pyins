@@ -635,12 +635,14 @@ class Spline:
     ----------
     t : ndarray, shape (n,)
         Times given to the constructor.
-    dcm : ndarray, shape (n, 3, 3)
-        DCMs given to the constructor.
     c : ndarray, (4, n, 3)
         Coefficients for the rotation vector cubic interpolants, ``coeff[0]``
         corresponds to the cubic term and ``coeff[3]`` corresponds to the
         constant term, which is zero identically.
+    dcm : ndarray, shape (n, 3, 3)
+        DCMs given to the constructor.
+    rv : ndarray, shape (n - 1, 3)
+        Full rotation vector on each interval.
     """
     MAX_ITER = 10
 
@@ -687,6 +689,7 @@ class Spline:
 
         self.theta = PPoly(coeff, t)
         self.C = dcm
+        self.rv = Theta
 
     @property
     def c(self):
