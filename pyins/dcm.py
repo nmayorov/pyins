@@ -355,7 +355,6 @@ def to_hpr(dcm):
 
     if dcm.ndim == 2:
         h, p, r = _to_hpr_single(dcm)
-        return np.rad2deg(h), np.rad2deg(p), np.rad2deg(r)
     else:
         h, p, r = _to_hpr_array(dcm)
 
