@@ -628,23 +628,23 @@ class Spline:
     ----------
     t : array_like, shape (n,)
         Sequence of times. Must be strictly increasing.
-    C : array_like, shape (n, 3, 3)
+    dcm : array_like, shape (n, 3, 3)
         Sequence of DCMs corresponding to `t`.
 
     Attributes
     ----------
     t : ndarray, shape (n,)
         Times given to the constructor.
-    C : ndarray, shape (n, 3, 3)
+    dcm : ndarray, shape (n, 3, 3)
         DCMs given to the constructor.
-    coef : ndarray, (4, n, 3)
+    c : ndarray, (4, n, 3)
         Coefficients for the rotation vector cubic interpolants, ``coeff[0]``
         corresponds to the cubic term and ``coeff[3]`` corresponds to the
         constant term, which is zero identically.
     """
     MAX_ITER = 10
 
-    def __init__(self, t, C):
+    def __init__(self, t, dcm):
         t = np.asarray(t, dtype=float)
         if t.ndim != 1:
             raise ValueError("`t` must be 1-dimensional.")
@@ -656,12 +656,12 @@ class Spline:
         if np.any(dt <= 0):
             raise ValueError("`t` must be strictly increasing.")
 
-        C = np.asarray(C)
-        if C.shape != (t.shape[0], 3, 3):
+        dcm = np.asarray(dcm)
+        if dcm.shape != (t.shape[0], 3, 3):
             raise ValueError("`C` is expected to have shape {}, but actually "
-                             "has {}".format((t.shape[0], 3, 3), C.shape))
+                             "has {}".format((t.shape[0], 3, 3), dcm.shape))
 
-        Theta = to_rv(util.mm_prod(C[:-1], C[1:], at=True))
+        Theta = to_rv(util.mm_prod(dcm[:-1], dcm[1:], at=True))
         omega = Theta / dt[:, None]
         omega = np.vstack((omega[0], omega))
         A = _dtheta_from_omega_matrix(Theta)
@@ -686,10 +686,10 @@ class Spline:
         coeff[0] = (-2 * Theta + dt * omega[:-1] + dt * dTheta) / dt**3
 
         self.theta = PPoly(coeff, t)
-        self.C = C
+        self.C = dcm
 
     @property
-    def coef(self):
+    def c(self):
         return self.theta.c
 
     @property
