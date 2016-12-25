@@ -302,6 +302,9 @@ def _to_hpr_single(dcm):
     if heading < 0:
         heading += 2 * np.pi
 
+    if heading == 2 * np.pi:
+        heading = 0
+
     return heading, pitch, roll
 
 
@@ -326,6 +329,10 @@ def _to_hpr_array(dcm):
                            dcm[h_mask, 0, 0] + dcm[h_mask, 1, 2])
 
     h[h < 0] += 2 * np.pi
+
+    # If h were very small and negative after adding 2 * pi it can become
+    # 2 * pi exactly, then it's better to make it 0.
+    h[h == 2 * np.pi] = 0
 
     return h, p, r
 
