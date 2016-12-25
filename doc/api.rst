@@ -19,6 +19,7 @@ Direction Cosine Matrices
     dcm.to_hpr
     dcm.from_llw
     dcm.to_llw
+    dcm.Spline
 
 
 Earth Surface and Gravity Models

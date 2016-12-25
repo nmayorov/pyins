@@ -19,7 +19,8 @@ setup_options = dict(
         "Programming Language :: Python :: 3",
     ],
     requires=["numpy", "scipy", "pandas", "Cython"],
-    ext_modules=cythonize(["pyins/_integrate.pyx"])
+    ext_modules=cythonize(["pyins/_integrate.pyx",
+                           "pyins/_dcm_spline_solver.pyx"])
 )
 
 setup(**setup_options)

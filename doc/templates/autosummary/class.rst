@@ -5,4 +5,5 @@
 
 .. autoclass:: {{ objname }}
    :members:
+   :special-members: __call__
    

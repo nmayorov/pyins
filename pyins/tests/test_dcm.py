@@ -259,5 +259,37 @@ def test_dcm_llw_conversion():
     assert_allclose(wan_r, wan, rtol=1e-10)
 
 
+def test_dcm_Spline():
+    ht = [0, 45, 90]
+    C = dcm.from_hpr(ht, 0, 0)
+    t = [0, 45, 90]
+    s = dcm.Spline(t, C)
+
+    t_test = [0, 30, 60, 90]
+    C_test = s(t_test)
+    h, p, r = dcm.to_hpr(C_test)
+    assert_allclose(h, [0, 30, 60, 90], rtol=1e-14, atol=1e-16)
+    assert_allclose(p, 0, atol=1e-16)
+    assert_allclose(r, 0, atol=1e-16)
+
+    omega = np.rad2deg(s(t_test, 1))
+    assert_allclose(omega[:, 0], 0, atol=1e-16)
+    assert_allclose(omega[:, 1], 0, atol=1e-6)
+    assert_allclose(omega[:, 2], -1)
+
+    beta = np.rad2deg(s(t_test, 2))
+    assert_allclose(beta, 0, atol=1e-16)
+
+    t = np.linspace(0, 100, 101)
+    ht = 10 * t + 5 * np.sin(2 * np.pi * t / 10)
+    pt = 7 * t + 3 * np.sin(2 * np.pi * t / 10 + 2)
+    rt = -3 * t + 3 * np.sin(2 * np.pi * t / 10 - 2)
+    C = dcm.from_hpr(ht, pt, rt)
+    s = dcm.Spline(t, C)
+
+    Cs = s(t[::-1])
+    assert_allclose(Cs[::-1], C)
+
+
 if __name__ == '__main__':
     run_module_suite()
