@@ -133,36 +133,60 @@ def _generate_sensors(dt, lat, lon, alt, h, p, r):
 
     Cnb = dcm.from_hpr(h, p, r)
     Cib = mm_prod(Cin, Cnb)
-    Cbi = Cib.transpose(0, 2, 1)
 
-    Cbb_ = mm_prod(Cbi[:-1], Cib[1:])
-    phi = dcm.to_rv(Cbb_)
-    phi_acc = np.vstack((np.zeros(3), np.cumsum(phi, axis=0)))
+    Cib_spline = dcm.Spline(time, Cib)
+    a = Cib_spline.c[2]
+    b = Cib_spline.c[1]
+    c = Cib_spline.c[0]
+    ab = np.cross(a, b)
+    ac = np.cross(a, c)
+    bc = np.cross(b, c)
 
-    phi_s = CubicSpline(time, phi_acc)
-    gyros = phi
-    gyros += dt ** 3 / 6 * np.cross(phi_s.c[1], phi_s.c[2])
-    gyros += dt ** 4 / 4 * np.cross(phi_s.c[0], phi_s.c[2])
-    gyros += dt ** 5 / 10 * np.cross(phi_s.c[0], phi_s.c[1])
+    omega = np.empty((8,) + a.shape)
+    omega[0] = a
+    omega[1] = 2 * b
+    omega[2] = 3 * c - 0.5 * ab
+    omega[3] = -ac + np.cross(a, ab) / 6
+    omega[4] = -0.5 * bc + np.cross(a, ac) / 3 + np.cross(b, ab) / 6
+    omega[5] = np.cross(a, bc) / 6 + np.cross(b, ac) / 3 + np.cross(c, ab) / 6
+    omega[6] = np.cross(b, bc) / 6 + np.cross(c, ac) / 3
+    omega[7] = np.cross(c, bc) / 6
+
+    gyros = 0
+    for k in reversed(range(8)):
+        gyros += omega[k] / (k + 1)
+        gyros *= dt
 
     g = earth.gravitation_ecef(lat_inertial, lon_inertial)
     a_s = v_s.derivative()
-    f_coeff_0 = a_s.c[1]
-    f_coeff_1 = a_s.c[0]
+    d = a_s.c[1] - g[:-1]
+    e = a_s.c[0] - np.diff(g, axis=0) / dt
 
-    f_coeff_0 -= g[:-1]
-    f_coeff_1 -= np.diff(g, axis=0) / dt
+    d = mv_prod(Cib[:-1], d, at=True)
+    e = mv_prod(Cib[:-1], e, at=True)
+    ad = np.cross(a, d)
+    ae = np.cross(a, e)
+    bd = np.cross(b, d)
+    be = np.cross(b, e)
+    cd = np.cross(c, d)
+    ce = np.cross(c, e)
 
-    f_coeff_0 = mv_prod(Cib[:-1], f_coeff_0, at=True)
-    f_coeff_1 = mv_prod(Cib[:-1], f_coeff_1, at=True)
+    f = np.empty((8,) + d.shape)
+    f[0] = d
+    f[1] = e - ad
+    f[2] = -ae - bd + 0.5 * np.cross(a, ad)
+    f[3] = -be - cd + 0.5 * (np.cross(a, ae + bd) + np.cross(b, ad))
+    f[4] = -ce + 0.5 * (np.cross(a, be + cd) + np.cross(b, ae + bd) +
+                        np.cross(c, ad))
+    f[5] = 0.5 * (np.cross(a, ce) + np.cross(b, be + cd) +
+                  np.cross(c, ae + bd))
+    f[6] = 0.5 * (np.cross(b, ce) + np.cross(c, be + cd))
+    f[7] = 0.5 * np.cross(c, ce)
 
-    accels = f_coeff_0 * dt + f_coeff_1 * dt**2 / 2
-    accels -= dt ** 2 / 2 * np.cross(phi_s.c[2], f_coeff_0)
-    accels -= dt ** 3 / 3 * (np.cross(phi_s.c[1], f_coeff_0) +
-                             np.cross(phi_s.c[2], f_coeff_1))
-    accels -= dt ** 4 / 4 * (np.cross(phi_s.c[0], f_coeff_0) +
-                             np.cross(phi_s.c[1], f_coeff_1))
-    accels -= dt ** 5 / 5 * np.cross(phi_s.c[0], f_coeff_1)
+    accels = 0
+    for k in reversed(range(8)):
+        accels += f[k] / (k + 1)
+        accels *= dt
 
     traj = pd.DataFrame(index=np.arange(time.shape[0]))
     traj['lat'] = lat
