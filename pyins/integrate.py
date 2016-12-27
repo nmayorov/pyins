@@ -6,12 +6,16 @@ from . import dcm
 from ._integrate import integrate_fast
 
 
-def coning_sculling(gyro, accel):
+def coning_sculling(gyro, accel, order=1):
     """Apply coning and sculling corrections to inertial readings.
 
-    Currently the two simplest methods described in [1]_ and [2]_ are
-    implemented. The accelerometer readings are also corrected for body frame
-    rotation during a sampling period.
+    The algorithm assumes a polynomial model for the angular velocity and the
+    specific force, fitting coefficients by considering previous time
+    intervals. The algorithm for a linear approximation is well known and
+    described in [1]_ and [2]_.
+
+    The accelerometer readings are also corrected for body frame rotation
+    during a sampling period.
 
     Parameters
     ----------
@@ -19,6 +23,10 @@ def coning_sculling(gyro, accel):
         Gyro readings.
     accel : array_like, shape (n_readings, 3)
         Accelerometer readings.
+    order : {0, 1, 2}, optional
+        Angular velocity and specific force polynomial model order.
+        Note that 0 means not applying non-commutative corrections at all.
+        Default is 1.
 
     Returns
     -------
@@ -36,14 +44,35 @@ def coning_sculling(gyro, accel):
            Design Part 2: Velocity and Position Algorithms", Journal of
            Guidance, Control, and Dynamics 1998, Vol. 21, no. 2.
     """
+    if order not in [0, 1, 2]:
+        raise ValueError("`order` must be 1, 2 or 3.")
+
     gyro = np.asarray(gyro)
     accel = np.asarray(accel)
 
-    coning = np.vstack((np.zeros(3), np.cross(gyro[:-1], gyro[1:]) / 12))
-    sculling = np.vstack((
-        np.zeros(3),
-        (np.cross(gyro[:-1], accel[1:]) + np.cross(accel[:-1], gyro[1:])) / 12
-    ))
+    if order == 0:
+        coning = 0
+        sculling = 0
+    elif order == 1:
+        coning = np.vstack((np.zeros(3), np.cross(gyro[:-1], gyro[1:]) / 12))
+        sculling = np.vstack((np.zeros(3),
+                             (np.cross(gyro[:-1], accel[1:]) +
+                              np.cross(accel[:-1], gyro[1:])) / 12))
+    elif order == 2:
+        coning = (-121 * np.cross(gyro[2:], gyro[1:-1]) +
+                  31 * np.cross(gyro[2:], gyro[:-2]) -
+                  np.cross(gyro[1:-1], gyro[:-2])) / 720
+        sculling = (-121 * np.cross(gyro[2:], accel[1:-1]) +
+                    31 * np.cross(gyro[2:], accel[:-2]) -
+                    np.cross(gyro[1:-1], accel[:-2]) -
+                    121 * np.cross(accel[2:], gyro[1:-1]) +
+                    31 * np.cross(accel[2:], gyro[:-2]) -
+                    np.cross(accel[1:-1], gyro[:-2])) / 720
+        coning = np.vstack((np.zeros((2, 3)), coning))
+        sculling = np.vstack((np.zeros((2, 3)), sculling))
+    else:
+        assert False
+
     rc = 0.5 * np.cross(gyro, accel)
 
     return gyro + coning, accel + sculling + rc
