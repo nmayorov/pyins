@@ -130,6 +130,7 @@ Strapdown Sensors Simulator
     :toctree: generated/
 
     sim.from_position
+    sim.from_velocity
 
 
 Utility Functions
