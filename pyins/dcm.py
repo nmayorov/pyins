@@ -240,6 +240,127 @@ def to_rv(dcm):
         return _to_rotvec_array(dcm)
 
 
+def from_quat(quat):
+    """Create a direction cosine matrix from a quaternion.
+
+    First 3 elements of the quaternion form its vector part.
+
+    Parameters
+    ----------
+    quat : array_like, shape (4,) or (n, 4)
+        Quaternions.
+
+    Returns
+    -------
+    dcm : ndarray, shape (3, 3) or (n, 3, 3)
+        Direction cosine matrices.
+    """
+    q = np.asarray(quat)
+    if q.ndim == 1:
+        rho = q[:3]
+        q4 = q[3]
+        rho_skew = _skew_matrix_single(rho)
+        dcm = 2 * (np.outer(rho, rho) + q4 * rho_skew)
+        dcm[np.diag_indices_from(dcm)] += q4**2 - np.dot(rho, rho)
+    else:
+        rho = q[:, :3]
+        q4 = q[:, 3]
+        rho_skew = _skew_matrix_array(rho)
+        dcm = 2 * (rho[:, None, :] * rho[:, :, None] +
+                   2 * q4[:, None, None] * rho_skew)
+        diag = q4**2 - np.sum(rho**2, axis=1)
+        dcm[:, np.arange(3), np.arange(3)] += diag[:, None]
+
+    return dcm
+
+
+def to_quat(dcm):
+    """Convert a direction cosine matrix to a quaternion.
+
+    First 3 elements of the quaternion form its vector part. The conversion
+    algorithm is from [1]_.
+
+    Parameters
+    ----------
+    dcm : array_like, shape (3, 3) or (n, 3, 3)
+        Direction cosine matrices.
+
+    Returns
+    -------
+    quat : ndarray, shape (4,) or (n, 4)
+        Quaternions.
+
+    References
+    ----------
+    .. [1] F. L. Markley, "Unit Quaternion from Rotation Matrix", Journal
+       of Guidance Control and Dynamics, Vol. 31, No. 2, 2008
+    """
+    if dcm.ndim == 2:
+        A = dcm
+        v = np.hstack((np.diag(A), np.trace(A)))
+        case = np.argmax(v)
+        x = np.empty(4)
+        if case == 0:
+            x[0] = -1 - A[0, 0] + A[1, 1] + A[2, 2]
+            x[1] = -A[0, 1] - A[1, 0]
+            x[2] = -A[0, 2] - A[2, 0],
+            x[3] = A[1, 2] - A[2, 1]
+        elif case == 1:
+            x[0] = -A[1, 0] - A[0, 1]
+            x[1] = -1 - A[1, 1] + A[2, 2] + A[0, 0]
+            x[2] = -A[1, 2] - A[2, 1]
+            x[3] = A[2, 0] - A[0, 2]
+        elif case == 2:
+            x[0] = -A[2, 0] - A[0, 2]
+            x[1] = -A[2, 1] - A[1, 2]
+            x[2] = -1 - A[2, 2] + A[0, 0] + A[1, 1]
+            x[3] = A[0, 1] - A[1, 0]
+        else:
+            x[0] = -A[1, 2] + A[2, 1]
+            x[1] = -A[2, 0] + A[0, 2]
+            x[2] = -A[0, 1] + A[1, 0]
+            x[3] = 1 + A[0, 0] + A[1, 1] + A[2, 2]
+
+        x /= np.linalg.norm(x)
+    else:
+        v = np.hstack((dcm[:, np.arange(3), np.arange(3)],
+                       np.trace(dcm, axis1=1, axis2=2)[:, None]))
+        case = np.argmax(v, axis=1)
+        x = np.empty((dcm.shape[0], 4))
+
+        mask = case == 0
+        A = dcm[mask].T
+        x[mask, 0] = -1 - A[0, 0] + A[1, 1] + A[2, 2]
+        x[mask, 1] = -A[0, 1] - A[1, 0]
+        x[mask, 2] = -A[0, 2] - A[2, 0]
+        x[mask, 3] = A[1, 2] - A[2, 1]
+
+        mask = case == 1
+        A = dcm[mask].T
+        x[mask, 0] = -A[1, 0] - A[0, 1]
+        x[mask, 1] = -1 - A[1, 1] + A[2, 2] + A[0, 0]
+        x[mask, 2] = -A[1, 2] - A[2, 1]
+        x[mask, 3] = A[2, 0] - A[0, 2]
+
+        mask = case == 2
+        A = dcm[mask].T
+        x[mask, 0] = -A[2, 0] - A[0, 2]
+        x[mask, 1] = -A[2, 1] - A[1, 2]
+        x[mask, 2] = -1 - A[2, 2] + A[0, 0] + A[1, 1]
+        x[mask, 3] = A[0, 1] - A[1, 0]
+
+        mask = case == 3
+        A = dcm[mask].T
+        x[mask, 0] = -A[1, 2] + A[2, 1]
+        x[mask, 1] = -A[2, 0] + A[0, 2]
+        x[mask, 2] = -A[0, 1] + A[1, 0]
+        x[mask, 3] = 1 + A[0, 0] + A[1, 1] + A[2, 2]
+
+        x /= np.linalg.norm(x, axis=1)[:, None]
+
+    return x
+
+
 def from_hpr(h, p, r):
     """Create a direction cosine matrix from heading, pitch and roll angles.
 

@@ -108,6 +108,21 @@ def test_dcm_rv_conversion():
     assert_allclose(rv, rv_from_A, rtol=1e-10)
 
 
+def test_dcm_quat_conversion():
+    np.random.seed(0)
+    Q = np.random.randn(10, 4)
+    Q /= np.linalg.norm(Q, axis=1)[:, None]
+
+    for q in Q:
+        qc = dcm.to_quat(dcm.from_quat(q))
+        qc *= np.sign(qc[0] * q[0])
+        assert_allclose(qc, q, rtol=1e-14, atol=1e-15)
+
+    Qc = dcm.to_quat(dcm.from_quat(Q))
+    Qc *= np.sign(Qc[:, 0] * Q[:, 0])[:, None]
+    assert_allclose(qc, q, rtol=1e-14, atol=1e-15)
+
+
 def test_from_hpr():
     hpr1 = [30, 0, 0]
     A_true1 = np.array([[np.sqrt(3)/2, 0.5, 0],
@@ -292,4 +307,5 @@ def test_dcm_Spline():
 
 
 if __name__ == '__main__':
-    run_module_suite()
+    # run_module_suite()
+    test_dcm_quat_conversion()
