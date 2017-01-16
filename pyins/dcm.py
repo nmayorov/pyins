@@ -241,7 +241,7 @@ def to_rv(dcm):
 
 
 def from_hpr(h, p, r):
-    """Create a direction dosine matrix from heading, pitch and roll angles.
+    """Create a direction cosine matrix from heading, pitch and roll angles.
 
     The sequence of elemental rotations is as follows::
 
