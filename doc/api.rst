@@ -15,6 +15,12 @@ Direction Cosine Matrices
 
     dcm.from_rv
     dcm.to_rv
+    dcm.from_quat
+    dcm.to_quat
+    dcm.from_gibbs
+    dcm.to_gibbs
+    dcm.from_mrp
+    dcm.to_mrp
     dcm.from_hpr
     dcm.to_hpr
     dcm.from_llw

@@ -267,7 +267,7 @@ def from_quat(quat):
         q4 = q[:, 3]
         rho_skew = _skew_matrix_array(rho)
         dcm = 2 * (rho[:, None, :] * rho[:, :, None] +
-                   2 * q4[:, None, None] * rho_skew)
+                   q4[:, None, None] * rho_skew)
         diag = q4**2 - np.sum(rho**2, axis=1)
         dcm[:, np.arange(3), np.arange(3)] += diag[:, None]
 
@@ -303,7 +303,7 @@ def to_quat(dcm):
         if case == 0:
             x[0] = -1 - A[0, 0] + A[1, 1] + A[2, 2]
             x[1] = -A[0, 1] - A[1, 0]
-            x[2] = -A[0, 2] - A[2, 0],
+            x[2] = -A[0, 2] - A[2, 0]
             x[3] = A[1, 2] - A[2, 1]
         elif case == 1:
             x[0] = -A[1, 0] - A[0, 1]
@@ -327,30 +327,31 @@ def to_quat(dcm):
                        np.trace(dcm, axis1=1, axis2=2)[:, None]))
         case = np.argmax(v, axis=1)
         x = np.empty((dcm.shape[0], 4))
+        dcm = np.transpose(dcm, axes=(1, 2, 0))
 
         mask = case == 0
-        A = dcm[mask].T
+        A = dcm[:, :, mask]
         x[mask, 0] = -1 - A[0, 0] + A[1, 1] + A[2, 2]
         x[mask, 1] = -A[0, 1] - A[1, 0]
         x[mask, 2] = -A[0, 2] - A[2, 0]
         x[mask, 3] = A[1, 2] - A[2, 1]
 
         mask = case == 1
-        A = dcm[mask].T
+        A = dcm[:, :, mask]
         x[mask, 0] = -A[1, 0] - A[0, 1]
         x[mask, 1] = -1 - A[1, 1] + A[2, 2] + A[0, 0]
         x[mask, 2] = -A[1, 2] - A[2, 1]
         x[mask, 3] = A[2, 0] - A[0, 2]
 
         mask = case == 2
-        A = dcm[mask].T
+        A = dcm[:, :, mask]
         x[mask, 0] = -A[2, 0] - A[0, 2]
         x[mask, 1] = -A[2, 1] - A[1, 2]
         x[mask, 2] = -1 - A[2, 2] + A[0, 0] + A[1, 1]
         x[mask, 3] = A[0, 1] - A[1, 0]
 
         mask = case == 3
-        A = dcm[mask].T
+        A = dcm[:, :, mask]
         x[mask, 0] = -A[1, 2] + A[2, 1]
         x[mask, 1] = -A[2, 0] + A[0, 2]
         x[mask, 2] = -A[0, 1] + A[1, 0]
@@ -359,6 +360,118 @@ def to_quat(dcm):
         x /= np.linalg.norm(x, axis=1)[:, None]
 
     return x
+
+
+def from_gibbs(gibbs):
+    """Create a direction cosine matrix from Gibbs vectors.
+
+    These parameters are related to quaternion components as follows::
+
+        mrp = 2 * q_vec / q_scal
+
+    It can be expressed from the angle and axis of rotation::
+
+        mrp = 2 * tan(angle / 2) * axis
+
+    Parameters
+    ----------
+    gibbs : array_like, shape (3,) or (n, 3)
+        Gibbs vectors.
+
+    Returns
+    -------
+    dcm : ndarray, shape (3, 3) or (n, 3, 3)
+        Direction cosine matrices.
+    """
+    gibbs = np.asarray(gibbs, dtype=float).T
+    norm2 = np.sum(gibbs ** 2, axis=0)
+
+    q_scal = 2 / (4 + norm2) ** 0.5
+    q_vec = 0.5 * q_scal * gibbs
+
+    if gibbs.ndim == 1:
+        q = np.hstack((q_vec, q_scal))
+    else:
+        q = np.vstack((q_vec, q_scal)).T
+
+    return from_quat(q)
+
+
+def to_gibbs(dcm):
+    """Convert a direction cosine matrix to Gibbs vectors.
+
+    See `from_gibbs`.
+
+    Parameters
+    ----------
+    dcm : array_like, shape (3, 3) or (n, 3, 3)
+        Direction cosine matrices.
+
+    Returns
+    -------
+    gibbs : ndarray, shape (3,) or (n, 3)
+        Gibbs vectors.
+    """
+    q = to_quat(dcm).T
+    gibbs = 2 * q[:3] / q[3]
+
+    return gibbs.T
+
+
+def from_mrp(mrp):
+    """Create a direction cosine matrix from modified Rodrigues parameters.
+
+    These parameters are related to quaternion components as follows::
+
+        mrp = 4 * q_vec / (1 + q_scal)
+
+    It can be expressed from the angle and axis of rotation::
+
+        mrp = 4 * tan(angle / 4) * axis
+
+    Parameters
+    ----------
+    mrp : array_like, shape (3,) or (n, 3)
+        Vectors of modified Rodigues parameters.
+
+    Returns
+    -------
+    dcm : ndarray, shape (3, 3) or (n, 3, 3)
+        Direction cosine matrices.
+    """
+    mrp = np.asarray(mrp, dtype=float).T
+    norm2 = np.sum(mrp ** 2, axis=0)
+
+    q_scal = (16 - norm2) / (16 + norm2)
+    q_vec = (1 + q_scal) / 4 * mrp
+
+    if mrp.ndim == 1:
+        q = np.hstack((q_vec, q_scal))
+    else:
+        q = np.vstack((q_vec, q_scal)).T
+
+    return from_quat(q)
+
+
+def to_mrp(dcm):
+    """Convert a direction cosine matrix to modified Rodrigues parameters.
+
+    See `from_mrp`.
+
+    Parameters
+    ----------
+    dcm : array_like, shape (3, 3) or (n, 3, 3)
+        Direction cosine matrices.
+
+    Returns
+    -------
+    mrp : ndarray, shape (3,) or (n, 3)
+        Vectors of generalized Rodrigues parameters.
+    """
+    q = to_quat(dcm).T
+    grp = 4 / (1 + q[3]) * q[:3]
+
+    return grp.T
 
 
 def from_hpr(h, p, r):

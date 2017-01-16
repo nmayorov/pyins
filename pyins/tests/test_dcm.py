@@ -110,17 +110,53 @@ def test_dcm_rv_conversion():
 
 def test_dcm_quat_conversion():
     np.random.seed(0)
-    Q = np.random.randn(10, 4)
-    Q /= np.linalg.norm(Q, axis=1)[:, None]
+    h = np.random.uniform(0, 360, 20)
+    p = np.random.uniform(-90, 90, 20)
+    r = np.random.uniform(-180, 180, 20)
 
-    for q in Q:
-        qc = dcm.to_quat(dcm.from_quat(q))
-        qc *= np.sign(qc[0] * q[0])
-        assert_allclose(qc, q, rtol=1e-14, atol=1e-15)
+    As = dcm.from_hpr(h, p, r)
+    for A in As:
+        q = dcm.to_quat(A)
+        Ac = dcm.from_quat(q)
+        assert_allclose(Ac, A, rtol=1e-14, atol=1e-16)
 
-    Qc = dcm.to_quat(dcm.from_quat(Q))
-    Qc *= np.sign(Qc[:, 0] * Q[:, 0])[:, None]
-    assert_allclose(qc, q, rtol=1e-14, atol=1e-15)
+    q = dcm.to_quat(As)
+    Asc = dcm.from_quat(q)
+    assert_allclose(Asc, As, rtol=1e-14, atol=1e-16)
+
+
+def test_dcm_mrp_conversion():
+    np.random.seed(1)
+    h = np.random.uniform(0, 360, 100)
+    p = np.random.uniform(-90, 90, 100)
+    r = np.random.uniform(-180, 180, 100)
+
+    As = dcm.from_hpr(h, p, r)
+    for A in As:
+        grp = dcm.to_mrp(A)
+        Ac = dcm.from_mrp(grp)
+        assert_allclose(Ac, A, rtol=1e-14, atol=1e-15)
+
+    grp = dcm.to_mrp(As)
+    Asc = dcm.from_mrp(grp)
+    assert_allclose(Asc, As, rtol=1e-14, atol=1e-15)
+
+
+def test_dcm_gibbs_conversion():
+    np.random.seed(1)
+    h = np.random.uniform(0, 360, 100)
+    p = np.random.uniform(-90, 90, 100)
+    r = np.random.uniform(-180, 180, 100)
+
+    As = dcm.from_hpr(h, p, r)
+    for A in As:
+        grp = dcm.to_gibbs(A)
+        Ac = dcm.from_gibbs(grp)
+        assert_allclose(Ac, A, rtol=1e-14, atol=1e-15)
+
+    grp = dcm.to_gibbs(As)
+    Asc = dcm.from_gibbs(grp)
+    assert_allclose(Asc, As, rtol=1e-14, atol=1e-15)
 
 
 def test_from_hpr():
@@ -307,5 +343,4 @@ def test_dcm_Spline():
 
 
 if __name__ == '__main__':
-    # run_module_suite()
-    test_dcm_quat_conversion()
+    run_module_suite()
