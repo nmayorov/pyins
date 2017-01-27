@@ -155,7 +155,7 @@ def gravity(slat, alt=0):
 
     slat2 = slat ** 2
 
-    return GE * (1 + F * slat2) / (1 - E2 * slat)**0.5 * (1 - 2 * alt / R0)
+    return GE * (1 + F * slat2) / (1 - E2 * slat2)**0.5 * (1 - 2 * alt / R0)
 
 
 def gravitation_ecef(lat, lon, alt=0):
