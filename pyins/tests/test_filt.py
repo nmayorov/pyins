@@ -211,15 +211,17 @@ def test_kalman_correct():
 def test_propagate_errors():
     # This test is complex and hardly a unit test, but it is strong.
     # I believe it's better than a formal test.
-    lat = [50, 50]
-    lon = [60, 60]
-    h = [10, 10]
-    r = [-5, -5]
-    p = [3, 3]
-    t = [0, 6 * 3600]
     dt = 0.5
+    t = 6 * 3600
+    n_samples = int(t / dt)
+    lat = np.full(n_samples, 50.0)
+    lon = np.full(n_samples, 60.0)
+    alt = np.zeros_like(lat)
+    h = np.full(n_samples, 10.0)
+    r = np.full(n_samples, -5.0)
+    p = np.full(n_samples, 3.0)
 
-    traj, gyro, accel = sim.from_position(dt, lat, lon, t, h, p, r)
+    traj, gyro, accel = sim.from_position(dt, lat, lon, alt, h, p, r)
 
     gyro_bias = np.array([1e-8, -2e-8, 3e-8])
     accel_bias = np.array([3e-3, -4e-3, 2e-3])
@@ -342,8 +344,9 @@ def test_FeedbackFilter():
     traj['p'] = 0
     traj['r'] = 0
 
-    _, gyro, accel = sim.from_position(dt, traj.lat, traj.lon, h=traj.h,
-                                       p=traj.p, r=traj.r)
+    _, gyro, accel = sim.from_position(dt, traj.lat, traj.lon,
+                                       np.zeros_like(traj.lat),
+                                       h=traj.h, p=traj.p, r=traj.r)
     theta, dv = coning_sculling(gyro, accel)
 
     np.random.seed(0)
