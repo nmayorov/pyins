@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from . import earth
 from . import dcm
-from ._integrate import integrate_fast
+from ._integrate import integrate_fast, integrate_fast_stationary
 
 
 def coning_sculling(gyro, accel, order=1):
@@ -320,3 +320,15 @@ class Integrator:
         self.traj.iloc[-1] = [np.rad2deg(self.lat_arr[i]),
                               np.rad2deg(self.lon_arr[i]),
                               self.VE_arr[i], self.VN_arr[i], h, p, r]
+
+
+def integrate_stationary(dt, lat, Cnb, theta, dv):
+    n_readings = theta.shape[0]
+    V_arr = np.empty((n_readings + 1, 3))
+    Cnb_arr = np.empty((n_readings + 1, 3, 3))
+    lat = np.deg2rad(lat)
+    V_arr[0] = 0
+    Cnb_arr[0] = Cnb
+    integrate_fast_stationary(dt, lat, Cnb_arr, V_arr, theta, dv)
+
+    return Cnb_arr, V_arr

@@ -1,3 +1,5 @@
+# cython: boundscheck=False, wraparound=False
+
 """Strapdown integration implemented in Cython."""
 import numpy as np
 cimport cython
@@ -10,8 +12,6 @@ cdef double* R0 = [6378137, 6378136]
 cdef double* E2 = [6.6943799901413e-3, 6.69436619e-3]
 
 
-@cython.boundscheck(False)
-@cython.wraparound(False)
 cdef dcm_from_rotvec(double[:] rv, double[:, :] dcm):
     cdef double norm, norm2, norm4, cos, k1, k2
 
@@ -38,8 +38,6 @@ cdef dcm_from_rotvec(double[:] rv, double[:, :] dcm):
     dcm[2, 2] = k2 * rv[2] * rv[2] + cos
 
 
-@cython.boundscheck(False)
-@cython.wraparound(False)
 cdef mv(double[:, :] A, double[:] b, double[:] ret):
     cdef int m = A.shape[0]
     cdef int n = A.shape[1]
@@ -50,8 +48,6 @@ cdef mv(double[:, :] A, double[:] b, double[:] ret):
     dgemv('N', &m, &n, &done, &A[0, 0], &m, &b[0], &one, &dzero, &ret[0], &one)
 
 
-@cython.boundscheck(False)
-@cython.wraparound(False)
 cdef mm(double[:, :] A, double[:, :] B, double[:, :] ret):
     cdef int m = A.shape[0]
     cdef int n = A.shape[1]
@@ -67,8 +63,12 @@ cdef mm(double[:, :] A, double[:, :] B, double[:, :] ret):
           &ret[0, 0], &m)
 
 
-@cython.boundscheck(False)
-@cython.wraparound(False)
+cdef cross(double[:] a, double[:] b, double[:] ret):
+    ret[0] = a[1] * b[2] - a[2] * b[1]
+    ret[1] = a[2] * b[0] - a[0] * b[2]
+    ret[2] = a[0] * b[1] - a[1] * b[0]
+
+
 def integrate_fast(double dt, double[:] lat_arr, double[:] lon_arr,
                    double[:] VE_arr, double[:] VN_arr, double[:, :, :] Cnb_arr,
                    double[:, ::1] theta, double[:, ::1] dv, int earth_model,
@@ -148,3 +148,36 @@ def integrate_fast(double dt, double[:] lat_arr, double[:] lon_arr,
         mm(B, dBb, C)
         mm(dBn, C, B)
         Cnb_arr[j + 1] = B.copy()
+
+
+def integrate_fast_stationary(double dt, double lat, double[:, :, :] Cnb_arr,
+                              double[:, :] V_arr, double[:, ::1] theta,
+                              double[:, ::1] dv):
+    xi_arr = dt * RATE * np.array([0, np.cos(lat), np.sin(lat)])
+
+    cdef:
+        double[:] xi = xi_arr
+        double[:] minus_xi = -xi_arr
+        double[:] dv_n = np.empty(3)
+        double[:] dv_n_correction = np.empty(3)
+
+        double[:, :] B = Cnb_arr[0].copy_fortran()
+        double[::1, :] C = np.empty((3, 3), order='F')
+        double[::1, :] dBn = np.empty((3, 3), order='F')
+
+        double[::1, :] dBb = np.empty((3, 3), order='F')
+        int i, j
+
+    dcm_from_rotvec(minus_xi, dBn)
+    for i in range(theta.shape[0]):
+        mv(B, dv[i], dv_n)
+        cross(dv_n, xi, dv_n_correction)
+
+        for j in range(3):
+            V_arr[i + 1, j] = V_arr[i, j] + dv_n[j] + 0.5 * dv_n_correction[j]
+
+
+        dcm_from_rotvec(theta[i], dBb)
+        mm(B, dBb, C)
+        mm(dBn, C, B)
+        Cnb_arr[i + 1] = B.copy()

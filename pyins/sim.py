@@ -256,3 +256,187 @@ def from_velocity(dt, lat0, lon0, alt0, VE, VN, VU, h, p, r):
     traj['r'] = r
 
     return traj, gyros, accels
+
+
+def stationary_rotation(dt, lat, alt, Cnb):
+    n_points = Cnb.shape[0]
+
+    time = dt * np.arange(n_points)
+    lon_inertial = np.rad2deg(earth.RATE) * time
+    lat = np.full_like(lon_inertial, lat)
+    Cin = dcm.from_llw(lat, lon_inertial)
+
+    R = coord.lla_to_ecef(lat, lon_inertial, alt)
+    v_s = CubicSpline(time, R).derivative()
+
+    Cib = util.mm_prod(Cin, Cnb)
+    Cib_spline = dcm.Spline(time, Cib)
+    a = Cib_spline.c[2]
+    b = Cib_spline.c[1]
+    c = Cib_spline.c[0]
+
+    g = earth.gravitation_ecef(lat, lon_inertial, alt)
+    a_s = v_s.derivative()
+    d = a_s.c[1] - g[:-1]
+    e = a_s.c[0] - np.diff(g, axis=0) / dt
+
+    d = util.mv_prod(Cib[:-1], d, at=True)
+    e = util.mv_prod(Cib[:-1], e, at=True)
+
+    gyros, accels = _compute_readings(dt, a, b, c, d, e)
+
+    return gyros, accels
+
+
+def _align_matrix(align_angles):
+    align_angles = np.deg2rad(align_angles)
+    theta1 = align_angles[0]
+    phi1 = align_angles[1]
+    theta2 = align_angles[2]
+    phi2 = align_angles[3]
+    theta3 = align_angles[4]
+    phi3 = align_angles[5]
+
+    return np.array([
+        [np.cos(theta1), np.sin(theta1) * np.cos(phi1),
+         np.sin(theta1) * np.sin(phi1)],
+        [np.sin(theta2) * np.sin(phi2), np.cos(theta2),
+         np.sin(theta2) * np.cos(phi2)],
+        [np.sin(theta3) * np.cos(phi3), np.sin(theta3) * np.sin(phi3),
+         np.cos(theta3)]
+    ])
+
+
+def _apply_errors(dt, readings, scale_error, scale_asym, align, bias, noise):
+    out = util.mv_prod(align, readings)
+    out += bias * dt
+    out += noise * dt ** 0.5 * np.random.randn(*readings.shape)
+    scale = 1 + scale_error + scale_asym * np.sign(out)
+    out *= scale
+    return out
+
+
+class ImuErrors:
+    def __init__(self, gyro_scale_error=None, gyro_scale_asym=None,
+                 gyro_align=None, gyro_bias=None, gyro_noise=None,
+                 accel_scale_error=None, accel_scale_asym=None,
+                 accel_align=None, accel_bias=None, accel_noise=None):
+        if gyro_scale_error is None:
+            gyro_scale_error = 0
+        else:
+            gyro_scale_error = np.asarray(gyro_scale_error)
+
+        if gyro_scale_asym is None:
+            gyro_scale_asym = 0
+        else:
+            gyro_scale_asym = np.asarray(gyro_scale_asym)
+
+        if gyro_align is None:
+            gyro_align = np.eye(3)
+        else:
+            gyro_align = _align_matrix(gyro_align)
+
+        if gyro_bias is None:
+            gyro_bias = 0
+        else:
+            gyro_bias = np.asarray(gyro_bias)
+
+        if gyro_noise is None:
+            gyro_noise = 0
+        else:
+            gyro_noise = np.asarray(gyro_noise)
+
+        if accel_scale_error is None:
+            accel_scale_error = 0
+        else:
+            accel_scale_error = np.asarray(accel_scale_error)
+
+        if accel_scale_asym is None:
+            accel_scale_asym = 0
+        else:
+            accel_scale_asym = np.asarray(accel_scale_asym)
+
+        if accel_align is None:
+            accel_align = np.eye(3)
+        else:
+            accel_align = _align_matrix(accel_align)
+
+        if accel_bias is None:
+            accel_bias = 0
+        else:
+            accel_bias = np.asarray(accel_bias)
+
+        if accel_noise is None:
+            accel_noise = 0
+        else:
+            accel_noise = np.asarray(accel_noise)
+
+        U, S, VT = np.linalg.svd(gyro_align)
+        Cmb = np.dot(U, VT)
+        gyro_align_mars = gyro_align.dot(Cmb.T)
+        accel_align_mars = accel_align.dot(Cmb.T)
+
+        self.gyro_scale_error = gyro_scale_error
+        self.gyro_scale_asym = gyro_scale_asym
+        self.gyro_align = gyro_align
+        self.gyro_bias = gyro_bias
+        self.gyro_noise = gyro_noise
+        self.accel_scale_error = accel_scale_error
+        self.accel_scale_asym = accel_scale_asym
+        self.accel_align = accel_align
+        self.accel_bias = accel_bias
+        self.accel_noise = accel_noise
+
+        self.gyro_align_mars = gyro_align_mars
+        self.accel_align_mars = accel_align_mars
+        self.Cmb = Cmb
+
+    def apply(self, dt, gyro, accel):
+        gyro_out = _apply_errors(dt, gyro, self.gyro_scale_error,
+                                 self.gyro_scale_asym, self.gyro_align,
+                                 self.gyro_bias, self.gyro_noise)
+        accel_out = _apply_errors(dt, accel, self.accel_scale_error,
+                                  self.accel_scale_asym, self.accel_align,
+                                  self.accel_bias, self.accel_noise)
+
+        return gyro_out, accel_out
+
+
+class TableRotations:
+    def __init__(self, dt, h0, p0, r0, rot_speed=10, rest_time=20):
+        self.dt = dt
+        self.rot_speed = rot_speed
+        self.rest_time = rest_time
+
+        self.Cnb = np.empty((1, 3, 3))
+        self.Cnb[0] = dcm.from_hpr(h0, p0, r0)
+        self._rest_intervals = []
+
+    def rotate(self, axis, angle, rot_speed=None):
+        if rot_speed is None:
+            rot_speed = self.rot_speed
+
+        n = int(np.abs(angle) / (self.dt * rot_speed))
+        angle = np.linspace(0, angle, n)
+
+        rv = np.zeros((angle.shape[0], 3))
+        rv[:, axis] = np.deg2rad(angle)
+        C = dcm.from_rv(rv)
+        Cnb_batch = util.mm_prod(self.Cnb[-1], C)
+        self.Cnb = np.vstack((self.Cnb, Cnb_batch))
+
+    def rest(self, time=None):
+        if time is None:
+            time = self.rest_time
+
+        n = int(time / self.dt)
+        self._rest_intervals.append([self.Cnb.shape[0] - 1,
+                                     self.Cnb.shape[0] - 1 + n])
+
+        Cnb_batch = np.empty((n, 3, 3))
+        Cnb_batch[:] = self.Cnb[-1]
+        self.Cnb = np.vstack((self.Cnb, Cnb_batch))
+
+    @property
+    def rest_intervals(self):
+        return np.asarray(self._rest_intervals)
