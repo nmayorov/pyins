@@ -1243,7 +1243,8 @@ class FeedbackFilter:
         if record_stamps is None:
             record_stamps = stamps
 
-        return theta, dv, observations, stamps, record_stamps, gain_factor
+        return (theta, dv, observations, stamps, record_stamps, gain_factor,
+                feedback_period)
 
     def _forward_pass(self, integrator, theta, dv, observations, gain_factor,
                       stamps, record_stamps, feedback_period,
@@ -1477,7 +1478,8 @@ class FeedbackFilter:
         returned because they are computed relative to partially corrected
         trajectory and are not useful for interpretation.
         """
-        theta, dv, observations, stamps, record_stamps, gain_factor = \
+        (theta, dv, observations, stamps, record_stamps,
+         gain_factor, feedback_period) = \
             self._validate_parameters(integrator, theta, dv, observations,
                                       gain_factor, max_step, record_stamps,
                                       feedback_period)
@@ -1561,7 +1563,8 @@ class FeedbackFilter:
         returned because they are computed relative to partially corrected
         trajectory and are not useful for interpretation.
         """
-        theta, dv, observations, stamps, record_stamps, gain_factor = \
+        (theta, dv, observations, stamps, record_stamps,
+         gain_factor, feedback_period) = \
             self._validate_parameters(integrator, theta, dv, observations,
                                       gain_factor, max_step, record_stamps,
                                       feedback_period)

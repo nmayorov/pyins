@@ -334,7 +334,7 @@ def test_FeedforwardFilter():
 
 
 def test_FeedbackFilter():
-    dt = 1
+    dt = 0.9
     traj = pd.DataFrame(index=np.arange(1 * 3600))
     traj['lat'] = 50
     traj['lon'] = 60
