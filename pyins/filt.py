@@ -806,20 +806,6 @@ class FeedforwardFilter:
         self.q = q
         self.G = G
 
-        states = OrderedDict((
-            ('DR1', DR1),
-            ('DR2', DR2),
-            ('DV1', DV1),
-            ('DV2', DV2),
-            ('PHI1', PHI1),
-            ('PHI2', PHI2),
-            ('PSI3', PSI3)
-        ))
-        for name, state in gyro_model.states.items():
-            states['GYRO_' + name] = n + state
-        for name, state in accel_model.states.items():
-            states['ACCEL_' + name] = n + n1 + state
-
         self.dt = dt
         self.n_points = n_points
         self.n_states = n_states
