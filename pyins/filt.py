@@ -427,22 +427,22 @@ def _errors_transform_matrix(traj):
     cp, tp = np.cos(p), np.tan(p)
 
     T = np.zeros((traj.shape[0], N_BASE_STATES, N_BASE_STATES))
-    T[:, 0, 0] = 1
-    T[:, 1, 1] = 1
-    T[:, 2, 0] = VN * tlat / earth.R0
-    T[:, 2, 2] = 1
-    T[:, 2, 6] = VN
-    T[:, 3, 0] = -VE * tlat / earth.R0
-    T[:, 3, 3] = 1
-    T[:, 3, 6] = -VE
-    T[:, 4, 0] = tlat / earth.R0
-    T[:, 4, 4] = -sh * tp
-    T[:, 4, 5] = -ch * tp
-    T[:, 4, 6] = 1
-    T[:, 5, 4] = -ch
-    T[:, 5, 5] = sh
-    T[:, 6, 4] = -sh / cp
-    T[:, 6, 5] = -ch / cp
+    T[:, DRE, DR1] = 1
+    T[:, DRN, DR2] = 1
+    T[:, DVE, DR1] = VN * tlat / earth.R0
+    T[:, DVE, DV1] = 1
+    T[:, DVE, PSI3] = VN
+    T[:, DVN, DR1] = -VE * tlat / earth.R0
+    T[:, DVN, DV2] = 1
+    T[:, DVN, PSI3] = -VE
+    T[:, DH, DR1] = tlat / earth.R0
+    T[:, DH, PHI1] = -sh * tp
+    T[:, DH, PHI2] = -ch * tp
+    T[:, DH, PSI3] = 1
+    T[:, DP, PHI1] = -ch
+    T[:, DP, PHI2] = sh
+    T[:, DR, PHI1] = -sh / cp
+    T[:, DR, PHI2] = -ch / cp
 
     return T
 
