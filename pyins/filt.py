@@ -1609,7 +1609,7 @@ def traj_diff(t1, t2):
     diff.h[diff.h < -180] += 360
     diff.h[diff.h > 180] -= 360
 
-    return diff.dropna()
+    return diff.loc[t1.index.intersection(t2.index)]
 
 
 def correct_traj(traj, error):
