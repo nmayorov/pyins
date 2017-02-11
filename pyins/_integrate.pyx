@@ -1,4 +1,7 @@
+# cython : boundscheck=False, wraparound=False
+
 """Strapdown integration implemented in Cython."""
+
 import numpy as np
 cimport cython
 from scipy.linalg.cython_blas cimport dgemv, dgemm
@@ -10,8 +13,6 @@ cdef double* R0 = [6378137, 6378136]
 cdef double* E2 = [6.6943799901413e-3, 6.69436619e-3]
 
 
-@cython.boundscheck(False)
-@cython.wraparound(False)
 cdef dcm_from_rotvec(double[:] rv, double[:, :] dcm):
     cdef double norm, norm2, norm4, cos, k1, k2
 
@@ -38,8 +39,6 @@ cdef dcm_from_rotvec(double[:] rv, double[:, :] dcm):
     dcm[2, 2] = k2 * rv[2] * rv[2] + cos
 
 
-@cython.boundscheck(False)
-@cython.wraparound(False)
 cdef mv(double[:, :] A, double[:] b, double[:] ret):
     cdef int m = A.shape[0]
     cdef int n = A.shape[1]
@@ -50,8 +49,6 @@ cdef mv(double[:, :] A, double[:] b, double[:] ret):
     dgemv('N', &m, &n, &done, &A[0, 0], &m, &b[0], &one, &dzero, &ret[0], &one)
 
 
-@cython.boundscheck(False)
-@cython.wraparound(False)
 cdef mm(double[:, :] A, double[:, :] B, double[:, :] ret):
     cdef int m = A.shape[0]
     cdef int n = A.shape[1]
@@ -67,8 +64,6 @@ cdef mm(double[:, :] A, double[:, :] B, double[:, :] ret):
           &ret[0, 0], &m)
 
 
-@cython.boundscheck(False)
-@cython.wraparound(False)
 def integrate_fast(double dt, double[:] lat_arr, double[:] lon_arr,
                    double[:] VE_arr, double[:] VN_arr, double[:, :, :] Cnb_arr,
                    double[:, ::1] theta, double[:, ::1] dv, int earth_model,
