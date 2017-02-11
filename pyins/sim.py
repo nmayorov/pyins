@@ -105,7 +105,7 @@ def from_position(dt, lat, lon, alt, h, p, r):
     b = Cib_spline.c[1]
     c = Cib_spline.c[0]
 
-    g = earth.gravitation_ecef(lat_inertial, lon_inertial)
+    g = earth.gravitation_ecef(lat_inertial, lon_inertial, alt)
     a_s = v_s.derivative()
     d = a_s.c[1] - g[:-1]
     e = a_s.c[0] - np.diff(g, axis=0) / dt
@@ -118,8 +118,10 @@ def from_position(dt, lat, lon, alt, h, p, r):
     traj = pd.DataFrame(index=np.arange(time.shape[0]))
     traj['lat'] = lat
     traj['lon'] = lon
+    traj['alt'] = alt
     traj['VE'] = V[:, 0]
     traj['VN'] = V[:, 1]
+    traj['VU'] = V[:, 2]
     traj['h'] = h
     traj['p'] = p
     traj['r'] = r
@@ -236,7 +238,7 @@ def from_velocity(dt, lat0, lon0, alt0, VE, VN, VU, h, p, r):
     b = Cib_spline.c[1]
     c = Cib_spline.c[0]
 
-    g = earth.gravitation_ecef(lat, lon_inertial)
+    g = earth.gravitation_ecef(lat, lon_inertial, alt)
     a_s = v_s.derivative()
     d = a_s.c[1] - g[:-1]
     e = a_s.c[0] - np.diff(g, axis=0) / dt
@@ -249,8 +251,10 @@ def from_velocity(dt, lat0, lon0, alt0, VE, VN, VU, h, p, r):
     traj = pd.DataFrame(index=np.arange(n_points))
     traj['lat'] = lat
     traj['lon'] = lon
+    traj['alt'] = alt
     traj['VE'] = VE
     traj['VN'] = VN
+    traj['VU'] = VU
     traj['h'] = h
     traj['p'] = p
     traj['r'] = r
