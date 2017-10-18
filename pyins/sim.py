@@ -262,7 +262,28 @@ def from_velocity(dt, lat0, lon0, alt0, VE, VN, VU, h, p, r):
     return traj, gyros, accels
 
 
-def stationary_rotation(dt, lat, alt, Cnb):
+def stationary_rotation(dt, lat, alt, Cnb, Cbs=None):
+    """Simulate readings on a stationary bench.
+
+    Parameters
+    ----------
+    dt : float
+        Time step.
+    lat : float
+        Latitude of the place.
+    alt : float
+        Altitude of the place.
+    Cnb : ndarray, shape (n_points, 3, 3)
+        Body attitude matrix.
+    Cbs : ndarray with shape (3, 3) or (n_points, 3, 3) or None
+        Sensor assembly attitude matrix relative to the body axes. If None,
+        (default) identity attitude is assumed.
+
+    Returns
+    -------
+    gyro, accel : ndarray, shape (n_points - 1, 3)
+        Gyro and accelerometer readings.
+    """
     n_points = Cnb.shape[0]
 
     time = dt * np.arange(n_points)
@@ -273,8 +294,13 @@ def stationary_rotation(dt, lat, alt, Cnb):
     R = coord.lla_to_ecef(lat, lon_inertial, alt)
     v_s = CubicSpline(time, R).derivative()
 
-    Cib = util.mm_prod(Cin, Cnb)
-    Cib_spline = dcm.Spline(time, Cib)
+    if Cbs is None:
+        Cns = Cnb
+    else:
+        Cns = util.mm_prod(Cnb, Cbs)
+
+    Cis = util.mm_prod(Cin, Cns)
+    Cib_spline = dcm.Spline(time, Cis)
     a = Cib_spline.c[2]
     b = Cib_spline.c[1]
     c = Cib_spline.c[0]
@@ -284,8 +310,8 @@ def stationary_rotation(dt, lat, alt, Cnb):
     d = a_s.c[1] - g[:-1]
     e = a_s.c[0] - np.diff(g, axis=0) / dt
 
-    d = util.mv_prod(Cib[:-1], d, at=True)
-    e = util.mv_prod(Cib[:-1], e, at=True)
+    d = util.mv_prod(Cis[:-1], d, at=True)
+    e = util.mv_prod(Cis[:-1], e, at=True)
 
     gyros, accels = _compute_readings(dt, a, b, c, d, e)
 
