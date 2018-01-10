@@ -3,6 +3,43 @@ import numpy as np
 from pyins import dcm
 
 
+def test_from_basic():
+    A1 = dcm.from_basic(1, 30)
+    A1_true = np.array([
+        [1, 0, 0],
+        [0, 0.5 * 3**0.5, -0.5],
+        [0, 0.5, 0.5 * 3**0.5]
+    ])
+    assert_allclose(A1, A1_true, rtol=1e-10)
+
+    A2 = dcm.from_basic(2, 30)
+    A2_true = np.array([
+        [0.5 * 3 ** 0.5, 0, 0.5],
+        [0, 1, 0],
+        [-0.5, 0, 0.5 * 3**0.5]
+    ])
+    assert_allclose(A2, A2_true, rtol=1e-10)
+
+    A3 = dcm.from_basic(3, 30)
+    A3_true = np.array([
+        [0.5 * 3**0.5, -0.5, 0],
+        [0.5, 0.5 * 3**0.5, 0],
+        [0, 0, 1]
+    ])
+    assert_allclose(A3, A3_true, rtol=1e-10)
+
+    A4 = dcm.from_basic(3, [30, 60])
+    A4_true = np.array([
+        [[0.5 * 3**0.5, -0.5, 0],
+         [0.5, 0.5 * 3**0.5, 0],
+         [0, 0, 1]],
+        [[0.5, -0.5 * 3**0.5, 0],
+         [0.5 * 3**0.5, 0.5, 0],
+         [0, 0, 1]]
+    ])
+    assert_allclose(A4, A4_true, rtol=1e-10)
+
+
 def test_from_rv():
     rv1 = np.array([1, 0, 0]) * np.pi / 3
     A1 = dcm.from_rv(rv1)

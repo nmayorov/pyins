@@ -64,6 +64,56 @@ def _from_rotvec_array(rv):
             k2[:, np.newaxis, np.newaxis] * skew_squared)
 
 
+def from_basic(axis, angle):
+    """Create a direction cosine matrix corresponding to a basic rotation.
+
+    This is a DCM corresponding to the rotation around one of the axes of a
+    frame (i.e. 1, 2 or 3).
+
+    Parameters
+    ----------
+    axis : 1, 2 or 3
+        Axis to rotate around.
+    angle : float or array_like, shape (n_points,)
+        Angle of rotation in degrees.
+
+    Returns
+    -------
+    dcm : array_like, shape (3, 3) or (n_points, 3, 3)
+        Direction cosine matrix.
+    """
+    if axis not in [1, 2, 3]:
+        raise ValueError("`axis` must be 1, 2 or 3.")
+
+    angle = np.deg2rad(angle)
+    dcm = np.zeros((3, 3) + angle.shape)
+    sa = np.sin(angle)
+    ca = np.cos(angle)
+    if axis == 1:
+        dcm[0, 0] = 1
+        dcm[1, 1] = ca
+        dcm[1, 2] = -sa
+        dcm[2, 1] = sa
+        dcm[2, 2] = ca
+    elif axis == 2:
+        dcm[0, 0] = ca
+        dcm[0, 2] = sa
+        dcm[1, 1] = 1
+        dcm[2, 0] = -sa
+        dcm[2, 2] = ca
+    elif axis == 3:
+        dcm[0, 0] = ca
+        dcm[0, 1] = -sa
+        dcm[1, 0] = sa
+        dcm[1, 1] = ca
+        dcm[2, 2] = 1
+
+    if dcm.ndim == 3:
+        dcm = np.rollaxis(dcm, -1)
+
+    return dcm
+
+
 def from_rv(rv):
     """Create a direction cosine matrix from a rotation vector.
 
