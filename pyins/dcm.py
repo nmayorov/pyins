@@ -653,7 +653,7 @@ def to_hpr(dcm):
     else:
         h, p, r = _to_hpr_array(dcm)
 
-    return np.rad2deg(h), np.rad2deg(p), np.rad2deg(r)
+    return np.rad2deg([h, p, r])
 
 
 def from_llw(lat, lon, wan=0):
@@ -778,7 +778,7 @@ def to_llw(dcm):
     else:
         lat, lon, wan = _to_llw_array(dcm)
 
-    return np.rad2deg(lat), np.rad2deg(lon), np.rad2deg(wan)
+    return np.rad2deg([lat, lon, wan])
 
 
 def _dtheta_from_omega_matrix(theta):
