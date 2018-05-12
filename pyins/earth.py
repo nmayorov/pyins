@@ -16,6 +16,8 @@ R0 = None
 E2 = None
 GE = None
 F = None
+#: Standard gravitational parameter for Earth
+MU = 3.986004418e14
 
 
 def set_model(model='WGS84'):
@@ -53,7 +55,7 @@ def set_model(model='WGS84'):
     ----------
     .. [1] W. A. Heiskanen, H. Moritz, "Physical Geodesy".
     """
-    global MODEL, RATE, R0, E2, GE, F
+    global MODEL, RATE, R0, E2, GE, F, MU
     if model == 'WGS84':
         R0 = 6378137.0
         E2 = 6.6943799901413e-3
