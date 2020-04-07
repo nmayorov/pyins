@@ -567,8 +567,8 @@ def from_hpr(h, p, r):
     return Rotation.from_euler('yxz', angles, degrees=True).as_matrix()
 
 
-def from_llw(lat, lon):
-    """Create a direction cosine matrix from latitude and longitude.
+def from_llw(lat, lon, wan=0):
+    """Create a direction cosine matrix from latitude and longitude and wander angle.
 
     The sequence of elemental rotations is as follows::
 
@@ -585,6 +585,8 @@ def from_llw(lat, lon):
     ----------
     lat, lon : float or array_like with shape (n,)
         Latitude and longitude.
+    wan : float or array_like with shape (n,), optional
+        Wander angle, default is 0.
 
     Returns
     -------
@@ -593,69 +595,22 @@ def from_llw(lat, lon):
     """
     lat = np.asarray(lat)
     lon = np.asarray(lon)
+    wan = np.asarray(wan)
 
-    if lat.ndim == 0 and lon.ndim == 0:
-        return Rotation.from_euler('xz', [90 - lat, 90 + lon], degrees=True).as_matrix()
+    if lat.ndim == 0 and lon.ndim == 0 and wan.ndim == 0:
+        return Rotation.from_euler('ZXZ', [90 + lon, 90 - lat, wan], degrees=True).as_matrix()
 
     lat = np.atleast_1d(lat)
     lon = np.atleast_1d(lon)
+    wan = np.atleast_1d(wan)
 
-    n = max(len(lat), len(lon))
+    n = max(len(lat), len(lon), len(wan))
 
-    angles = np.empty((n, 2))
-    angles[:, 0] = 90 - lat
-    angles[:, 1] = 90 + lon
-    return Rotation.from_euler('xz', angles, degrees=True).as_matrix()
-
-
-def _to_hpr_single(dcm):
-    pitch = np.arcsin(dcm[2, 1])
-    if np.abs(pitch) < 0.5 * np.pi - 1e-3:
-        heading = np.arctan2(dcm[0, 1], dcm[1, 1])
-        roll = np.arctan2(-dcm[2, 0], dcm[2, 2])
-    elif pitch > 0:
-        roll = 0
-        heading = np.arctan2(-dcm[0, 2] - dcm[1, 0], dcm[0, 0] - dcm[1, 2])
-    else:
-        roll = 0
-        heading = np.arctan2(dcm[0, 2] - dcm[1, 0], dcm[0, 0] + dcm[1, 2])
-
-    if heading < 0:
-        heading += 2 * np.pi
-
-    if heading == 2 * np.pi:
-        heading = 0
-
-    return heading, pitch, roll
-
-
-def _to_hpr_array(dcm):
-    h = np.empty(dcm.shape[0])
-    p = np.arcsin(dcm[:, 2, 1])
-    r = np.empty(dcm.shape[0])
-
-    mask = np.abs(p) < 0.5 * np.pi - 1e-3
-    h[mask] = np.arctan2(dcm[mask, 0, 1], dcm[mask, 1, 1])
-    r[mask] = np.arctan2(-dcm[mask, 2, 0], dcm[mask, 2, 2])
-
-    mask = ~mask
-    r[mask] = 0
-
-    h_mask = mask & (p > 0)
-    h[h_mask] = np.arctan2(-dcm[h_mask, 0, 2] - dcm[h_mask, 1, 0],
-                            dcm[h_mask, 0, 0] - dcm[h_mask, 1, 2])
-
-    h_mask = mask & (p < 0)
-    h[h_mask] = np.arctan2(dcm[h_mask, 0, 2] - dcm[h_mask, 1, 0],
-                           dcm[h_mask, 0, 0] + dcm[h_mask, 1, 2])
-
-    h[h < 0] += 2 * np.pi
-
-    # If h were very small and negative after adding 2 * pi it can become
-    # 2 * pi exactly, then it's better to make it 0.
-    h[h == 2 * np.pi] = 0
-
-    return h, p, r
+    angles = np.empty((n, 3))
+    angles[:, 0] = 90 + lon
+    angles[:, 1] = 90 - lat
+    angles[:, 2] = wan
+    return Rotation.from_euler('ZXZ', angles, degrees=True).as_matrix()
 
 
 def to_hpr(dcm):
@@ -677,109 +632,15 @@ def to_hpr(dcm):
     h, p, r : float or ndarray with shape (n,)
         Heading, pitch and roll.
     """
-    dcm = np.asarray(dcm)
-    if dcm.ndim not in [2, 3] or dcm.shape[-1] != 3 or dcm.shape[-2] != 3:
-        raise ValueError('`dcm` has a wrong shape.')
-
-    if dcm.ndim == 2:
-        h, p, r = _to_hpr_single(dcm)
+    h, p, r = Rotation.from_matrix(dcm).as_euler('ZXY', degrees=True).T
+    h = -h
+    if h.ndim == 0:
+        if h < 0:
+            h += 360
     else:
-        h, p, r = _to_hpr_array(dcm)
+        h[h < 0] += 360
 
-    return np.rad2deg([h, p, r])
-
-
-def from_llw(lat, lon, wan=0):
-    """Create a direction cosine matrix from latitude, longitude and wander.
-
-    The sequence of elemental rotations is as follows::
-
-           pi/2+lon    pi/2-lan     wan
-        E ----------> ----------> ------> N
-               3           1         3
-
-    Here E denotes the ECEF frame and N denotes the local level wander-angle
-    frame. The resulting DCM projects from N frame to E frame.
-
-    If ``wan=0`` then the 2nd axis of N frame points to North.
-
-    Parameters
-    ----------
-    lat, lon : float or array_like with shape (n,)
-        Latitude and longitude.
-    wan : float or array_like with shape (n,), optional
-        Wander angle. Default is 0.
-
-    Returns
-    -------
-    dcm : ndarray, shape (3, 3) or (n, 3, 3)
-        Direction Cosine Matrices.
-    """
-    lat = np.deg2rad(lat)
-    lon = np.deg2rad(lon)
-    wan = np.deg2rad(wan)
-
-    clat = np.cos(lat)
-    slat = np.sin(lat)
-    clon = np.cos(lon)
-    slon = np.sin(lon)
-    cwan = np.cos(wan)
-    swan = np.sin(wan)
-
-    dcm = np.empty((3, 3) + lat.shape)
-
-    dcm[0, 0] = -clon * slat * swan - slon * cwan
-    dcm[0, 1] = -clon * slat * cwan + slon * swan
-    dcm[0, 2] = clon * clat
-    dcm[1, 0] = -slon * slat * swan + clon * cwan
-    dcm[1, 1] = -slon * slat * cwan - clon * swan
-    dcm[1, 2] = slon * clat
-    dcm[2, 0] = clat * swan
-    dcm[2, 1] = clat * cwan
-    dcm[2, 2] = slat
-
-    if dcm.ndim == 3:
-        dcm = np.rollaxis(dcm, -1)
-
-    return dcm
-
-
-def _to_llw_single(dcm):
-    lat = np.arcsin(dcm[2, 2])
-    if np.abs(lat) < 0.5 * np.pi - 1e-3:
-        lon = np.arctan2(dcm[1, 2], dcm[0, 2])
-        wan = np.arctan2(dcm[2, 0], dcm[2, 1])
-    elif lat > 0:
-        lon = 0
-        wan = np.arctan2(-dcm[0, 0] - dcm[1, 1], dcm[1, 0] - dcm[0, 1])
-    else:
-        lon = 0
-        wan = np.arctan2(dcm[0, 0] - dcm[1, 1], dcm[0, 1] + dcm[1, 0])
-
-    return lat, lon, wan
-
-
-def _to_llw_array(dcm):
-    lat = np.arcsin(dcm[:, 2, 2])
-    lon = np.empty(dcm.shape[0])
-    wan = np.empty(dcm.shape[0])
-
-    mask = np.abs(lat) < 0.5 * np.pi - 1e-3
-    lon[mask] = np.arctan2(dcm[mask, 1, 2], dcm[mask, 0, 2])
-    wan[mask] = np.arctan2(dcm[mask, 2, 0], dcm[mask, 2, 1])
-
-    mask = ~mask
-    lon[mask] = 0
-
-    l_mask = mask & (lat > 0)
-    wan[l_mask] = np.arctan2(-dcm[l_mask, 0, 0] - dcm[l_mask, 1, 1],
-                             dcm[l_mask, 1, 0] - dcm[l_mask, 0, 1])
-
-    l_mask = mask & (lat < 0)
-    wan[l_mask] = np.arctan2(dcm[l_mask, 0, 0] - dcm[l_mask, 1, 1],
-                             dcm[l_mask, 0, 1] + dcm[l_mask, 1, 0])
-
-    return lat, lon, wan
+    return h, p, r
 
 
 def to_llw(dcm):
@@ -802,16 +663,19 @@ def to_llw(dcm):
         Latitude, longitude and wander. Note that `wan` is always returned
         even though it can be known to be equal 0.
     """
-    dcm = np.asarray(dcm)
-    if dcm.ndim not in [2, 3] or dcm.shape[-1] != 3 or dcm.shape[-2] != 3:
-        raise ValueError("`dcm` has a wrong shape.")
-
-    if dcm.ndim == 2:
-        lat, lon, wan = _to_llw_single(dcm)
+    alpha, beta, wan = Rotation.from_matrix(dcm).as_euler('ZXZ', degrees=True).T
+    lon = alpha - 90.0
+    lat = 90.0 - beta
+    if lon.ndim == 0:
+        if lon < -180:
+            lon += 360
+        elif lon > 180:
+            lon -= 360
     else:
-        lat, lon, wan = _to_llw_array(dcm)
+        lon[lon < -180] += 360
+        lon[lon > 180] -= 360
 
-    return np.rad2deg([lat, lon, wan])
+    return lat, lon, wan
 
 
 def _dtheta_from_omega_matrix(theta):

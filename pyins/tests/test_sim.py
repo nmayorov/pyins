@@ -35,7 +35,7 @@ def test_from_position():
     assert_allclose(traj.r, 0, atol=1e-8)
 
     for i in range(3):
-        assert_allclose(gyro_g[:, i], gyro[i], atol=1e-16)
+        assert_allclose(gyro_g[:, i], gyro[i], atol=1e-14)
         assert_allclose(accel_g[:, i], accel[i], atol=1e-7)
 
     traj, gyro_g, accel_g = sim.from_velocity(dt, 50, 45, 0, VE, VN, VU,
@@ -49,7 +49,7 @@ def test_from_position():
     assert_allclose(traj.r, 0, atol=1e-8)
 
     for i in range(3):
-        assert_allclose(gyro_g[:, i], gyro[i], atol=1e-16)
+        assert_allclose(gyro_g[:, i], gyro[i], atol=1e-14)
         assert_allclose(accel_g[:, i], accel[i], atol=1e-7)
 
 
