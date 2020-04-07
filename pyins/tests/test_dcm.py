@@ -238,7 +238,7 @@ def test_to_hpr():
     A3 = np.array([
         [1/np.sqrt(2), 0, 1/np.sqrt(2)],
         [0, 1, 0],
-        [-np.sqrt(2), 0, np.sqrt(2)]
+        [-1/np.sqrt(2), 0, 1/np.sqrt(2)]
     ])
     hpr3 = np.array([0, 0, 45])
     assert_allclose(dcm.to_hpr(A3), hpr3, rtol=1e-10)
