@@ -2,6 +2,7 @@
 import numpy as np
 from scipy.interpolate import PPoly
 from scipy.linalg import svd, det
+from scipy.spatial.transform import Rotation
 from . import util
 from ._dcm_spline_solver import solve_for_omega
 
@@ -547,32 +548,64 @@ def from_hpr(h, p, r):
     dcm : ndarray, shape (3, 3) or (n, 3, 3)
         Direction cosine matrices.
     """
-    h = np.deg2rad(h)
-    p = np.deg2rad(p)
-    r = np.deg2rad(r)
+    h = np.asarray(h)
+    p = np.asarray(p)
+    r = np.asarray(r)
+    if h.ndim == 0 and p.ndim == 0 and r.ndim == 0:
+        return Rotation.from_euler('yxz', [r, p, -h], degrees=True).as_matrix()
 
-    ch = np.cos(h)
-    sh = np.sin(h)
-    cp = np.cos(p)
-    sp = np.sin(p)
-    cr = np.cos(r)
-    sr = np.sin(r)
+    h = np.atleast_1d(h)
+    p = np.atleast_1d(p)
+    r = np.atleast_1d(r)
 
-    dcm = np.empty((3, 3) + h.shape)
-    dcm[0, 0] = ch * cr + sh * sp * sr
-    dcm[0, 1] = sh * cp
-    dcm[0, 2] = ch * sr - sh * sp * cr
-    dcm[1, 0] = -sh * cr + ch * sp * sr
-    dcm[1, 1] = ch * cp
-    dcm[1, 2] = -sh * sr - ch * sp * cr
-    dcm[2, 0] = -cp * sr
-    dcm[2, 1] = sp
-    dcm[2, 2] = cp * cr
+    n = max(len(h), len(p), len(r))
 
-    if dcm.ndim == 3:
-        dcm = np.rollaxis(dcm, -1)
+    angles = np.empty((n, 3))
+    angles[:, 0] = r
+    angles[:, 1] = p
+    angles[:, 2] = -h
+    return Rotation.from_euler('yxz', angles, degrees=True).as_matrix()
 
-    return dcm
+
+def from_llw(lat, lon):
+    """Create a direction cosine matrix from latitude and longitude.
+
+    The sequence of elemental rotations is as follows::
+
+           pi/2+lon    pi/2-lan     wan
+        E ----------> ----------> ------> N
+               3           1         3
+
+    Here E denotes the ECEF frame and N denotes the local level wander-angle
+    frame. The resulting DCM projects from N frame to E frame.
+
+    If ``wan=0`` then the 2nd axis of N frame points to North.
+
+    Parameters
+    ----------
+    lat, lon : float or array_like with shape (n,)
+        Latitude and longitude.
+
+    Returns
+    -------
+    dcm : ndarray, shape (3, 3) or (n, 3, 3)
+        Direction Cosine Matrices.
+    """
+    lat = np.asarray(lat)
+    lon = np.asarray(lon)
+
+    if lat.ndim == 0 and lon.ndim == 0:
+        return Rotation.from_euler('xz', [90 - lat, 90 + lon], degrees=True).as_matrix()
+
+    lat = np.atleast_1d(lat)
+    lon = np.atleast_1d(lon)
+
+    n = max(len(lat), len(lon))
+
+    angles = np.empty((n, 2))
+    angles[:, 0] = 90 - lat
+    angles[:, 1] = 90 + lon
+    return Rotation.from_euler('xz', angles, degrees=True).as_matrix()
 
 
 def _to_hpr_single(dcm):
