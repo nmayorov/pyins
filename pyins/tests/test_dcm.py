@@ -364,27 +364,5 @@ def test_dcm_Spline():
     assert_allclose(Cs[::-1], C)
 
 
-def test_match_vectors():
-    Cab_true = dcm.from_hpr(20, -10, 5)
-    vb = np.array([
-        [0, 1, 0],
-        [0, 0, 1]
-    ])
-    va = vb.dot(Cab_true.T)
-
-    Cab = dcm.match_vectors(va, vb)
-    assert_allclose(Cab, Cab_true, atol=1e-16)
-
-    Cab = dcm.match_vectors(va, vb, [200, 1])
-    assert_allclose(Cab, Cab_true, atol=1e-16)
-
-    rng = np.random.RandomState(0)
-    vb = rng.rand(100, 3)
-    vb /= np.linalg.norm(vb, axis=1)[:, None]
-    va = vb.dot(Cab_true.T)
-    Cab = dcm.match_vectors(va, vb)
-    assert_allclose(Cab, Cab_true, atol=1e-16)
-
-
 if __name__ == '__main__':
     run_module_suite()
