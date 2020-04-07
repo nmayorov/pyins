@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from scipy.interpolate import CubicSpline, PPoly
 from scipy.linalg import solve_banded
+from scipy.spatial.transform import Rotation, RotationSpline
 from . import dcm, earth, transform, util
 
 
@@ -110,10 +111,10 @@ def from_position(dt, lat, lon, alt, h, p, r):
     Cnb = dcm.from_hpr(h, p, r)
     Cib = util.mm_prod(Cin, Cnb)
 
-    Cib_spline = dcm.Spline(time, Cib)
-    a = Cib_spline.c[2]
-    b = Cib_spline.c[1]
-    c = Cib_spline.c[0]
+    Cib_spline = RotationSpline(time, Rotation.from_matrix(Cib))
+    a = Cib_spline.interpolator.c[2]
+    b = Cib_spline.interpolator.c[1]
+    c = Cib_spline.interpolator.c[0]
 
     g = earth.gravitation_ecef(lat_inertial, lon_inertial, alt)
     a_s = v_s.derivative()
@@ -243,10 +244,10 @@ def from_velocity(dt, lat0, lon0, alt0, VE, VN, VU, h, p, r):
     Cnb = dcm.from_hpr(h, p, r)
     Cib = util.mm_prod(Cin, Cnb)
 
-    Cib_spline = dcm.Spline(time, Cib)
-    a = Cib_spline.c[2]
-    b = Cib_spline.c[1]
-    c = Cib_spline.c[0]
+    Cib_spline = RotationSpline(time, Rotation.from_matrix(Cib))
+    a = Cib_spline.interpolator.c[2]
+    b = Cib_spline.interpolator.c[1]
+    c = Cib_spline.interpolator.c[0]
 
     g = earth.gravitation_ecef(lat, lon_inertial, alt)
     a_s = v_s.derivative()
@@ -310,10 +311,10 @@ def stationary_rotation(dt, lat, alt, Cnb, Cbs=None):
         Cns = util.mm_prod(Cnb, Cbs)
 
     Cis = util.mm_prod(Cin, Cns)
-    Cib_spline = dcm.Spline(time, Cis)
-    a = Cib_spline.c[2]
-    b = Cib_spline.c[1]
-    c = Cib_spline.c[0]
+    Cib_spline = RotationSpline(time, Rotation.from_matrix(Cis))
+    a = Cib_spline.interpolator.c[2]
+    b = Cib_spline.interpolator.c[1]
+    c = Cib_spline.interpolator.c[0]
 
     g = earth.gravitation_ecef(lat, lon_inertial, alt)
     a_s = v_s.derivative()
