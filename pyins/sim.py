@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from scipy.interpolate import CubicSpline, PPoly
 from scipy.linalg import solve_banded
-from . import dcm, earth, coord, util
+from . import dcm, earth, transform, util
 
 
 #: Degrees per hour to radians per second (SI units)
@@ -98,7 +98,7 @@ def from_position(dt, lat, lon, alt, h, p, r):
     lon_inertial += np.rad2deg(earth.RATE) * time
     Cin = dcm.from_llw(lat_inertial, lon_inertial)
 
-    R = coord.lla_to_ecef(lat_inertial, lon_inertial, alt)
+    R = transform.lla_to_ecef(lat_inertial, lon_inertial, alt)
     v_s = CubicSpline(time, R).derivative()
     v = v_s(time)
 
@@ -235,7 +235,7 @@ def from_velocity(dt, lat0, lon0, alt0, VE, VN, VU, h, p, r):
 
     v = np.vstack((VE, VN, VU)).T
     v = util.mv_prod(Cin, v)
-    R = coord.lla_to_ecef(lat, lon_inertial, alt)
+    R = transform.lla_to_ecef(lat, lon_inertial, alt)
     v[:, 0] -= earth.RATE * R[:, 1]
     v[:, 1] += earth.RATE * R[:, 0]
     v_s = _QuadraticSpline(time, v)
@@ -301,7 +301,7 @@ def stationary_rotation(dt, lat, alt, Cnb, Cbs=None):
     lat = np.full_like(lon_inertial, lat)
     Cin = dcm.from_llw(lat, lon_inertial)
 
-    R = coord.lla_to_ecef(lat, lon_inertial, alt)
+    R = transform.lla_to_ecef(lat, lon_inertial, alt)
     v_s = CubicSpline(time, R).derivative()
 
     if Cbs is None:

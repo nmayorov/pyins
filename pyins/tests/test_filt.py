@@ -8,7 +8,7 @@ from pyins.filt import (InertialSensor, LatLonObs, VeVnObs, propagate_errors,
 from pyins import earth
 from pyins import sim
 from pyins.integrate import integrate, coning_sculling, Integrator
-from pyins.coord import perturb_ll
+from pyins.transform import perturb_ll
 
 
 def test_InertialSensor():
