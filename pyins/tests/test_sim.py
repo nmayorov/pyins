@@ -23,7 +23,7 @@ def test_from_position():
     clat = (1 - slat**2) ** 0.5
 
     gyro = earth.RATE * np.array([0, clat, slat]) * dt
-    accel = np.array([0, 0, earth.gravity(slat)]) * dt
+    accel = np.array([0, 0, earth.gravity(50)]) * dt
 
     traj, gyro_g, accel_g = sim.from_position(dt, lat, lon, alt, h, p, r)
     assert_allclose(traj.lat, 50, rtol=1e-12)
@@ -67,7 +67,7 @@ def test_stationary():
     slat = np.sin(np.deg2rad(lat))
     clat = (1 - slat ** 2) ** 0.5
     omega_n = earth.RATE * np.array([0, clat, slat])
-    g_n = np.array([0, 0, -earth.gravity(slat, alt)])
+    g_n = np.array([0, 0, -earth.gravity(lat, alt)])
     Omega_b = Cnb[0].T.dot(omega_n)
     g_b = Cnb[0].T.dot(g_n)
 

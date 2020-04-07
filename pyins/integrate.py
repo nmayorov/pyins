@@ -131,12 +131,7 @@ def integrate(dt, lat, lon, VE, VN, h, p, r, theta, dv, stamp=0):
     VN_arr[0] = VN
     Cnb_arr[0] = dcm.from_hpr(h, p, r)
 
-    if earth.MODEL == 'WGS84':
-        earth_model = 0
-    elif earth.MODEL == 'PZ90':
-        earth_model = 1
-    else:
-        raise ValueError("Set Earth model by calling `earth.set_model`.")
+    earth_model = 0
     integrate_fast(dt, lat_arr, lon_arr, VE_arr, VN_arr, Cnb_arr, theta, dv,
                    earth_model)
 
@@ -266,13 +261,7 @@ class Integrator:
             self.VN_arr.resize(new_size)
             self.Cnb_arr.resize((new_size, 3, 3))
 
-        if earth.MODEL == 'WGS84':
-            earth_model = 0
-        elif earth.MODEL == 'PZ90':
-            earth_model = 1
-        else:
-            raise ValueError("Set Earth model by calling `earth.set_model`.")
-
+        earth_model = 0
         integrate_fast(self.dt, self.lat_arr, self.lon_arr, self.VE_arr,
                        self.VN_arr, self.Cnb_arr, theta, dv, earth_model,
                        offset=n_data-1)

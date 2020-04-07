@@ -18,17 +18,18 @@ def lla_to_ecef(lat, lon, alt=0):
     r_e : ndarray, shape (3,) or (n, 3)
         Cartesian coordinates in ECEF frame.
     """
-    lat = np.deg2rad(lat)
-    lon = np.deg2rad(lon)
+    lat = np.asarray(lat)
 
-    slat, clat = np.sin(lat), np.cos(lat)
-    slon, clon = np.sin(lon), np.cos(lon)
+    sin_lat = np.sin(np.deg2rad(lat))
+    cos_lat = np.cos(np.deg2rad(lat))
+    sin_lon = np.sin(np.deg2rad(lon))
+    cos_lon = np.cos(np.deg2rad(lon))
 
-    re, _ = earth.principal_radii(slat)
+    re, _ = earth.principal_radii(lat)
     r_e = np.empty((3,) + lat.shape)
-    r_e[0] = (re + alt) * clat * clon
-    r_e[1] = (re + alt) * clat * slon
-    r_e[2] = ((1 - earth.E2) * re + alt) * slat
+    r_e[0] = (re + alt) * cos_lat * cos_lon
+    r_e[1] = (re + alt) * cos_lat * sin_lon
+    r_e[2] = ((1 - earth.E2) * re + alt) * sin_lat
     r_e = r_e.T
 
     return r_e
@@ -59,7 +60,7 @@ def perturb_ll(lat, lon, d_lat, d_lon):
     """
     slat = np.sin(np.deg2rad(lat))
     clat = (1 - slat**2) ** 0.5
-    re, rn = earth.principal_radii(slat)
+    re, rn = earth.principal_radii(lat)
 
     lat_new = lat + np.rad2deg(d_lat / rn)
     lon_new = lon + np.rad2deg(d_lon / (re * clat))

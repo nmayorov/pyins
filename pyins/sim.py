@@ -212,7 +212,7 @@ def from_velocity(dt, lat0, lon0, alt0, VE, VN, VU, h, p, r):
     lat = lat0
 
     for iteration in range(MAX_ITER):
-        _, rn = earth.principal_radii(np.sin(lat))
+        _, rn = earth.principal_radii(np.rad2deg(lat))
         rn += alt
         dlat_spline = _QuadraticSpline(time, VN / rn)
         lat_spline = dlat_spline.antiderivative()
@@ -222,7 +222,7 @@ def from_velocity(dt, lat0, lon0, alt0, VE, VN, VU, h, p, r):
         if np.all(np.abs(delta) < ACCURACY):
             break
 
-    re, _ = earth.principal_radii(np.sin(lat))
+    re, _ = earth.principal_radii(np.rad2deg(lat))
     re += alt
     dlon_spline = _QuadraticSpline(time, VE / (re * np.cos(lat)))
     lon_spline = dlon_spline.antiderivative()

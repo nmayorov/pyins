@@ -101,7 +101,7 @@ def align_wahba(dt, theta, dv, lat, VE=None, VN=None):
 
     slat, clat = np.sin(lat), np.cos(lat)
     tlat = slat / clat
-    re, rn = earth.principal_radii(slat)
+    re, rn = earth.principal_radii(lat)
     u = earth.RATE * np.array([0, clat, slat])
     g = np.array([0, 0, -earth.gravity(slat)])
 
