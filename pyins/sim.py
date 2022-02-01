@@ -184,7 +184,8 @@ class _QuadraticSpline(PPoly):
         super(_QuadraticSpline, self).__init__(c, x)
 
 
-def from_velocity(dt, lat0, lon0, alt0, VE, VN, VU, h, p, r):
+def from_velocity(dt, lat0, lon0, alt0, VE, VN, VU, h, p, r,
+                  sensor_type='increment'):
     """Generate inertial readings given velocity and attitude.
 
     Parameters
@@ -197,6 +198,11 @@ def from_velocity(dt, lat0, lon0, alt0, VE, VN, VU, h, p, r):
         Time series of East, North and vertical velocity components.
     h, p, r : array_like, shape (n_points,)
         Time series of heading, pitch and roll angles.
+    sensor_type: 'increment' or 'rate', optional
+        Type of sensor to generate. If 'increment' (default), then integrals
+        over sampling intervals are generated (in rad and m/s).
+        If 'rate', then instantaneous rate values are generated
+        (in rad/s and /m/s/s).
 
     Returns
     -------
@@ -242,50 +248,11 @@ def from_velocity(dt, lat0, lon0, alt0, VE, VN, VU, h, p, r):
     re += alt
     dlon_spline = _QuadraticSpline(time, VE / (re * np.cos(lat)))
     lon_spline = dlon_spline.antiderivative()
-    lon = lon_spline(time) + lon0
 
     lat = np.rad2deg(lat)
-    lon = np.rad2deg(lon)
-    lon_inertial = lon + np.rad2deg(earth.RATE) * time
-    Cin = dcm.from_llw(lat, lon_inertial)
+    lon = np.rad2deg(lon0 + lon_spline(time))
 
-    v = np.vstack((VE, VN, VU)).T
-    v = util.mv_prod(Cin, v)
-    R = transform.lla_to_ecef(lat, lon_inertial, alt)
-    v[:, 0] -= earth.RATE * R[:, 1]
-    v[:, 1] += earth.RATE * R[:, 0]
-    v_s = _QuadraticSpline(time, v)
-
-    Cnb = dcm.from_hpr(h, p, r)
-    Cib = util.mm_prod(Cin, Cnb)
-
-    Cib_spline = RotationSpline(time, Rotation.from_matrix(Cib))
-    a = Cib_spline.interpolator.c[2]
-    b = Cib_spline.interpolator.c[1]
-    c = Cib_spline.interpolator.c[0]
-
-    g = earth.gravitation_ecef(lat, lon_inertial, alt)
-    a_s = v_s.derivative()
-    d = a_s.c[1] - g[:-1]
-    e = a_s.c[0] - np.diff(g, axis=0) / dt
-
-    d = util.mv_prod(Cib[:-1], d, at=True)
-    e = util.mv_prod(Cib[:-1], e, at=True)
-
-    gyros, accels = _compute_increment_readings(dt, a, b, c, d, e)
-
-    traj = pd.DataFrame(index=np.arange(n_points))
-    traj['lat'] = lat
-    traj['lon'] = lon
-    traj['alt'] = alt
-    traj['VE'] = VE
-    traj['VN'] = VN
-    traj['VU'] = VU
-    traj['h'] = h
-    traj['p'] = p
-    traj['r'] = r
-
-    return traj, gyros, accels
+    return from_position(dt, lat, lon, alt, h, p, r, sensor_type)
 
 
 def stationary_rotation(dt, lat, alt, Cnb, Cbs=None):

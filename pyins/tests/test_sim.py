@@ -66,6 +66,20 @@ def test_sim_on_stationary():
         assert_allclose(gyro_g[:, i], gyro[i] * dt, atol=1e-14)
         assert_allclose(accel_g[:, i], accel[i] * dt, atol=1e-7)
 
+    traj, gyro_g, accel_g = sim.from_velocity(dt, 50, 45, 0, VE, VN, VU,
+                                              h, p, r, sensor_type='rate')
+    assert_allclose(traj.lat, 50, rtol=1e-12)
+    assert_allclose(traj.lon, 45, rtol=1e-12)
+    assert_allclose(traj.VE, 0, atol=1e-7)
+    assert_allclose(traj.VN, 0, atol=1e-7)
+    assert_allclose(traj.h, 0, atol=1e-8)
+    assert_allclose(traj.p, 0, atol=1e-8)
+    assert_allclose(traj.r, 0, atol=1e-8)
+
+    for i in range(3):
+        assert_allclose(gyro_g[:, i], gyro[i], atol=1e-14)
+        assert_allclose(accel_g[:, i], accel[i], atol=1e-6)
+
 
 def test_stationary():
     dt = 0.1
