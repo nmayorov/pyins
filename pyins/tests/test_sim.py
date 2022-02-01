@@ -5,7 +5,7 @@ from pyins import earth
 from pyins import dcm
 
 
-def test_from_position():
+def test_sim_on_stationary():
     dt = 1e-1
     n_points = 1000
 
@@ -22,8 +22,8 @@ def test_from_position():
     slat = np.sin(np.deg2rad(50))
     clat = (1 - slat**2) ** 0.5
 
-    gyro = earth.RATE * np.array([0, clat, slat]) * dt
-    accel = np.array([0, 0, earth.gravity(50)]) * dt
+    gyro = earth.RATE * np.array([0, clat, slat])
+    accel = np.array([0, 0, earth.gravity(50)])
 
     traj, gyro_g, accel_g = sim.from_position(dt, lat, lon, alt, h, p, r)
     assert_allclose(traj.lat, 50, rtol=1e-12)
@@ -35,8 +35,22 @@ def test_from_position():
     assert_allclose(traj.r, 0, atol=1e-8)
 
     for i in range(3):
+        assert_allclose(gyro_g[:, i], gyro[i] * dt, atol=1e-14)
+        assert_allclose(accel_g[:, i], accel[i] * dt, atol=1e-7)
+
+    traj, gyro_g, accel_g = sim.from_position(dt, lat, lon, alt, h, p, r,
+                                              sensor_type='rate')
+    assert_allclose(traj.lat, 50, rtol=1e-12)
+    assert_allclose(traj.lon, 45, rtol=1e-12)
+    assert_allclose(traj.VE, 0, atol=1e-7)
+    assert_allclose(traj.VN, 0, atol=1e-7)
+    assert_allclose(traj.h, 0, atol=1e-8)
+    assert_allclose(traj.p, 0, atol=1e-8)
+    assert_allclose(traj.r, 0, atol=1e-8)
+
+    for i in range(3):
         assert_allclose(gyro_g[:, i], gyro[i], atol=1e-14)
-        assert_allclose(accel_g[:, i], accel[i], atol=1e-7)
+        assert_allclose(accel_g[:, i], accel[i], atol=1e-6)
 
     traj, gyro_g, accel_g = sim.from_velocity(dt, 50, 45, 0, VE, VN, VU,
                                               h, p, r)
@@ -49,8 +63,8 @@ def test_from_position():
     assert_allclose(traj.r, 0, atol=1e-8)
 
     for i in range(3):
-        assert_allclose(gyro_g[:, i], gyro[i], atol=1e-14)
-        assert_allclose(accel_g[:, i], accel[i], atol=1e-7)
+        assert_allclose(gyro_g[:, i], gyro[i] * dt, atol=1e-14)
+        assert_allclose(accel_g[:, i], accel[i] * dt, atol=1e-7)
 
 
 def test_stationary():

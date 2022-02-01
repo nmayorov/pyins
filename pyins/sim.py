@@ -17,7 +17,7 @@ DRH2SI = np.pi / (180 * 60)
 SI2DRH = 1 / DRH2SI
 
 
-def _compute_readings(dt, a, b, c, d, e):
+def _compute_increment_readings(dt, a, b, c, d, e):
     ab = np.cross(a, b)
     ac = np.cross(a, c)
     bc = np.cross(b, c)
@@ -64,7 +64,7 @@ def _compute_readings(dt, a, b, c, d, e):
     return gyros, accels
 
 
-def from_position(dt, lat, lon, alt, h, p, r):
+def from_position(dt, lat, lon, alt, h, p, r, sensor_type='increment'):
     """Generate inertial readings given position and attitude.
 
     Parameters
@@ -75,16 +75,24 @@ def from_position(dt, lat, lon, alt, h, p, r):
         Time series of latitude, longitude and altitude.
     h, p, r : array_like, shape (n_points,)
         Time series of heading, pitch and roll angles.
+    sensor_type: 'increment' or 'rate', optional
+        Type of sensor to generate. If 'increment' (default), then integrals
+        over sampling intervals are generated (in rad and m/s).
+        If 'rate', then instantaneous rate values are generated
+        (in rad/s and /m/s/s).
 
     Returns
     -------
     traj : DataFrame
         Trajectory. Contains n_points rows.
-    gyro : ndarray, shape (n_points - 1, 3)
+    gyro : ndarray, shape (n_points - 1, 3) or (n_points, 3)
         Gyro readings.
-    accel : ndarray, shape (n_points - 1, 3)
+    accel : ndarray, shape (n_points - 1, 3) or (n_points, 3)
         Accelerometer readings.
     """
+    if sensor_type not in ['rate', 'increment']:
+        raise ValueError("`sensor_type` must be 'rate' or 'increment'.")
+
     lat = np.asarray(lat, dtype=float)
     lon = np.asarray(lon, dtype=float)
     alt = np.asarray(alt, dtype=float)
@@ -112,19 +120,26 @@ def from_position(dt, lat, lon, alt, h, p, r):
     Cib = util.mm_prod(Cin, Cnb)
 
     Cib_spline = RotationSpline(time, Rotation.from_matrix(Cib))
-    a = Cib_spline.interpolator.c[2]
-    b = Cib_spline.interpolator.c[1]
-    c = Cib_spline.interpolator.c[0]
-
     g = earth.gravitation_ecef(lat_inertial, lon_inertial, alt)
-    a_s = v_s.derivative()
-    d = a_s.c[1] - g[:-1]
-    e = a_s.c[0] - np.diff(g, axis=0) / dt
 
-    d = util.mv_prod(Cib[:-1], d, at=True)
-    e = util.mv_prod(Cib[:-1], e, at=True)
+    if sensor_type == 'rate':
+        gyros = Cib_spline(time, 1)
+        accels = util.mv_prod(Cib, v_s(time, 1) - g, at=True)
+    elif sensor_type == 'increment':
+        a = Cib_spline.interpolator.c[2]
+        b = Cib_spline.interpolator.c[1]
+        c = Cib_spline.interpolator.c[0]
 
-    gyros, accels = _compute_readings(dt, a, b, c, d, e)
+        a_s = v_s.derivative()
+        d = a_s.c[1] - g[:-1]
+        e = a_s.c[0] - np.diff(g, axis=0) / dt
+
+        d = util.mv_prod(Cib[:-1], d, at=True)
+        e = util.mv_prod(Cib[:-1], e, at=True)
+
+        gyros, accels = _compute_increment_readings(dt, a, b, c, d, e)
+    else:
+        assert False
 
     traj = pd.DataFrame(index=np.arange(time.shape[0]))
     traj['lat'] = lat
@@ -257,7 +272,7 @@ def from_velocity(dt, lat0, lon0, alt0, VE, VN, VU, h, p, r):
     d = util.mv_prod(Cib[:-1], d, at=True)
     e = util.mv_prod(Cib[:-1], e, at=True)
 
-    gyros, accels = _compute_readings(dt, a, b, c, d, e)
+    gyros, accels = _compute_increment_readings(dt, a, b, c, d, e)
 
     traj = pd.DataFrame(index=np.arange(n_points))
     traj['lat'] = lat
@@ -324,7 +339,7 @@ def stationary_rotation(dt, lat, alt, Cnb, Cbs=None):
     d = util.mv_prod(Cis[:-1], d, at=True)
     e = util.mv_prod(Cis[:-1], e, at=True)
 
-    gyros, accels = _compute_readings(dt, a, b, c, d, e)
+    gyros, accels = _compute_increment_readings(dt, a, b, c, d, e)
 
     return gyros, accels
 
