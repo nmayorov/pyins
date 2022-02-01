@@ -6,7 +6,7 @@ from . import dcm
 from ._integrate import integrate_fast, integrate_fast_stationary
 
 
-def coning_sculling(gyro, accel, order=1):
+def coning_sculling(gyro, accel, order=1, dt=None):
     """Apply coning and sculling corrections to inertial readings.
 
     The algorithm assumes a polynomial model for the angular velocity and the
@@ -26,7 +26,11 @@ def coning_sculling(gyro, accel, order=1):
     order : {0, 1, 2}, optional
         Angular velocity and specific force polynomial model order.
         Note that 0 means not applying non-commutative corrections at all.
+        For
         Default is 1.
+    dt : float or None, optional
+        If None (default), `gyro` and `accel` are assumed to contain increments.
+        If float, it is interpreted as sampling rate of rate sensors.
 
     Returns
     -------
@@ -49,6 +53,24 @@ def coning_sculling(gyro, accel, order=1):
 
     gyro = np.asarray(gyro)
     accel = np.asarray(accel)
+
+    if dt is not None:
+        a_gyro = gyro[:-1]
+        b_gyro = gyro[1:] - gyro[:-1]
+        a_accel = accel[:-1]
+        b_accel = accel[1:] - accel[:-1]
+        alpha = (a_gyro + 0.5 * b_gyro) * dt
+        dv = (a_accel + 0.5 * b_accel) * dt
+
+        if order == 0:
+            coning = 0
+            sculling = 0
+        else:
+            coning = np.cross(a_gyro, b_gyro) * dt**2 / 12
+            sculling = (np.cross(a_gyro, b_accel) +
+                        np.cross(a_accel, b_gyro)) * dt**2/12
+
+        return alpha + coning, dv + sculling + 0.5 * np.cross(alpha, dv)
 
     if order == 0:
         coning = 0

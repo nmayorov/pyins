@@ -63,5 +63,45 @@ def test_integrate():
     assert_allclose(I.traj.r, 60, rtol=1e-12)
 
 
+def test_integrate_rate_sensors():
+    # Test on the static bench.
+    dt = 1e-1
+    n = 100
+
+    Cnb = dcm.from_hpr(45, -30, 60)
+    gyro = np.array([0, 1/np.sqrt(2), 1/np.sqrt(2)]) * earth.RATE
+    gyro = Cnb.T.dot(gyro)
+    gyro = np.resize(gyro, (n, 3))
+
+    accel = np.array([0, 0, earth.gravity(1/np.sqrt(2))])
+    accel = Cnb.T.dot(accel)
+    accel = np.resize(accel, (n, 3))
+
+    theta, dv = coning_sculling(gyro, accel, dt=dt)
+
+    traj = integrate(dt, 45, 50, 0, 0, 45, -30, 60, theta, dv)
+
+    assert_allclose(traj.lat, 45, rtol=1e-12)
+    assert_allclose(traj.lon, 50, rtol=1e-12)
+    assert_allclose(traj.VE, 0, atol=1e-8)
+    assert_allclose(traj.VN, 0, atol=1e-8)
+    assert_allclose(traj.h, 45, rtol=1e-12)
+    assert_allclose(traj.p, -30, rtol=1e-12)
+    assert_allclose(traj.r, 60, rtol=1e-12)
+
+    Integrator.INITIAL_SIZE = 50
+    I = Integrator(dt, 45, 50, 0, 0, 45, -30, 60)
+    I.integrate(theta[:n//2], dv[:n//2])
+    I.integrate(theta[n//2:], dv[n//2:])
+
+    assert_allclose(I.traj.lat, 45, rtol=1e-12)
+    assert_allclose(I.traj.lon, 50, rtol=1e-12)
+    assert_allclose(I.traj.VE, 0, atol=1e-8)
+    assert_allclose(I.traj.VN, 0, atol=1e-8)
+    assert_allclose(I.traj.h, 45, rtol=1e-12)
+    assert_allclose(I.traj.p, -30, rtol=1e-12)
+    assert_allclose(I.traj.r, 60, rtol=1e-12)
+
+
 if __name__ == '__main__':
     run_module_suite()
