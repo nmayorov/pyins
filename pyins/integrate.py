@@ -343,3 +343,41 @@ def integrate_stationary(dt, lat, Cnb, theta, dv):
     integrate_fast_stationary(dt, lat, Cnb_arr, V_arr, theta, dv)
 
     return Cnb_arr, V_arr
+
+
+def _integrate_py(lla, Vn, Cnb, theta, dv, dt, offset=0):
+    for i in range(theta.shape[0]):
+        j = i + offset
+
+        lat = lla[j, 0]
+        alt = lla[j, 2]
+        sin_lat = np.sin(lat)
+        cos_lat = np.sqrt(1.0 - sin_lat * sin_lat)
+        tan_lat = sin_lat / cos_lat
+
+        V = Vn[j]
+        dv_n = Cnb[j].dot(dv[i])
+
+        lat_deg = np.rad2deg(lat)
+        re, rn = earth.principal_radii(lat_deg, alt)
+
+        u = earth.RATE * np.asarray([0.0, cos_lat, sin_lat])
+        VE, VN, VU = V
+        rho = np.asarray([-VN / rn, VE / re, VE / re * tan_lat])
+        omega = u + rho
+        w = u + omega
+
+        V_new = V + dv_n - dt * (np.cross(w, V) + 0.5 * np.cross(omega, dv_n))
+        V_new[2] -= dt * earth.gravity(lat_deg, alt + 0.5 * VU * dt)
+        Vn[j + 1] = V_new
+
+        VE, VN, VU = 0.5 * (V + V_new)
+        rho = np.asarray([-VN / rn, VE / re, VE / re * tan_lat])
+        omega = u + rho
+
+        lla[j + 1] = lla[j] + dt * np.asarray([-rho[0], rho[1] / cos_lat, VU])
+
+        xi = -omega * dt
+        dCn = dcm.from_rv(xi)
+        dCb = dcm.from_rv(theta[i])
+        Cnb[j + 1] = dCn.dot(Cnb[j]).dot(dCb)

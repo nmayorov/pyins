@@ -2,7 +2,8 @@ from numpy.testing import assert_allclose, run_module_suite
 import numpy as np
 from pyins import earth
 from pyins.integrate import coning_sculling, integrate, Integrator
-from pyins import dcm
+from pyins.integrate import _integrate_py
+from pyins import dcm, sim
 
 
 def test_coning_sculling():
@@ -101,6 +102,59 @@ def test_integrate_rate_sensors():
     assert_allclose(I.traj.h, 45, rtol=1e-12)
     assert_allclose(I.traj.p, -30, rtol=1e-12)
     assert_allclose(I.traj.r, 60, rtol=1e-12)
+
+
+def sim_traj():
+    dt = 0.01
+    n = 36000
+    t = dt * np.arange(n)
+
+    lat, lon, alt = (50, 35, 1000)
+    VE = 10 * np.ones(n)
+    VN = 10 * np.ones(n)
+    VU = np.cos(2 * np.pi * t / 60)
+
+    h = 5 * np.sin(2 * np.pi * t / 30)
+    p = 5 * np.cos(2 * np.pi * t / 30)
+    r = 45 + 5 * np.sin(2 * np.pi * t / 30)
+
+    return  dt, *sim.from_velocity(dt, lat, lon, alt, VE, VN, VU, h, p, r)
+
+
+def test_integrate_py():
+    dt, traj, gyro, accel = sim_traj()
+
+    lla0 = traj.loc[0, ['lat', 'lon', 'alt']]
+    Vn0 = traj.loc[0, ['VE', 'VN', 'VU']]
+    hpr0 = traj.loc[0, ['h', 'p', 'r']]
+
+    lla = np.zeros((traj.shape[0], 3))
+    Vn = np.zeros((traj.shape[0], 3))
+    Cnb = np.zeros((traj.shape[0], 3, 3))
+
+    lla[0] = lla0
+    lla[0, :2] = np.deg2rad(lla[0, :2])
+    Vn[0] = Vn0
+    Cnb[0] = dcm.from_hpr(hpr0[0], hpr0[1], hpr0[2])
+
+    theta, dv = coning_sculling(gyro, accel)
+
+    _integrate_py(lla, Vn, Cnb, theta, dv, dt)
+    lla[:, :2] = np.rad2deg(lla[:, :2])
+    h, p, r = dcm.to_hpr(Cnb)
+    h[h > 180] -= 360
+
+    assert_allclose(traj.lat, lla[:, 0], atol=2e-8)
+    assert_allclose(traj.lon, lla[:, 1], atol=2e-8)
+    assert_allclose(traj.alt, lla[:, 2], atol=4e-3)
+
+    assert_allclose(traj.VE, Vn[:, 0], atol=1e-5)
+    assert_allclose(traj.VN, Vn[:, 1], atol=1e-5)
+    assert_allclose(traj.VU, Vn[:, 2], atol=3e-5)
+
+    assert_allclose(traj.h, h, atol=3e-8)
+    assert_allclose(traj.p, p, atol=3e-8)
+    assert_allclose(traj.r, r, atol=3e-8)
 
 
 if __name__ == '__main__':
