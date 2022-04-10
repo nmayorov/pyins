@@ -24,7 +24,7 @@ F = R0 * (1 - E2) ** 0.5 * GP / (GE * R0) - 1
 MU = 3.986004418e14
 
 
-def principal_radii(lat):
+def principal_radii(lat, alt=0):
     """Compute the principal radii of curvature of Earth ellipsoid.
 
     See [1]_ (p. 41) for the definition and formulas.
@@ -33,6 +33,8 @@ def principal_radii(lat):
     ----------
     lat : array_like
         Latitude.
+    alt : array_like
+        Altitude. Default is 0.
 
     Returns
     -------
@@ -50,7 +52,7 @@ def principal_radii(lat):
     re = R0 / np.sqrt(x)
     rn = re * (1 - E2) / x
 
-    return re, rn
+    return re + alt, rn + alt
 
 
 def gravity(lat, alt=0):

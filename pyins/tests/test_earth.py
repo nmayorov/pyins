@@ -9,10 +9,11 @@ def test_principal_radii():
     assert_allclose(rn, earth.R0 * (1 - earth.E2), rtol=1e-10)
 
     lat = [0, 90]
-    re, rn = earth.principal_radii(lat)
-    assert_allclose(re[0], earth.R0, rtol=1e-10)
-    assert_allclose(rn[0], earth.R0 * (1 - earth.E2), rtol=1e-10)
+    re, rn = earth.principal_radii(lat, 1000)
+    assert_allclose(re[0], earth.R0 + 1000, rtol=1e-10)
+    assert_allclose(rn[0], earth.R0 * (1 - earth.E2 + 1000), rtol=1e-10)
     assert_allclose(re[1], rn[1], rtol=1e-10)
+    
 
 
 def test_gravity():
