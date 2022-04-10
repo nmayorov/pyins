@@ -1,4 +1,12 @@
 """Compute a navigation solution by integration of inertial readings."""
+import math
+try:
+    from numba import jit
+except ImportError:
+    from sys import exc_info
+    print (exc_info())
+    def jit(fn):
+        return fn
 import numpy as np
 import pandas as pd
 from . import earth
@@ -381,3 +389,149 @@ def _integrate_py(lla, Vn, Cnb, theta, dv, dt, offset=0):
         dCn = dcm.from_rv(xi)
         dCb = dcm.from_rv(theta[i])
         Cnb[j + 1] = dCn.dot(Cnb[j]).dot(dCb)
+
+
+@jit
+def __dcm_from_rv_single(rv, out=None):
+    rv1, rv2, rv3 = rv
+    rv11 = rv1 * rv1
+    rv12 = rv1 * rv2
+    rv13 = rv1 * rv3
+    rv22 = rv2 * rv2
+    rv23 = rv2 * rv3
+    rv33 = rv3 * rv3
+
+    norm2 = rv11 + rv22 + rv33
+    if norm2 > 1e-6:
+        norm = norm2 ** 0.5
+        k1 = math.sin(norm) / norm
+        k2 = (1.0 - math.cos(norm)) / norm2
+    else:
+        norm4 = norm2 * norm2
+        k1 = 1.0 - norm2 / 6.0 + norm4 / 120.0
+        k2 = 0.5 - norm2 / 24.0 + norm4 / 720.0
+
+    if out is None:
+        out = np.empty((3,3))
+    out[0, :] = 1.0 - k2*(rv33 + rv22), -k1*rv3 + k2*rv12, k1*rv2 + k2*rv13
+    out[1, :] = k1*rv3 + k2*rv12, 1.0 - k2*(rv33 + rv11), -k1*rv1 + k2*rv23
+    out[2, :] = -k1*rv2 + k2*rv13, k1*rv1 + k2*rv23, 1.0 - k2*(rv22 + rv11)
+    return out
+
+
+@jit
+def __mv_dot3(A, b):
+    b1, b2, b3 = b
+    v1 = A[0, 0] * b1 + A[0, 1] * b2 + A[0, 2] * b3
+    v2 = A[1, 0] * b1 + A[1, 1] * b2 + A[1, 2] * b3
+    v3 = A[2, 0] * b1 + A[2, 1] * b2 + A[2, 2] * b3
+    return v1, v2, v3
+
+
+@jit
+def _integrate_py_fast(lla, Vn, Cnb, theta, dv, dt, offset=0):
+    """Mechanization in a rotating navigation frame.
+
+    Parameters
+    ----------
+    lla : array_like, shape: (N, 3)
+        Geodetic coordinates [rad].
+    V : array_like, shape: (N, 3)
+        Velocity in local level frame [m/s].
+    Cnb : array_like, shape: (N, 3, 3)
+        Direct cosine matrix.
+    theta : array_like, shape: (N, 3)
+        Rotation increments in body frame.
+    dv : array_like, shape: (N, 3)
+        Velocity increments in body frame.
+    dt : float
+        Time step.
+    offset : int
+        Offset index for intital conditions in arrays: lla, Vn, Cnb.
+    """
+
+    C = np.empty((3,3))
+    dCn = np.empty((3,3))
+    dCb = np.empty((3,3))
+    xi = np.empty(3)
+    V = np.empty(3)
+    V_new = np.empty(3)
+    dv_n = np.empty(3)
+
+    for i in range(theta.shape[0]):
+        j = i + offset
+
+        lat, lon, alt = lla[j]
+        sin_lat = math.sin(lat)
+        sin_lat2 = sin_lat * sin_lat
+        cos_lat = (1.0 - sin_lat2) ** 0.5
+        tan_lat = sin_lat / cos_lat
+
+        V = Vn[j]
+        VE, VN, VU = V
+
+        u2 = earth.RATE * cos_lat
+        u3 = earth.RATE * sin_lat
+
+        x = 1 - earth.E2 * sin_lat2
+        re = earth.R0 / (x ** 0.5)
+        rn = re * (1 - earth.E2) / x
+        re += alt
+        rn += alt
+
+        rho1, rho2, rho3 = -VN / rn, VE / re, tan_lat * VE / re # w_en
+
+        omega1 = rho1
+        omega2 = u2 + rho2
+        omega3 = u3 + rho3
+
+        w1 = omega1
+        w2 = u2 + omega2
+        w3 = u3 + omega3
+
+        dv_n = __mv_dot3(Cnb[j], dv[i])
+        dv_n1, dv_n2, dv_n3 = dv_n
+
+        c1 = (-w3 * VN + w2 * VU) + 0.5 * (-omega3 * dv_n2 + omega2 * dv_n3)
+        c2 = ( w3 * VE - w1 * VU) + 0.5 * ( omega3 * dv_n1 - omega1 * dv_n3)
+        c3 = (-w2 * VE + w1 * VN) + 0.5 * (-omega2 * dv_n1 + omega1 * dv_n2)
+
+        g = (earth.GE * (1 + earth.F * sin_lat2)
+                / (1 - earth.E2 * sin_lat2)**0.5
+                * (1 - (2 * alt + VU * dt) / earth.R0))
+
+        VE_new = VE + (dv_n[0] - dt*c1)
+        VN_new = VN + (dv_n[1] - dt*c2)
+        VU_new = VU + (dv_n[2] - dt*c3)
+        VU_new -= dt * g
+
+        Vn[j + 1] = VE_new, VN_new, VU_new
+
+        VE = 0.5 * (VE + VE_new)
+        VN = 0.5 * (VN + VN_new)
+        VU = 0.5 * (VU + VU_new)
+        V = (VE, VN, VU)
+
+        rho1, rho2, rho3 = -VN / rn, VE / re, tan_lat * VE / re
+        omega1 = rho1
+        omega2 = u2 + rho2
+        omega3 = u3 + rho3
+
+        lla[j + 1, 0] = lat - dt * rho1
+        lla[j + 1, 1] = lon + dt * rho2 / cos_lat
+        lla[j + 1, 2] = alt + dt * VU
+
+        xi1 = -omega1 * dt
+        xi2 = -omega2 * dt
+        xi3 = -omega3 * dt
+
+        dCn = __dcm_from_rv_single((xi1, xi2, xi3), dCn)
+        dCb = __dcm_from_rv_single(theta[i], dCb)
+
+        C[:, 0] = __mv_dot3(dCn, Cnb[j, :, 0])
+        C[:, 1] = __mv_dot3(dCn, Cnb[j, :, 1])
+        C[:, 2] = __mv_dot3(dCn, Cnb[j, :, 2])
+
+        Cnb[j+1, :, 0] = __mv_dot3(C, dCb[:, 0])
+        Cnb[j+1, :, 1] = __mv_dot3(C, dCb[:, 1])
+        Cnb[j+1, :, 2] = __mv_dot3(C, dCb[:, 2])
