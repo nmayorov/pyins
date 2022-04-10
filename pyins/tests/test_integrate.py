@@ -2,7 +2,7 @@ from numpy.testing import assert_allclose, run_module_suite
 import numpy as np
 from pyins import earth
 from pyins.integrate import coning_sculling, integrate, Integrator
-from pyins.integrate import _integrate_py, _integrate_py_fast
+from pyins.integrate import _integrate_py_fast
 from pyins import dcm, sim
 
 
@@ -119,42 +119,6 @@ def sim_traj():
     r = 45 + 5 * np.sin(2 * np.pi * t / 30)
 
     return  dt, *sim.from_velocity(dt, lat, lon, alt, VE, VN, VU, h, p, r)
-
-
-def test_integrate_py():
-    dt, traj, gyro, accel = sim_traj()
-
-    lla0 = traj.loc[0, ['lat', 'lon', 'alt']]
-    Vn0 = traj.loc[0, ['VE', 'VN', 'VU']]
-    hpr0 = traj.loc[0, ['h', 'p', 'r']]
-
-    lla = np.zeros((traj.shape[0], 3))
-    Vn = np.zeros((traj.shape[0], 3))
-    Cnb = np.zeros((traj.shape[0], 3, 3))
-
-    lla[0] = lla0
-    lla[0, :2] = np.deg2rad(lla[0, :2])
-    Vn[0] = Vn0
-    Cnb[0] = dcm.from_hpr(hpr0[0], hpr0[1], hpr0[2])
-
-    theta, dv = coning_sculling(gyro, accel)
-
-    _integrate_py(lla, Vn, Cnb, theta, dv, dt)
-    lla[:, :2] = np.rad2deg(lla[:, :2])
-    h, p, r = dcm.to_hpr(Cnb)
-    h[h > 180] -= 360
-
-    assert_allclose(traj.lat, lla[:, 0], atol=2e-8)
-    assert_allclose(traj.lon, lla[:, 1], atol=2e-8)
-    assert_allclose(traj.alt, lla[:, 2], atol=4e-3)
-
-    assert_allclose(traj.VE, Vn[:, 0], atol=1e-5)
-    assert_allclose(traj.VN, Vn[:, 1], atol=1e-5)
-    assert_allclose(traj.VU, Vn[:, 2], atol=3e-5)
-
-    assert_allclose(traj.h, h, atol=3e-8)
-    assert_allclose(traj.p, p, atol=3e-8)
-    assert_allclose(traj.r, r, atol=3e-8)
 
 
 def test_integrate_py_fast():
