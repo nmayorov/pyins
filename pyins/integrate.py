@@ -2,9 +2,9 @@
 import math
 try:
     from numba import jit
-except ImportError:
-    from sys import exc_info
-    print (exc_info())
+except ImportError as error:
+    print(error)
+    print("Can't find numba.jit, execution may slow down dramatically.")
     def jit(fn):
         return fn
 import numpy as np
