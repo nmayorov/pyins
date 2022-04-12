@@ -354,7 +354,7 @@ def integrate_stationary(dt, lat, Cnb, theta, dv):
 
 
 @jit
-def __dcm_from_rv_single(rv, out=None):
+def _dcm_from_rv_single(rv, out=None):
     rv1, rv2, rv3 = rv
     rv11 = rv1 * rv1
     rv12 = rv1 * rv2
@@ -382,7 +382,7 @@ def __dcm_from_rv_single(rv, out=None):
 
 
 @jit
-def __mv_dot3(A, b):
+def _mv_dot3(A, b):
     b1, b2, b3 = b
     v1 = A[0, 0] * b1 + A[0, 1] * b2 + A[0, 2] * b3
     v2 = A[1, 0] * b1 + A[1, 1] * b2 + A[1, 2] * b3
@@ -391,12 +391,12 @@ def __mv_dot3(A, b):
 
 
 @jit
-def __v_add3(a, b):
+def _v_add3(a, b):
     return a[0] + b[0], a[1] + b[1], a[2] + b[2]
 
 
 @jit
-def __v_cross3(a, b):
+def _v_cross3(a, b):
     a1, a2, a3 = a
     b1, b2, b3 = b
     c1 = (-a3 * b2 + a2 * b3)
@@ -407,7 +407,7 @@ def __v_cross3(a, b):
 
 
 @jit
-def __gravity(lat, alt):
+def _gravity(lat, alt):
     sin_lat = math.sin(lat)
     sin_lat2 = sin_lat * sin_lat
     return (earth.GE * (1 + earth.F * sin_lat2)
@@ -436,7 +436,6 @@ def _integrate_py_fast(lla, Vn, Cnb, theta, dv, dt, offset=0):
     offset : int
         Offset index for intital conditions in arrays: lla, Vn, Cnb.
     """
-
     C = np.empty((3,3))
     dCn = np.empty((3,3))
     dCb = np.empty((3,3))
@@ -463,17 +462,17 @@ def _integrate_py_fast(lla, Vn, Cnb, theta, dv, dt, offset=0):
 
         u = (0, earth.RATE * cos_lat, earth.RATE * sin_lat)
         rho = (-VN / rn, VE / re, tan_lat * VE / re)
-        omega = __v_add3(u, rho)
-        w = __v_add3(u, omega)
+        omega = _v_add3(u, rho)
+        w = _v_add3(u, omega)
 
-        dv_n = __mv_dot3(Cnb[j], dv[i])
-        corriolis1 = __v_cross3(w, V)
-        corriolis2 = __v_cross3(omega, dv_n)
+        dv_n = _mv_dot3(Cnb[j], dv[i])
+        corriolis1 = _v_cross3(w, V)
+        corriolis2 = _v_cross3(omega, dv_n)
 
         VE_new = VE + (dv_n[0] - dt * (corriolis1[0] + 0.5 * corriolis2[0]))
         VN_new = VN + (dv_n[1] - dt * (corriolis1[1] + 0.5 * corriolis2[1]))
         VU_new = VU + (dv_n[2] - dt * (corriolis1[2] + 0.5 * corriolis2[2]))
-        VU_new -= dt * __gravity(lat, (alt + 0.5 * dt * VU))
+        VU_new -= dt * _gravity(lat, (alt + 0.5 * dt * VU))
 
         Vn[j + 1] = VE_new, VN_new, VU_new
 
@@ -482,20 +481,20 @@ def _integrate_py_fast(lla, Vn, Cnb, theta, dv, dt, offset=0):
         VU = 0.5 * (VU + VU_new)
 
         rho = (-VN / rn, VE / re, tan_lat * VE / re)
-        omega = __v_add3(u, rho)
+        omega = _v_add3(u, rho)
 
         lla[j + 1, 0] = lat - dt * rho[0]
         lla[j + 1, 1] = lon + dt * rho[1] / cos_lat
         lla[j + 1, 2] = alt + dt * VU
 
         xi = (-dt * omega[0], -dt * omega[1], -dt * omega[2])
-        dCn = __dcm_from_rv_single(xi, dCn)
-        dCb = __dcm_from_rv_single(theta[i], dCb)
+        dCn = _dcm_from_rv_single(xi, dCn)
+        dCb = _dcm_from_rv_single(theta[i], dCb)
 
-        C[:, 0] = __mv_dot3(dCn, Cnb[j, :, 0])
-        C[:, 1] = __mv_dot3(dCn, Cnb[j, :, 1])
-        C[:, 2] = __mv_dot3(dCn, Cnb[j, :, 2])
+        C[:, 0] = _mv_dot3(dCn, Cnb[j, :, 0])
+        C[:, 1] = _mv_dot3(dCn, Cnb[j, :, 1])
+        C[:, 2] = _mv_dot3(dCn, Cnb[j, :, 2])
 
-        Cnb[j+1, :, 0] = __mv_dot3(C, dCb[:, 0])
-        Cnb[j+1, :, 1] = __mv_dot3(C, dCb[:, 1])
-        Cnb[j+1, :, 2] = __mv_dot3(C, dCb[:, 2])
+        Cnb[j+1, :, 0] = _mv_dot3(C, dCb[:, 0])
+        Cnb[j+1, :, 1] = _mv_dot3(C, dCb[:, 1])
+        Cnb[j+1, :, 2] = _mv_dot3(C, dCb[:, 2])
