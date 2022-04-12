@@ -114,9 +114,9 @@ def sim_traj():
     VN = 10 * np.ones(n)
     VU = np.cos(2 * np.pi * t / 60)
 
-    h = 5 * np.sin(2 * np.pi * t / 30)
+    h = 10 + 5 * np.sin(2 * np.pi * t / 30)
     p = 5 * np.cos(2 * np.pi * t / 30)
-    r = 45 + 5 * np.sin(2 * np.pi * t / 30)
+    r = 5 * np.sin(2 * np.pi * t / 30)
 
     return  dt, *sim.from_velocity(dt, lat, lon, alt, VE, VN, VU, h, p, r)
 
@@ -142,7 +142,6 @@ def test_integrate_py_fast():
     _integrate_py_fast(lla, Vn, Cnb, theta, dv, dt)
     lla[:, :2] = np.rad2deg(lla[:, :2])
     h, p, r = dcm.to_hpr(Cnb)
-    h[h > 180] -= 360
 
     assert_allclose(traj.lat, lla[:, 0], atol=2e-8)
     assert_allclose(traj.lon, lla[:, 1], atol=2e-8)
