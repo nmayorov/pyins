@@ -19,35 +19,9 @@ GE = 9.7803253359
 #: Gravity at the pole.
 GP = 9.8321849378
 
-F = (1 - E2) ** 0.5 * GP / GE - 1
+F = R0 * (1 - E2) ** 0.5 * GP / (GE * R0) - 1
 #: Standard gravitational parameter for Earth
 MU = 3.986004418e14
-
-
-def rate_n(lat):
-    """Compute Earth rate expressed in the ENU frame.
-
-    Parameters
-    ----------
-    lat : array_like
-        Latitude.
-
-    Returns
-    -------
-    rate_n : ndarray, shape(3,) or (n, 3)
-    """
-    lat = np.deg2rad(lat)
-    sin_lat = np.sin(lat)
-    cos_lat = np.cos(lat)
-
-    if np.asarray(sin_lat).ndim == 0:
-        u = RATE * np.asarray([0, cos_lat, sin_lat])
-    else:
-        u = np.empty((len(lat), 3))
-        u[:, 0] = 0
-        u[:, 1] = RATE * cos_lat
-        u[:, 2] = RATE * sin_lat
-    return u
 
 
 def principal_radii(lat, alt=0):

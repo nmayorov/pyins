@@ -2,17 +2,6 @@ from numpy.testing import assert_allclose, run_module_suite
 from pyins import earth
 
 
-def test_rate_n():
-    lat = 0
-    u = earth.rate_n(lat)
-    assert_allclose(u, [0, earth.RATE, 0], rtol=1e-10)
-
-    lat = [0, 90]
-    u = earth.rate_n(lat)
-    assert_allclose(u[0, :], [0, earth.RATE, 0], rtol=1e-10)
-    assert_allclose(u[1, :], [0, 0, earth.RATE], rtol=1e-10, atol=1e-20)
-
-
 def test_principal_radii():
     lat = 0
     re, rn = earth.principal_radii(lat)
@@ -22,9 +11,9 @@ def test_principal_radii():
     lat = [0, 90]
     re, rn = earth.principal_radii(lat, 1000)
     assert_allclose(re[0], earth.R0 + 1000, rtol=1e-10)
-    assert_allclose(rn[0], earth.R0 * (1 - earth.E2) + 1000, rtol=1e-10)
+    assert_allclose(rn[0], earth.R0 * (1 - earth.E2 + 1000), rtol=1e-10)
     assert_allclose(re[1], rn[1], rtol=1e-10)
-
+    
 
 
 def test_gravity():
