@@ -2,7 +2,7 @@ from numpy.testing import assert_allclose, run_module_suite
 import numpy as np
 from pyins import earth
 from pyins.integrate import coning_sculling, integrate, Integrator
-from pyins.integrate import _integrate_py_fast
+from pyins.integrate import _integrate_py_fast, integrate3d, Integrator3d
 from pyins import dcm, sim
 
 
@@ -154,6 +154,95 @@ def test_integrate_py_fast():
     assert_allclose(traj.h, h, atol=3e-8)
     assert_allclose(traj.p, p, atol=3e-8)
     assert_allclose(traj.r, r, atol=3e-8)
+
+
+def test_integrate3d():
+    dt, traj_ref, gyro, accel = sim_traj()
+    theta, dv = coning_sculling(gyro, accel)
+
+    lla0 = traj_ref.loc[0, ['lat', 'lon', 'alt']]
+    Vn0 = traj_ref.loc[0, ['VE', 'VN', 'VU']]
+    hpr0 = traj_ref.loc[0, ['h', 'p', 'r']]
+
+    traj_test = integrate3d(dt, lla0, Vn0, hpr0, theta, dv)
+
+    assert_allclose(traj_test.lat, traj_ref.lat, atol=2e-8)
+    assert_allclose(traj_test.lon, traj_ref.lon, atol=2e-8)
+    assert_allclose(traj_test.alt, traj_ref.alt, atol=4e-3)
+
+    assert_allclose(traj_test.VE, traj_ref.VE, atol=1e-5)
+    assert_allclose(traj_test.VN, traj_ref.VN, atol=1e-5)
+    assert_allclose(traj_test.VU, traj_ref.VU, atol=3e-5)
+
+    assert_allclose(traj_test.h, traj_ref.h, atol=3e-8)
+    assert_allclose(traj_test.p, traj_ref.p, atol=3e-8)
+    assert_allclose(traj_test.r, traj_ref.r, atol=3e-8)
+
+
+    Integrator.INITIAL_SIZE = 10000
+    I = Integrator3d(dt, lla0, Vn0, hpr0)
+    n = theta.shape[0]
+    I.integrate(theta[:n//2], dv[:n//2])
+    I.integrate(theta[n//2:], dv[n//2:])
+
+    assert_allclose(I.traj.lat, traj_ref.lat, atol=2e-8)
+    assert_allclose(I.traj.lon, traj_ref.lon, atol=2e-8)
+    assert_allclose(I.traj.alt, traj_ref.alt, atol=4e-3)
+
+    assert_allclose(I.traj.VE, traj_ref.VE, atol=1e-5)
+    assert_allclose(I.traj.VN, traj_ref.VN, atol=1e-5)
+    assert_allclose(I.traj.VU, traj_ref.VU, atol=3e-5)
+
+    assert_allclose(I.traj.h, traj_ref.h, atol=3e-8)
+    assert_allclose(I.traj.p, traj_ref.p, atol=3e-8)
+    assert_allclose(I.traj.r, traj_ref.r, atol=3e-8)
+
+
+def test_integrate3d_rate_sensors():
+    # Test on the static bench.
+    dt = 1e-2
+    n = 100
+
+    Cnb = dcm.from_hpr(45, -30, 60)
+    gyro = np.array([0, 1/np.sqrt(2), 1/np.sqrt(2)]) * earth.RATE
+    gyro = Cnb.T.dot(gyro)
+    gyro = np.resize(gyro, (n, 3))
+
+    accel = np.array([0, 0, earth.gravity(45, 500)])
+    accel = Cnb.T.dot(accel)
+    accel = np.resize(accel, (n, 3))
+
+    theta, dv = coning_sculling(gyro, accel, dt=dt)
+
+    lla0 = [45, 50, 500]
+    Vn0 = [0, 0, 0]
+    hpr0 = [45, -30, 60]
+    traj = integrate3d(dt, lla0, Vn0, hpr0, theta, dv)
+
+    assert_allclose(traj.lat, 45, rtol=1e-20)
+    assert_allclose(traj.lon, 50, rtol=1e-20)
+    assert_allclose(traj.alt, 500, rtol=1e-20)
+    assert_allclose(traj.VE, 0, atol=1e-12)
+    assert_allclose(traj.VN, 0, atol=1e-12)
+    assert_allclose(traj.VU, 0, atol=1e-12)
+    assert_allclose(traj.h, 45, atol=1e-12)
+    assert_allclose(traj.p, -30, atol=1e-12)
+    assert_allclose(traj.r, 60, atol=1e-12)
+
+    Integrator.INITIAL_SIZE = 50
+    I = Integrator3d(dt, lla0, Vn0, hpr0)
+    I.integrate(theta[:n//2], dv[:n//2])
+    I.integrate(theta[n//2:], dv[n//2:])
+
+    assert_allclose(I.traj.lat, 45, rtol=1e-20)
+    assert_allclose(I.traj.lon, 50, rtol=1e-20)
+    assert_allclose(I.traj.alt, 500, rtol=1e-20)
+    assert_allclose(I.traj.VE, 0, atol=1e-12)
+    assert_allclose(I.traj.VN, 0, atol=1e-12)
+    assert_allclose(I.traj.VU, 0, atol=1e-12)
+    assert_allclose(I.traj.h, 45, atol=1e-12)
+    assert_allclose(I.traj.p, -30, atol=1e-12)
+    assert_allclose(I.traj.r, 60, atol=1e-12)
 
 
 if __name__ == '__main__':

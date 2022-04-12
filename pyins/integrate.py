@@ -14,6 +14,9 @@ from . import dcm
 from ._integrate import integrate_fast, integrate_fast_stationary
 
 
+_TRAJ_COLS = ['lat', 'lon', 'alt', 'VE', 'VN', 'VU', 'h', 'p', 'r']
+
+
 def coning_sculling(gyro, accel, order=1, dt=None):
     """Apply coning and sculling corrections to inertial readings.
 
@@ -339,6 +342,198 @@ class Integrator:
         self.traj.iloc[-1] = [np.rad2deg(self.lat_arr[i]),
                               np.rad2deg(self.lon_arr[i]),
                               self.VE_arr[i], self.VN_arr[i], h, p, r]
+
+
+def integrate3d(dt, lla, Vn, hpr, theta, dv, stamp=0):
+    """Integrate inertial readings.
+
+    The algorithm described in [1]_ and [2]_ is used with slight
+    simplifications. The position is updated using the trapezoid rule.
+
+    Parameters
+    ----------
+    dt : float
+        Sensors sampling period.
+    lla : array_like, shape(3,)
+        Initial latitude, longitude and altitude.
+    Vn : array_like, shape(3,)
+        Initial East, North and Up velocity.
+    hpr : array_like, shape (3,)
+        Initial heading, pitch and roll.
+    theta, dv : array_like, shape (n_readings, 3)
+        Rotation vectors and velocity increments computed from gyro and
+        accelerometer readings after applying coning and sculling
+        corrections.
+    stamp : int, optional
+        Stamp of the initial point.
+
+    Returns
+    -------
+    traj : DataFrame
+        Computed trajectory.
+
+    See Also
+    --------
+    coning_sculling : Apply coning and sculling corrections.
+
+    References
+    ----------
+    .. [1] P. G. Savage, "Strapdown Inertial Navigation Integration Algorithm
+           Design Part 1: Attitude Algorithms", Journal of Guidance, Control,
+           and Dynamics 1998, Vol. 21, no. 2.
+    .. [2] P. G. Savage, "Strapdown Inertial Navigation Integration Algorithm
+           Design Part 2: Velocity and Position Algorithms", Journal of
+           Guidance, Control, and Dynamics 1998, Vol. 21, no. 2.
+    """
+    n_readings = theta.shape[0]
+    lla_arr = np.empty((n_readings + 1, 3))
+    Vn_arr = np.empty((n_readings + 1, 3))
+    Cnb_arr = np.empty((n_readings + 1, 3, 3))
+    lla_arr[0, :2] = np.deg2rad(lla[:2])
+    lla_arr[0, 2] = lla[2]
+    Vn_arr[0] = Vn
+    Cnb_arr[0] = dcm.from_hpr(hpr[0], hpr[1], hpr[2])
+
+    _integrate_py_fast(lla_arr, Vn_arr, Cnb_arr, theta, dv, dt, stamp)
+
+    lla_arr[:, :2] = np.rad2deg(lla_arr[:, :2])
+    h_arr, p_arr, r_arr = dcm.to_hpr(Cnb_arr)
+
+    index = pd.Index(stamp + np.arange(n_readings + 1), name='stamp')
+    traj = pd.DataFrame(index=index, columns=_TRAJ_COLS)
+    traj[['lat', 'lon', 'alt']] = lla_arr
+    traj[['VE', 'VN', 'VU']] = Vn_arr
+    traj['h'] = h_arr
+    traj['p'] = p_arr
+    traj['r'] = r_arr
+    return traj
+
+
+
+class Integrator3d:
+    """Class interface for integration of inertial readings.
+
+    The algorithm described in [1]_ and [2]_ is used with slight simplifications.
+    The position is updated using the trapezoid rule.
+
+    Parameters
+    ----------
+    dt : float
+        Sensors sampling period.
+    lla : array_like, shape(3,)
+        Initial latitude, longitude and altitude.
+    Vn : array_like, shape(3,)
+        Initial East, North and Up velocity.
+    hpr : array_like, shape (3,)
+        Initial heading, pitch and roll.
+    stamp : int, optional
+        Time stamp of the initial point. Default is 0.
+
+    Attributes
+    ----------
+    traj : DataFrame
+        Computed trajectory so far.
+
+    See Also
+    --------
+    coning_sculling : Apply coning and sculling corrections.
+
+    References
+    ----------
+    .. [1] P. G. Savage, "Strapdown Inertial Navigation Integration Algorithm
+           Design Part 1: Attitude Algorithms", Journal of Guidance, Control,
+           and Dynamics 1998, Vol. 21, no. 2.
+    .. [2] P. G. Savage, "Strapdown Inertial Navigation Integration Algorithm
+           Design Part 2: Velocity and Position Algorithms", Journal of
+           Guidance, Control, and Dynamics 1998, Vol. 21, no. 2.
+    """
+    INITIAL_SIZE = 10000
+
+    def __init__(self, dt, lla, Vn, hpr, stamp=0):
+        self.dt = dt
+
+        self.lla_arr = np.empty((self.INITIAL_SIZE, 3))
+        self.Vn_arr = np.empty((self.INITIAL_SIZE, 3))
+        self.Cnb_arr = np.empty((self.INITIAL_SIZE, 3, 3))
+        self.traj = None
+
+        self._init_values = [lla, Vn, hpr, stamp]
+        self.reset()
+
+    def reset(self):
+        """Clear computed trajectory except the initial point."""
+        lla, Vn, hpr, stamp = self._init_values
+
+        self.lla_arr[0, :2] = np.deg2rad(lla[:2])
+        self.lla_arr[0, 2] = lla[2]
+        self.Vn_arr[0] = Vn
+        self.Cnb_arr[0] = dcm.from_hpr(hpr[0], hpr[1], hpr[2])
+
+        self.traj = pd.DataFrame(index=pd.Index([stamp], name='stamp'),
+                                 columns=_TRAJ_COLS)
+        self.traj[['lat', 'lon', 'alt']] = lla
+        self.traj[['VE', 'VN', 'VU']] = Vn
+        self.traj[['h', 'p', 'r']] = hpr
+
+    def integrate(self, theta, dv):
+        """Integrate inertial readings.
+
+        The integration continues from the last computed value.
+
+        Parameters
+        ----------
+        theta, dv : array_like, shape (n_readings, 3)
+            Rotation vectors and velocity increments computed from gyro and
+            accelerometer readings after applying coning and sculling
+            corrections.
+
+        Returns
+        -------
+        traj_last : DataFrame
+            Added chunk of the trajectory. It contains n_readings + 1 rows
+            including the last point before `theta` and `dv` where integrated.
+        """
+        theta = np.asarray(theta)
+        dv = np.asarray(dv)
+
+        n_data = self.traj.shape[0]
+        if n_data == 0:
+            raise ValueError("No point to start integration from. "
+                             "Call `init` first.")
+
+        n_readings = theta.shape[0]
+        size = self.lla_arr.shape[0]
+
+        required_size = n_data + n_readings
+        if required_size > self.lla_arr.shape[0]:
+            new_size = max(2 * size, required_size)
+            self.lla_arr.resize((new_size, 3))
+            self.Vn_arr.resize((new_size, 3))
+            self.Cnb_arr.resize((new_size, 3, 3))
+
+        _integrate_py_fast(self.lla_arr, self.Vn_arr, self.Cnb_arr,
+                           theta, dv, self.dt, offset=n_data-1)
+
+        lla_arr = np.empty((n_readings, 3))
+        lla_arr[:, :2] = np.rad2deg(
+            self.lla_arr[n_data : n_data+n_readings, :2])
+        lla_arr[:, 2] = self.lla_arr[n_data : n_data+n_readings, 2]
+        Vn_arr = self.Vn_arr[n_data : n_data+n_readings]
+        h_arr, p_arr, r_arr = dcm.to_hpr(
+            self.Cnb_arr[n_data : n_data+n_readings])
+
+        index = pd.Index(self.traj.index[-1] + 1 + np.arange(n_readings),
+                         name='stamp')
+        traj = pd.DataFrame(index=index, columns=_TRAJ_COLS)
+        traj[['lat', 'lon', 'alt']] = lla_arr
+        traj[['VE', 'VN', 'VU']] = Vn_arr
+        traj['h'] = h_arr
+        traj['p'] = p_arr
+        traj['r'] = r_arr
+
+        self.traj = self.traj.append(traj)
+
+        return self.traj.iloc[-n_readings - 1:]
 
 
 def integrate_stationary(dt, lat, Cnb, theta, dv):
