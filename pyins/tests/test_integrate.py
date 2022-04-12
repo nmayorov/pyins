@@ -34,7 +34,7 @@ def test_integrate():
     gyro = Cnb.T.dot(gyro)
     gyro = np.resize(gyro, (n, 3))
 
-    accel = np.array([0, 0, earth.gravity(1/np.sqrt(2))]) * dt
+    accel = np.array([0, 0, earth.gravity(np.rad2deg(1/np.sqrt(2)))]) * dt
     accel = Cnb.T.dot(accel)
     accel = np.resize(accel, (n, 3))
 
@@ -74,7 +74,7 @@ def test_integrate_rate_sensors():
     gyro = Cnb.T.dot(gyro)
     gyro = np.resize(gyro, (n, 3))
 
-    accel = np.array([0, 0, earth.gravity(1/np.sqrt(2))])
+    accel = np.array([0, 0, earth.gravity(np.rad2deg(1/np.sqrt(2)))])
     accel = Cnb.T.dot(accel)
     accel = np.resize(accel, (n, 3))
 
