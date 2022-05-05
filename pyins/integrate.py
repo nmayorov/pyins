@@ -153,9 +153,7 @@ def integrate(dt, lat, lon, VE, VN, h, p, r, theta, dv, stamp=0):
     VN_arr[0] = VN
     Cnb_arr[0] = dcm.from_hpr(h, p, r)
 
-    earth_model = 0
-    integrate_fast(dt, lat_arr, lon_arr, VE_arr, VN_arr, Cnb_arr, theta, dv,
-                   earth_model)
+    integrate_fast(dt, lat_arr, lon_arr, VE_arr, VN_arr, Cnb_arr, theta, dv)
 
     lat_arr = np.rad2deg(lat_arr)
     lon_arr = np.rad2deg(lon_arr)
@@ -283,10 +281,8 @@ class Integrator:
             self.VN_arr.resize(new_size)
             self.Cnb_arr.resize((new_size, 3, 3))
 
-        earth_model = 0
         integrate_fast(self.dt, self.lat_arr, self.lon_arr, self.VE_arr,
-                       self.VN_arr, self.Cnb_arr, theta, dv, earth_model,
-                       offset=n_data-1)
+                       self.VN_arr, self.Cnb_arr, theta, dv, offset=n_data-1)
 
         lat_arr = np.rad2deg(self.lat_arr[n_data: n_data + n_readings])
         lon_arr = np.rad2deg(self.lon_arr[n_data: n_data + n_readings])

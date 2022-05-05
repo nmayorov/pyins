@@ -9,8 +9,8 @@ from libc cimport math
 
 
 cdef double RATE = 7.2921157e-5
-cdef double* R0 = [6378137, 6378136]
-cdef double* E2 = [6.6943799901413e-3, 6.69436619e-3]
+cdef double R0 = 6378137.0
+cdef double E2 = 6.6943799901413e-3
 
 
 cdef dcm_from_rotvec(double[:] rv, double[:, :] dcm):
@@ -72,11 +72,7 @@ cdef cross(double[:] a, double[:] b, double[:] ret):
 
 def integrate_fast(double dt, double[:] lat_arr, double[:] lon_arr,
                double[:] VE_arr, double[:] VN_arr, double[:, :, :] Cnb_arr,
-               double[:, ::1] theta, double[:, ::1] dv, int earth_model,
-               int offset=0):
-    cdef double r0 = R0[earth_model]
-    cdef double e2 = E2[earth_model]
-
+               double[:, ::1] theta, double[:, ::1] dv, int offset=0):
     cdef int i, j
     cdef double slat, clat, tlat
     cdef double re, rn
@@ -103,9 +99,9 @@ def integrate_fast(double dt, double[:] lat_arr, double[:] lon_arr,
         clat = math.sqrt(1 - slat * slat)
         tlat = slat / clat
 
-        x = 1 - e2 * slat * slat
-        re = r0 / math.sqrt(x)
-        rn = re * (1 - e2) / x
+        x = 1 - E2 * slat * slat
+        re = R0 / math.sqrt(x)
+        rn = re * (1 - E2) / x
         u2 = RATE * clat
         u3 = RATE * slat
 
