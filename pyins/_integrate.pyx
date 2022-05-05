@@ -1,4 +1,4 @@
-# cython : boundscheck=False, wraparound=False
+# cython : boundscheck=False, wraparound=False, language_level=3, cdivision=True
 
 """Strapdown integration implemented in Cython."""
 
@@ -11,6 +11,9 @@ from libc cimport math
 cdef double RATE = 7.2921157e-5
 cdef double R0 = 6378137.0
 cdef double E2 = 6.6943799901413e-3
+cdef double GE = 9.7803253359
+cdef double GP = 9.8321849378
+cdef double F = (1 - E2) ** 0.5 * GP / GE - 1
 
 
 cdef dcm_from_rotvec(double[:] rv, double[:, :] dcm):
@@ -64,16 +67,16 @@ cdef mm(double[:, :] A, double[:, :] B, double[:, :] ret):
           &ret[0, 0], &m)
 
 
-cdef cross(double[:] a, double[:] b, double[:] ret):
-    ret[0] = a[1] * b[2] - a[2] * b[1]
-    ret[1] = a[2] * b[0] - a[0] * b[2]
-    ret[2] = a[0] * b[1] - a[1] * b[0]
+cdef double gravity(double lat, double alt):
+    s2 = math.sin(lat) ** 2
+    return GE * (1 + F * s2) / (1 - E2 * s2) ** 0.5 * (1 - 2 * alt / R0)
 
 
 def integrate_fast(double dt, double[:, :] lla, double[:, :] velocity_n,
                    double[:, :, :] Cnb, double[:, ::1] theta, double[:, ::1] dv,
                    int offset=0):
     cdef int i, j
+    cdef double lat, alt
     cdef double slat, clat, tlat
     cdef double re, rn
     cdef double x
@@ -86,62 +89,77 @@ def integrate_fast(double dt, double[:, :] lla, double[:, :] velocity_n,
     cdef double[::1, :] dBn = np.empty((3, 3), order='F')
     cdef double[::1, :] dBb = np.empty((3, 3), order='F')
 
-    cdef double VE, VN
+    cdef double V1, V2, V3
     cdef double dv1, dv2, dv3
-    cdef double u1 = 0
-    cdef double u2, u3
+    cdef double Omega1, Omega2, Omega3
     cdef double rho1, rho2, rho3
-    cdef double omega1, omega2, omega3
+    cdef double chi1, chi2, chi3
 
     for i in range(theta.shape[0]):
         j = i + offset
-        slat = math.sin(lla[j, 0])
+
+        lat = lla[j, 0]
+        alt = lla[j, 2]
+
+        slat = math.sin(lat)
         clat = math.sqrt(1 - slat * slat)
         tlat = slat / clat
 
         x = 1 - E2 * slat * slat
-        re = R0 / math.sqrt(x)
-        rn = re * (1 - E2) / x
-        u2 = RATE * clat
-        u3 = RATE * slat
+        re = R0 / math.sqrt(x) + alt
+        rn = re * (1 - E2) / x + alt
 
-        VE = velocity_n[j, 0]
-        VN = velocity_n[j, 1]
+        Omega1 = 0.0
+        Omega2 = RATE * clat
+        Omega3 = RATE * slat
 
-        rho1 = -VN / rn
-        rho2 = VE / re
+        V1 = velocity_n[j, 0]
+        V2 = velocity_n[j, 1]
+        V3 = velocity_n[j, 2]
+
+        rho1 = -V2 / rn
+        rho2 = V1 / re
         rho3 = rho2 * tlat
-        omega1 = u1 + rho1
-        omega2 = u2 + rho2
-        omega3 = u3 + rho3
+        chi1 = Omega1 + rho1
+        chi2 = Omega2 + rho2
+        chi3 = Omega3 + rho3
 
         mv(B, dv[i], dv_n)
         dv1 = dv_n[0]
         dv2 = dv_n[1]
         dv3 = dv_n[2]
-        x = 2 * u3 + rho3
-        velocity_n[j + 1, 0] = (VE + dv1 + dt *
-                                (x * VN - 0.5 * (omega2 * dv3 - omega3 * dv2)))
-        velocity_n[j + 1, 1] = (VN + dv2 - dt *
-                                (x * VE + 0.5 * (omega3 * dv1 - omega1 * dv3)))
-        velocity_n[j + 1, 2] = velocity_n[j, 2]
 
-        VE = 0.5 * (VE + velocity_n[j + 1, 0])
-        VN = 0.5 * (VN + velocity_n[j + 1, 1])
-        rho1 = -VN / rn
-        rho2 = VE / re
+        velocity_n[j + 1, 0] = V1 + dv1 + (- (chi2 + Omega2) * V3
+                                           + (chi3 + Omega3) * V2
+                                           - 0.5 * (chi2 * dv3 - chi3 * dv2)
+                                           ) * dt
+        velocity_n[j + 1, 1] = V2 + dv2 + (- (chi3 + Omega3) * V1
+                                           + (chi1 + Omega1) * V3
+                                           - 0.5 * (chi3 * dv1 - chi1 * dv3)
+                                           ) * dt
+        velocity_n[j + 1, 2] = V3 + dv3 + (- (chi1 + Omega1) * V2
+                                           + (chi2 + Omega2) * V1
+                                           - 0.5 * (chi1 * dv2 - chi2 * dv1)
+                                           - gravity(lat, alt + 0.5 * V3 * dt)
+                                           ) * dt
+
+        V1 = 0.5 * (V1 + velocity_n[j + 1, 0])
+        V2 = 0.5 * (V2 + velocity_n[j + 1, 1])
+        V3 = 0.5 * (V3 + velocity_n[j + 1, 2])
+        rho1 = -V2 / rn
+        rho2 = V1 / re
         rho3 = rho2 * tlat
-        omega1 = u1 + rho1
-        omega2 = u2 + rho2
-        omega3 = u3 + rho3
+        chi1 = Omega1 + rho1
+        chi2 = Omega2 + rho2
+        chi3 = Omega3 + rho3
 
         lla[j + 1, 0] = lla[j, 0] - rho1 * dt
         lla[j + 1, 1] = lla[j, 1] + rho2 / clat * dt
-        lla[j + 1, 2] = lla[j, 2]
+        lla[j + 1, 2] = lla[j, 2] + V3 * dt
 
-        xi[0] = -omega1 * dt
-        xi[1] = -omega2 * dt
-        xi[2] = -omega3 * dt
+        xi[0] = -chi1 * dt
+        xi[1] = -chi2 * dt
+        xi[2] = -chi3 * dt
         dcm_from_rotvec(xi, dBn)
         dcm_from_rotvec(theta[i], dBb)
         mm(B, dBb, C)
