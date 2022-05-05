@@ -101,7 +101,7 @@ def coning_sculling(gyro, accel, order=1, dt=None):
 
 
 class Integrator:
-    """Integrate inertial readings by strapdown.
+    """Integrate inertial readings by strapdown algorithm.
 
     The algorithm described in [1]_ and [2]_ is used with slight simplifications.
     The position is updated using the trapezoid rule.
