@@ -215,21 +215,18 @@ class Integrator:
 
     def _correct(self, x):
         i = self.traj.shape[0] - 1
-        d_lat = x[1] / earth.R0
         d_lon = x[0] / (earth.R0 * np.cos(self.lla[i, 0]))
-        self.lla[i, 0] -= d_lat
+        self.lla[i, 0] -= x[1] / earth.R0
         self.lla[i, 1] -= d_lon
+        self.lla[i, 2] -= x[2]
 
-        phi = x[4:7]
+        phi = x[6:9]
         phi[2] += d_lon * np.sin(self.lla[i, 0])
 
-        VE_new = self.velocity_n[i, 0] - x[2]
-        VN_new = self.velocity_n[i, 1] - x[3]
+        Ctp = dcm.from_rv(phi)
+        self.velocity_n[i] = Ctp @ (self.velocity_n[i] - x[3:6])
 
-        self.velocity_n[i, 0] = VE_new - phi[2] * VN_new
-        self.velocity_n[i, 1] = VN_new + phi[2] * VE_new
-
-        self.Cnb[i] = dcm.from_rv(phi).dot(self.Cnb[i])
+        self.Cnb[i] = Ctp @ self.Cnb[i]
         h, p, r = dcm.to_hpr(self.Cnb[i])
 
         self.traj.iloc[-1] = np.hstack((np.rad2deg(self.lla[i, :2]),

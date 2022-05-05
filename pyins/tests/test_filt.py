@@ -215,8 +215,10 @@ def test_FeedforwardFilter():
     traj = pd.DataFrame(index=np.arange(1 * 3600))
     traj['lat'] = 50
     traj['lon'] = 60
+    traj['alt'] = 100
     traj['VE'] = 0
     traj['VN'] = 0
+    traj['VU'] = 0
     traj['h'] = 0
     traj['p'] = 0
     traj['r'] = 0
@@ -238,13 +240,15 @@ def test_FeedforwardFilter():
 
     d_lat = 5
     d_lon = -3
+    d_alt = 0
     d_VE = 1
     d_VN = -1
+    d_VU = 0
     d_h = 0.1
     d_p = 0.03
     d_r = -0.02
 
-    errors = propagate_errors(dt, traj, d_lat, d_lon, d_VE, d_VN,
+    errors = propagate_errors(dt, traj, d_lat, d_lon, d_alt, d_VE, d_VN, d_VU,
                               d_h, d_p, d_r)
     traj_error = correct_traj(traj, -errors)
 
@@ -285,14 +289,15 @@ def test_FeedbackFilter():
     traj = pd.DataFrame(index=np.arange(1 * 3600))
     traj['lat'] = 50
     traj['lon'] = 60
+    traj['alt'] = 100
     traj['VE'] = 0
     traj['VN'] = 0
+    traj['VU'] = 0
     traj['h'] = 0
     traj['p'] = 0
     traj['r'] = 0
 
-    _, gyro, accel = sim.from_position(dt, traj.lat, traj.lon,
-                                       np.zeros_like(traj.lat),
+    _, gyro, accel = sim.from_position(dt, traj.lat, traj.lon, traj.alt,
                                        h=traj.h, p=traj.p, r=traj.r)
     theta, dv = coning_sculling(gyro, accel)
 
@@ -315,14 +320,17 @@ def test_FeedbackFilter():
 
     d_lat = 5
     d_lon = -3
+    d_alt = 0
     d_VE = 1
     d_VN = -1
+    d_VU = 0
     d_h = 0.1
     d_p = 0.03
     d_r = -0.02
 
     lat0, lon0 = perturb_ll(50, 60, d_lat, d_lon)
-    integrator = Integrator(dt, [lat0, lon0, 0], [d_VE, d_VN, 0],
+    alt0 = 100 + d_alt
+    integrator = Integrator(dt, [lat0, lon0, alt0], [d_VE, d_VN, d_VU],
                             [d_h, d_p, d_r])
     res = f.run(integrator, theta, dv, observations=[obs])
     error = traj_diff(res.traj, traj)

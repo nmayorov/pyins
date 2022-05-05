@@ -526,8 +526,10 @@ class FeedforwardFilter:
         states = OrderedDict((
             ('DR1', error_model.DR1),
             ('DR2', error_model.DR2),
+            ('DR3', error_model.DR3),
             ('DV1', error_model.DV1),
             ('DV2', error_model.DV2),
+            ('DV3', error_model.DV3),
             ('PHI1', error_model.PHI1),
             ('PHI2', error_model.PHI2),
             ('PSI3', error_model.PSI3)
@@ -542,8 +544,10 @@ class FeedforwardFilter:
 
         P0[error_model.DR1, error_model.DR1] = pos_sd ** 2
         P0[error_model.DR2, error_model.DR2] = pos_sd ** 2
+        P0[error_model.DR3, error_model.DR3] = pos_sd ** 2
         P0[error_model.DV1, error_model.DV1] = vel_sd ** 2
         P0[error_model.DV2, error_model.DV2] = vel_sd ** 2
+        P0[error_model.DV3, error_model.DV3] = vel_sd ** 2
         P0[error_model.PHI1, error_model.PHI1] = level_sd ** 2
         P0[error_model.PHI2, error_model.PHI2] = level_sd ** 2
         P0[error_model.PSI3, error_model.PSI3] = azimuth_sd ** 2
@@ -930,8 +934,10 @@ class FeedbackFilter:
 
         P0[error_model.DR1, error_model.DR1] = pos_sd ** 2
         P0[error_model.DR2, error_model.DR2] = pos_sd ** 2
+        P0[error_model.DR3, error_model.DR3] = pos_sd ** 2
         P0[error_model.DV1, error_model.DV1] = vel_sd ** 2
         P0[error_model.DV2, error_model.DV2] = vel_sd ** 2
+        P0[error_model.DV3, error_model.DV3] = vel_sd ** 2
         P0[error_model.PHI1, error_model.PHI1] = level_sd ** 2
         P0[error_model.PHI2, error_model.PHI2] = level_sd ** 2
         P0[error_model.PSI3, error_model.PSI3] = azimuth_sd ** 2
@@ -957,8 +963,10 @@ class FeedbackFilter:
         states = OrderedDict((
             ('DR1', error_model.DR1),
             ('DR2', error_model.DR2),
+            ('DR3', error_model.DR3),
             ('DV1', error_model.DV1),
             ('DV2', error_model.DV2),
+            ('DV3', error_model.DV3),
             ('PHI1', error_model.PHI1),
             ('PHI2', error_model.PHI2),
             ('PSI3', error_model.PSI3)
@@ -1185,7 +1193,7 @@ class FeedbackFilter:
                 i_stamp += 1
 
             i_reading += feedback_period
-            integrator._correct(xc[:error_model.N_BASE_STATES])
+            integrator._correct(xc[:error_model.N_BASE_STATES].copy())
             xc[:error_model.N_BASE_STATES] = 0
 
         if record_stamps[i_save] == stamps[i_stamp]:
