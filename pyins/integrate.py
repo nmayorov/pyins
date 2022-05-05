@@ -100,80 +100,8 @@ def coning_sculling(gyro, accel, order=1, dt=None):
     return gyro + coning, accel + sculling + rc
 
 
-def integrate(dt, lat, lon, VE, VN, h, p, r, theta, dv, stamp=0):
-    """Integrate inertial readings.
-
-    The algorithm described in [1]_ and [2]_ is used with slight
-    simplifications. The position is updated using the trapezoid rule.
-
-    Parameters
-    ----------
-    dt : float
-        Sensors sampling period.
-    lat, lon : float
-        Initial latitude and longitude.
-    VE, VN : float
-        Initial East and North velocity.
-    h, p, r : float
-        Initial heading, pitch and roll.
-    theta, dv : array_like, shape (n_readings, 3)
-        Rotation vectors and velocity increments computed from gyro and
-        accelerometer readings after applying coning and sculling
-        corrections.
-    stamp : int, optional
-        Stamp of the initial point.
-
-    Returns
-    -------
-    traj : DataFrame
-        Computed trajectory.
-
-    See Also
-    --------
-    coning_sculling : Apply coning and sculling corrections.
-
-    References
-    ----------
-    .. [1] P. G. Savage, "Strapdown Inertial Navigation Integration Algorithm
-           Design Part 1: Attitude Algorithms", Journal of Guidance, Control,
-           and Dynamics 1998, Vol. 21, no. 2.
-    .. [2] P. G. Savage, "Strapdown Inertial Navigation Integration Algorithm
-           Design Part 2: Velocity and Position Algorithms", Journal of
-           Guidance, Control, and Dynamics 1998, Vol. 21, no. 2.
-    """
-    n_readings = theta.shape[0]
-    lat_arr = np.empty(n_readings + 1)
-    lon_arr = np.empty(n_readings + 1)
-    VE_arr = np.empty(n_readings + 1)
-    VN_arr = np.empty(n_readings + 1)
-    Cnb_arr = np.empty((n_readings + 1, 3, 3))
-    lat_arr[0] = np.deg2rad(lat)
-    lon_arr[0] = np.deg2rad(lon)
-    VE_arr[0] = VE
-    VN_arr[0] = VN
-    Cnb_arr[0] = dcm.from_hpr(h, p, r)
-
-    integrate_fast(dt, lat_arr, lon_arr, VE_arr, VN_arr, Cnb_arr, theta, dv)
-
-    lat_arr = np.rad2deg(lat_arr)
-    lon_arr = np.rad2deg(lon_arr)
-    h, p, r = dcm.to_hpr(Cnb_arr)
-
-    index = pd.Index(stamp + np.arange(n_readings + 1), name='stamp')
-    traj = pd.DataFrame(index=index)
-    traj['lat'] = lat_arr
-    traj['lon'] = lon_arr
-    traj['VE'] = VE_arr
-    traj['VN'] = VN_arr
-    traj['h'] = h
-    traj['p'] = p
-    traj['r'] = r
-
-    return traj
-
-
 class Integrator:
-    """Class interface for integration of inertial readings.
+    """Integrate inertial readings by strapdown.
 
     The algorithm described in [1]_ and [2]_ is used with slight simplifications.
     The position is updated using the trapezoid rule.

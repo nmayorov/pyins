@@ -1,7 +1,7 @@
 from numpy.testing import assert_allclose, run_module_suite
 import numpy as np
 from pyins import earth
-from pyins.integrate import coning_sculling, integrate, Integrator
+from pyins.integrate import coning_sculling, Integrator
 from pyins import dcm
 
 
@@ -39,16 +39,6 @@ def test_integrate():
 
     theta, dv = coning_sculling(gyro, accel)
 
-    traj = integrate(dt, 45, 50, 0, 0, 45, -30, 60, theta, dv)
-
-    assert_allclose(traj.lat, 45, rtol=1e-12)
-    assert_allclose(traj.lon, 50, rtol=1e-12)
-    assert_allclose(traj.VE, 0, atol=1e-8)
-    assert_allclose(traj.VN, 0, atol=1e-8)
-    assert_allclose(traj.h, 45, rtol=1e-12)
-    assert_allclose(traj.p, -30, rtol=1e-12)
-    assert_allclose(traj.r, 60, rtol=1e-12)
-
     Integrator.INITIAL_SIZE = 50
     I = Integrator(dt, 45, 50, 0, 0, 45, -30, 60)
     I.integrate(theta[:n//2], dv[:n//2])
@@ -78,16 +68,6 @@ def test_integrate_rate_sensors():
     accel = np.resize(accel, (n, 3))
 
     theta, dv = coning_sculling(gyro, accel, dt=dt)
-
-    traj = integrate(dt, 45, 50, 0, 0, 45, -30, 60, theta, dv)
-
-    assert_allclose(traj.lat, 45, rtol=1e-12)
-    assert_allclose(traj.lon, 50, rtol=1e-12)
-    assert_allclose(traj.VE, 0, atol=1e-8)
-    assert_allclose(traj.VN, 0, atol=1e-8)
-    assert_allclose(traj.h, 45, rtol=1e-12)
-    assert_allclose(traj.p, -30, rtol=1e-12)
-    assert_allclose(traj.r, 60, rtol=1e-12)
 
     Integrator.INITIAL_SIZE = 50
     I = Integrator(dt, 45, 50, 0, 0, 45, -30, 60)

@@ -7,7 +7,7 @@ from pyins.filt import (InertialSensor, LatLonObs, VeVnObs, propagate_errors,
                         _refine_stamps, _kalman_correct, correct_traj)
 from pyins import earth
 from pyins import sim
-from pyins.integrate import integrate, coning_sculling, Integrator
+from pyins.integrate import coning_sculling, Integrator
 from pyins.transform import perturb_ll
 
 
@@ -245,7 +245,8 @@ def test_propagate_errors():
     p0 = traj.p[0] + d_p
     r0 = traj.r[0] + d_r
 
-    traj_c = integrate(dt, lat0, lon0, VE0, VN0, h0, p0, r0, theta, dv)
+    integrator = Integrator(dt, lat0, lon0, VE0, VN0, h0, p0, r0)
+    traj_c = integrator.integrate(theta, dv)
     error_true = traj_diff(traj_c, traj)
     error_linear = propagate_errors(dt, traj, d_lat, d_lon, d_VE, d_VN, d_h,
                                     d_p, d_r, gyro_bias, accel_bias)
