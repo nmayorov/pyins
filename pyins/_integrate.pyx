@@ -70,9 +70,9 @@ cdef cross(double[:] a, double[:] b, double[:] ret):
     ret[2] = a[0] * b[1] - a[1] * b[0]
 
 
-def integrate_fast(double dt, double[:] lat_arr, double[:] lon_arr,
-               double[:] VE_arr, double[:] VN_arr, double[:, :, :] Cnb_arr,
-               double[:, ::1] theta, double[:, ::1] dv, int offset=0):
+def integrate_fast(double dt, double[:, :] lla, double[:, :] velocity_n,
+                   double[:, :, :] Cnb, double[:, ::1] theta, double[:, ::1] dv,
+                   int offset=0):
     cdef int i, j
     cdef double slat, clat, tlat
     cdef double re, rn
@@ -81,7 +81,7 @@ def integrate_fast(double dt, double[:] lat_arr, double[:] lon_arr,
     cdef double[:] xi = np.empty(3)
     cdef double[:] dv_n = np.empty(3)
 
-    cdef double[:, :] B = Cnb_arr[offset].copy_fortran()
+    cdef double[:, :] B = Cnb[offset].copy_fortran()
     cdef double[::1, :] C = np.empty((3, 3), order='F')
     cdef double[::1, :] dBn = np.empty((3, 3), order='F')
     cdef double[::1, :] dBb = np.empty((3, 3), order='F')
@@ -95,7 +95,7 @@ def integrate_fast(double dt, double[:] lat_arr, double[:] lon_arr,
 
     for i in range(theta.shape[0]):
         j = i + offset
-        slat = math.sin(lat_arr[j])
+        slat = math.sin(lla[j, 0])
         clat = math.sqrt(1 - slat * slat)
         tlat = slat / clat
 
@@ -105,8 +105,8 @@ def integrate_fast(double dt, double[:] lat_arr, double[:] lon_arr,
         u2 = RATE * clat
         u3 = RATE * slat
 
-        VE = VE_arr[j]
-        VN = VN_arr[j]
+        VE = velocity_n[j, 0]
+        VN = velocity_n[j, 1]
 
         rho1 = -VN / rn
         rho2 = VE / re
@@ -120,13 +120,14 @@ def integrate_fast(double dt, double[:] lat_arr, double[:] lon_arr,
         dv2 = dv_n[1]
         dv3 = dv_n[2]
         x = 2 * u3 + rho3
-        VE_arr[j + 1] = VE + dv1 + dt * (x * VN -
-                                         0.5 * (omega2 * dv3 - omega3 * dv2))
-        VN_arr[j + 1] = VN + dv2 - dt * (x * VE +
-                                         0.5 * (omega3 * dv1 - omega1 * dv3))
+        velocity_n[j + 1, 0] = (VE + dv1 + dt *
+                                (x * VN - 0.5 * (omega2 * dv3 - omega3 * dv2)))
+        velocity_n[j + 1, 1] = (VN + dv2 - dt *
+                                (x * VE + 0.5 * (omega3 * dv1 - omega1 * dv3)))
+        velocity_n[j + 1, 2] = velocity_n[j, 2]
 
-        VE = 0.5 * (VE + VE_arr[j + 1])
-        VN = 0.5 * (VN + VN_arr[j + 1])
+        VE = 0.5 * (VE + velocity_n[j + 1, 0])
+        VN = 0.5 * (VN + velocity_n[j + 1, 1])
         rho1 = -VN / rn
         rho2 = VE / re
         rho3 = rho2 * tlat
@@ -134,8 +135,9 @@ def integrate_fast(double dt, double[:] lat_arr, double[:] lon_arr,
         omega2 = u2 + rho2
         omega3 = u3 + rho3
 
-        lat_arr[j + 1] = lat_arr[j] - rho1 * dt
-        lon_arr[j + 1] = lon_arr[j] + rho2 / clat * dt
+        lla[j + 1, 0] = lla[j, 0] - rho1 * dt
+        lla[j + 1, 1] = lla[j, 1] + rho2 / clat * dt
+        lla[j + 1, 2] = lla[j, 2]
 
         xi[0] = -omega1 * dt
         xi[1] = -omega2 * dt
@@ -144,4 +146,4 @@ def integrate_fast(double dt, double[:] lat_arr, double[:] lon_arr,
         dcm_from_rotvec(theta[i], dBb)
         mm(B, dBb, C)
         mm(dBn, C, B)
-        Cnb_arr[j + 1] = B.copy()
+        Cnb[j + 1] = B.copy()

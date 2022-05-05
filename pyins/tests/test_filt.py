@@ -245,7 +245,7 @@ def test_propagate_errors():
     p0 = traj.p[0] + d_p
     r0 = traj.r[0] + d_r
 
-    integrator = Integrator(dt, lat0, lon0, VE0, VN0, h0, p0, r0)
+    integrator = Integrator(dt, [lat0, lon0,0], [VE0, VN0, 0], [h0, p0, r0])
     traj_c = integrator.integrate(theta, dv)
     error_true = traj_diff(traj_c, traj)
     error_linear = propagate_errors(dt, traj, d_lat, d_lon, d_VE, d_VN, d_h,
@@ -376,7 +376,8 @@ def test_FeedbackFilter():
     d_r = -0.02
 
     lat0, lon0 = perturb_ll(50, 60, d_lat, d_lon)
-    integrator = Integrator(dt, lat0, lon0, d_VE, d_VN, d_h, d_p, d_r)
+    integrator = Integrator(dt, [lat0, lon0, 0], [d_VE, d_VN, 0],
+                            [d_h, d_p, d_r])
     res = f.run(integrator, theta, dv, observations=[obs])
     error = traj_diff(res.traj, traj)
     error = error.iloc[3000:]

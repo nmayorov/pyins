@@ -1,8 +1,7 @@
 """Compute a navigation solution by integration of inertial readings."""
 import numpy as np
 import pandas as pd
-from . import earth
-from . import dcm
+from . import dcm, earth
 from ._integrate import integrate_fast
 
 
@@ -103,18 +102,18 @@ def coning_sculling(gyro, accel, order=1, dt=None):
 class Integrator:
     """Integrate inertial readings by strapdown algorithm.
 
-    The algorithm described in [1]_ and [2]_ is used with slight simplifications.
-    The position is updated using the trapezoid rule.
+    The algorithm described in [1]_ and [2]_ is used with slight
+    simplifications. The position is updated using the trapezoid rule.
 
     Parameters
     ----------
     dt : float
         Sensors sampling period.
-    lat, lon : float
-        Initial latitude and longitude.
-    VE, VN : float
-        Initial East and North velocity.
-    h, p, r : float
+    lla : array_like, shape (3,)
+        Initial latitude, longitude and altitude.
+    velocity_n: array_like, shape (3,)
+        Initial velocity in ENU frame.
+    hpr : array_like, shape (3,)
         Initial heading, pitch and roll.
     stamp : int, optional
         Time stamp of the initial point. Default is 0.
@@ -137,39 +136,32 @@ class Integrator:
            Design Part 2: Velocity and Position Algorithms", Journal of
            Guidance, Control, and Dynamics 1998, Vol. 21, no. 2.
     """
+    TRAJECTORY_COLUMNS = ['lat', 'lon', 'alt', 'VE', 'VN', 'VU', 'h', 'p', 'r']
     INITIAL_SIZE = 10000
 
-    def __init__(self, dt, lat, lon, VE, VN, h, p, r, stamp=0):
+    def __init__(self, dt, lla, velocity_n, hpr, stamp=0):
         self.dt = dt
 
-        self.lat_arr = np.empty(self.INITIAL_SIZE)
-        self.lon_arr = np.empty(self.INITIAL_SIZE)
-        self.VE_arr = np.empty(self.INITIAL_SIZE)
-        self.VN_arr = np.empty(self.INITIAL_SIZE)
-        self.Cnb_arr = np.empty((self.INITIAL_SIZE, 3, 3))
+        self.lla = np.empty((self.INITIAL_SIZE, 3))
+        self.velocity_n = np.empty((self.INITIAL_SIZE, 3))
+        self.Cnb = np.empty((self.INITIAL_SIZE, 3, 3))
+
         self.traj = None
 
-        self._init_values = [lat, lon, VE, VN, h, p, r, stamp]
+        self._init_values = [lla, velocity_n, hpr, stamp]
         self.reset()
 
     def reset(self):
         """Clear computed trajectory except the initial point."""
-        lat, lon, VE, VN, h, p, r, stamp = self._init_values
-
-        self.lat_arr[0] = np.deg2rad(lat)
-        self.lon_arr[0] = np.deg2rad(lon)
-        self.VE_arr[0] = VE
-        self.VN_arr[0] = VN
-        self.Cnb_arr[0] = dcm.from_hpr(h, p, r)
-
-        self.traj = pd.DataFrame(index=pd.Index([stamp], name='stamp'))
-        self.traj['lat'] = [lat]
-        self.traj['lon'] = [lon]
-        self.traj['VE'] = [VE]
-        self.traj['VN'] = [VN]
-        self.traj['h'] = [h]
-        self.traj['p'] = [p]
-        self.traj['r'] = [r]
+        lla, velocity_n, hpr, stamp = self._init_values
+        self.lla[0, :2] = np.deg2rad(lla[:2])
+        self.lla[0, 2] = lla[2]
+        self.velocity_n[0] = velocity_n
+        self.Cnb[0] = dcm.from_hpr(*hpr)
+        self.traj = pd.DataFrame(
+            data=np.atleast_2d(np.hstack((lla, velocity_n, hpr))),
+            columns=self.TRAJECTORY_COLUMNS,
+            index=pd.Index([stamp], name='stamp'))
 
     def integrate(self, theta, dv):
         """Integrate inertial readings.
@@ -193,38 +185,26 @@ class Integrator:
         dv = np.asarray(dv)
 
         n_data = self.traj.shape[0]
-        if n_data == 0:
-            raise ValueError("No point to start integration from. "
-                             "Call `init` first.")
-
         n_readings = theta.shape[0]
-        size = self.lat_arr.shape[0]
+        size = self.lla.shape[0]
 
         required_size = n_data + n_readings
-        if required_size > self.lat_arr.shape[0]:
+        if required_size > size:
             new_size = max(2 * size, required_size)
-            self.lat_arr.resize(new_size, refcheck=False)
-            self.lon_arr.resize(new_size, refcheck=False)
-            self.VE_arr.resize(new_size, refcheck=False)
-            self.VN_arr.resize(new_size, refcheck=False)
-            self.Cnb_arr.resize((new_size, 3, 3), refcheck=False)
+            self.lla.resize((new_size, 3), refcheck=False)
+            self.velocity_n.resize((new_size, 3), refcheck=False)
+            self.Cnb.resize((new_size, 3, 3), refcheck=False)
 
-        integrate_fast(self.dt, self.lat_arr, self.lon_arr, self.VE_arr,
-                       self.VN_arr, self.Cnb_arr, theta, dv, offset=n_data-1)
-
-        lat_arr = np.rad2deg(self.lat_arr[n_data: n_data + n_readings])
-        lon_arr = np.rad2deg(self.lon_arr[n_data: n_data + n_readings])
-        VE_arr = self.VE_arr[n_data: n_data + n_readings]
-        VN_arr = self.VN_arr[n_data: n_data + n_readings]
-        h, p, r = dcm.to_hpr(self.Cnb_arr[n_data: n_data + n_readings])
-
+        integrate_fast(self.dt, self.lla, self.velocity_n, self.Cnb,
+                       theta, dv, offset=n_data-1)
+        h, p, r = dcm.to_hpr(self.Cnb[n_data:n_data + n_readings])
         index = pd.Index(self.traj.index[-1] + 1 + np.arange(n_readings),
                          name='stamp')
         traj = pd.DataFrame(index=index)
-        traj['lat'] = lat_arr
-        traj['lon'] = lon_arr
-        traj['VE'] = VE_arr
-        traj['VN'] = VN_arr
+        traj[['lat', 'lon']] = np.rad2deg(
+            self.lla[n_data:n_data + n_readings, :2])
+        traj['alt'] = self.lla[n_data:n_data + n_readings, 2]
+        traj[['VE', 'VN', 'VU']] = self.velocity_n[n_data:n_data + n_readings]
         traj['h'] = h
         traj['p'] = p
         traj['r'] = r
@@ -236,22 +216,23 @@ class Integrator:
     def _correct(self, x):
         i = self.traj.shape[0] - 1
         d_lat = x[1] / earth.R0
-        d_lon = x[0] / (earth.R0 * np.cos(self.lat_arr[i]))
-        self.lat_arr[i] -= d_lat
-        self.lon_arr[i] -= d_lon
+        d_lon = x[0] / (earth.R0 * np.cos(self.lla[i, 0]))
+        self.lla[i, 0] -= d_lat
+        self.lla[i, 1] -= d_lon
 
         phi = x[4:7]
-        phi[2] += d_lon * np.sin(self.lat_arr[i])
+        phi[2] += d_lon * np.sin(self.lla[i, 0])
 
-        VE_new = self.VE_arr[i] - x[2]
-        VN_new = self.VN_arr[i] - x[3]
+        VE_new = self.velocity_n[i, 0] - x[2]
+        VN_new = self.velocity_n[i, 1] - x[3]
 
-        self.VE_arr[i] = VE_new - phi[2] * VN_new
-        self.VN_arr[i] = VN_new + phi[2] * VE_new
+        self.velocity_n[i, 0] = VE_new - phi[2] * VN_new
+        self.velocity_n[i, 1] = VN_new + phi[2] * VE_new
 
-        self.Cnb_arr[i] = dcm.from_rv(phi).dot(self.Cnb_arr[i])
-        h, p, r = dcm.to_hpr(self.Cnb_arr[i])
+        self.Cnb[i] = dcm.from_rv(phi).dot(self.Cnb[i])
+        h, p, r = dcm.to_hpr(self.Cnb[i])
 
-        self.traj.iloc[-1] = [np.rad2deg(self.lat_arr[i]),
-                              np.rad2deg(self.lon_arr[i]),
-                              self.VE_arr[i], self.VN_arr[i], h, p, r]
+        self.traj.iloc[-1] = np.hstack((np.rad2deg(self.lla[i, :2]),
+                                        self.lla[i, 2],
+                                        self.velocity_n[i],
+                                        h, p, r))
