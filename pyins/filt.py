@@ -6,22 +6,26 @@ from scipy.linalg import cholesky, cho_solve, solve_triangular
 from . import dcm, earth, util
 
 
-N_BASE_STATES = 7
+N_BASE_STATES = 9
 DR1 = 0
 DR2 = 1
-DV1 = 2
-DV2 = 3
-PHI1 = 4
-PHI2 = 5
-PSI3 = 6
+DR3 = 2
+DV1 = 3
+DV2 = 4
+DV3 = 5
+PHI1 = 6
+PHI2 = 7
+PSI3 = 8
 
 DRE = 0
 DRN = 1
-DVE = 2
-DVN = 3
-DH = 4
-DP = 5
-DR = 6
+DRU = 2
+DVE = 3
+DVN = 4
+DVU = 5
+DH = 6
+DP = 7
+DR = 8
 
 
 class FiltResult:
@@ -419,6 +423,7 @@ def _errors_transform_matrix(traj):
     lat = np.deg2rad(traj.lat)
     VE = traj.VE
     VN = traj.VN
+    VU = traj.VU
     h = np.deg2rad(traj.h)
     p = np.deg2rad(traj.p)
 
@@ -429,12 +434,18 @@ def _errors_transform_matrix(traj):
     T = np.zeros((traj.shape[0], N_BASE_STATES, N_BASE_STATES))
     T[:, DRE, DR1] = 1
     T[:, DRN, DR2] = 1
+    T[:, DRU, DR3] = 1
     T[:, DVE, DR1] = VN * tlat / earth.R0
     T[:, DVE, DV1] = 1
+    T[:, DVE, PHI2] = -VU
     T[:, DVE, PSI3] = VN
     T[:, DVN, DR1] = -VE * tlat / earth.R0
     T[:, DVN, DV2] = 1
+    T[:, DVN, PHI1] = VU
     T[:, DVN, PSI3] = -VE
+    T[:, DVU, DV3] = 1
+    T[:, DVU, PHI1] = -VN
+    T[:, DVU, PHI2] = VE
     T[:, DH, DR1] = tlat / earth.R0
     T[:, DH, PHI1] = -sh * tp
     T[:, DH, PHI2] = -ch * tp
@@ -466,13 +477,19 @@ def _error_model_matrices(traj):
 
     F = np.zeros((n_samples, N_BASE_STATES, N_BASE_STATES))
 
-    F[:, DR1, DR2] = rho[:, 2]
+    # F[:, DR1, DR2] = rho[:, 2]
     F[:, DR1, DV1] = 1
+    F[:, DR1, PHI2] = -traj.VU
     F[:, DR1, PSI3] = traj.VN
 
-    F[:, DR2, DR1] = -rho[:, 2]
+    # F[:, DR2, DR1] = -rho[:, 2]
     F[:, DR2, DV2] = 1
+    F[:, DR2, PHI1] = traj.VU
     F[:, DR2, PSI3] = -traj.VE
+
+    F[:, DR3, DV3] = 1
+    F[:, DR3, PHI1] = -traj.VN
+    F[:, DR3, PHI2] = traj.VE
 
     F[:, DV1, DV2] = 2 * u[:, 2] + rho[:, 2]
     F[:, DV1, PHI2] = -earth.G0
@@ -480,14 +497,20 @@ def _error_model_matrices(traj):
     F[:, DV2, DV1] = -2 * u[:, 2] - rho[:, 2]
     F[:, DV2, PHI1] = earth.G0
 
+    F[:, DV3, DR3] = 2 * earth.G0 / earth.R0
+    F[:, DV3, DV1] = 2 * u[:, 1] + rho[:, 1]
+    F[:, DV3, DV2] = -2 * u[:, 0] - rho[:, 0]
+
     F[:, PHI1, DR1] = -u[:, 2] / earth.R0
     F[:, PHI1, DV2] = -1 / earth.R0
+    F[:, PHI1, PHI1] = -traj.VU / earth.R0
     F[:, PHI1, PHI2] = u[:, 2] + rho[:, 2]
     F[:, PHI1, PSI3] = -u[:, 1]
 
     F[:, PHI2, DR2] = -u[:, 2] / earth.R0
     F[:, PHI2, DV1] = 1 / earth.R0
     F[:, PHI2, PHI1] = -u[:, 2] - rho[:, 2]
+    F[:, PHI2, PHI2] = -traj.VU / earth.R0
     F[:, PHI2, PSI3] = u[:, 0]
 
     F[:, PSI3, DR1] = (u[:, 0] + rho[:, 0]) / earth.R0
@@ -499,12 +522,13 @@ def _error_model_matrices(traj):
     B_gyro[np.ix_(np.arange(n_samples), [PHI1, PHI2, PSI3], [0, 1, 2])] = -Cnb
 
     B_accel = np.zeros((n_samples, N_BASE_STATES, 3))
-    B_accel[np.ix_(np.arange(n_samples), [DV1, DV2], [0, 1, 2])] = Cnb[:, :2]
+    B_accel[np.ix_(np.arange(n_samples), [DV1, DV2, DV3], [0, 1, 2])] = Cnb
 
     return F, B_gyro, B_accel
 
 
-def propagate_errors(dt, traj, d_lat=0, d_lon=0, d_VE=0, d_VN=0,
+def propagate_errors(dt, traj, d_lat=0, d_lon=0, d_alt=0,
+                     d_VE=0, d_VN=0, d_VU=0,
                      d_h=0, d_p=0, d_r=0, d_gyro=0, d_accel=0):
     """Deterministic linear propagation of INS errors.
 
@@ -514,9 +538,9 @@ def propagate_errors(dt, traj, d_lat=0, d_lon=0, d_VE=0, d_VN=0,
         Time step per stamp.
     traj : DataFrame
         Trajectory.
-    d_lat, d_lon : float
+    d_lat, d_lon, d_alt : float
         Initial position errors in meters.
-    d_VE, d_VN : float
+    d_VE, d_VN, d_VU : float
         Initial velocity errors.
     d_h, d_p, d_r : float
         Initial heading, pitch and roll errors.
@@ -548,7 +572,7 @@ def propagate_errors(dt, traj, d_lat=0, d_lon=0, d_VE=0, d_VN=0,
     d_h = np.deg2rad(d_h)
     d_p = np.deg2rad(d_p)
     d_r = np.deg2rad(d_r)
-    x0 = np.array([d_lon, d_lat, d_VE, d_VN, d_h, d_p, d_r])
+    x0 = np.array([d_lon, d_lat, d_alt, d_VE, d_VN, d_VU, d_h, d_p, d_r])
     x0 = np.linalg.inv(T[0]).dot(x0)
 
     n_samples = Fi.shape[0]
@@ -561,8 +585,10 @@ def propagate_errors(dt, traj, d_lat=0, d_lon=0, d_VE=0, d_VN=0,
     error = pd.DataFrame(index=traj.index)
     error['lat'] = x[:, DRN]
     error['lon'] = x[:, DRE]
+    error['alt'] = x[:, DRU]
     error['VE'] = x[:, DVE]
     error['VN'] = x[:, DVN]
+    error['VU'] = x[:, DVU]
     error['h'] = np.rad2deg(x[:, DH])
     error['p'] = np.rad2deg(x[:, DP])
     error['r'] = np.rad2deg(x[:, DR])
@@ -625,8 +651,10 @@ def _compute_output_errors(traj, x, P, output_stamps,
     err = pd.DataFrame(index=output_stamps)
     err['lat'] = y[:, DRN]
     err['lon'] = y[:, DRE]
+    err['alt'] = y[:, DRU]
     err['VE'] = y[:, DVE]
     err['VN'] = y[:, DVN]
+    err['VU'] = y[:, DVU]
     err['h'] = np.rad2deg(y[:, DH])
     err['p'] = np.rad2deg(y[:, DP])
     err['r'] = np.rad2deg(y[:, DR])
@@ -634,8 +662,10 @@ def _compute_output_errors(traj, x, P, output_stamps,
     sd = pd.DataFrame(index=output_stamps)
     sd['lat'] = sd_y[:, DRN]
     sd['lon'] = sd_y[:, DRE]
+    sd['alt'] = sd_y[:, DRU]
     sd['VE'] = sd_y[:, DVE]
     sd['VN'] = sd_y[:, DVN]
+    sd['VU'] = sd_y[:, DVU]
     sd['h'] = np.rad2deg(sd_y[:, DH])
     sd['p'] = np.rad2deg(sd_y[:, DP])
     sd['r'] = np.rad2deg(sd_y[:, DR])
@@ -1633,8 +1663,10 @@ def correct_traj(traj, error):
     traj_corr['lat'] -= np.rad2deg(error.lat / earth.R0)
     traj_corr['lon'] -= np.rad2deg(error.lon / (earth.R0 *
                                    np.cos(np.deg2rad(traj_corr['lat']))))
+    traj_corr['alt'] -= error.alt
     traj_corr['VE'] -= error.VE
     traj_corr['VN'] -= error.VN
+    traj_corr['VU'] -= error.VU
     traj_corr['h'] -= error.h
     traj_corr['p'] -= error.p
     traj_corr['r'] -= error.r
