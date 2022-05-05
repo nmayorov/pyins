@@ -275,11 +275,11 @@ class Integrator:
         required_size = n_data + n_readings
         if required_size > self.lat_arr.shape[0]:
             new_size = max(2 * size, required_size)
-            self.lat_arr.resize(new_size)
-            self.lon_arr.resize(new_size)
-            self.VE_arr.resize(new_size)
-            self.VN_arr.resize(new_size)
-            self.Cnb_arr.resize((new_size, 3, 3))
+            self.lat_arr.resize(new_size, refcheck=False)
+            self.lon_arr.resize(new_size, refcheck=False)
+            self.VE_arr.resize(new_size, refcheck=False)
+            self.VN_arr.resize(new_size, refcheck=False)
+            self.Cnb_arr.resize((new_size, 3, 3), refcheck=False)
 
         integrate_fast(self.dt, self.lat_arr, self.lon_arr, self.VE_arr,
                        self.VN_arr, self.Cnb_arr, theta, dv, offset=n_data-1)
