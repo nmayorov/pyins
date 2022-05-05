@@ -3,13 +3,13 @@ from numpy.testing import (assert_, assert_allclose, run_module_suite,
 import numpy as np
 import pandas as pd
 from pyins.filt import (InertialSensor, LatLonObs, VeVnObs,
-                        FeedforwardFilter, FeedbackFilter, traj_diff,
+                        FeedforwardFilter, FeedbackFilter,
                         _refine_stamps, _kalman_correct, correct_traj)
 from pyins.error_model import propagate_errors
 from pyins import earth
 from pyins import sim
 from pyins.integrate import coning_sculling, Integrator
-from pyins.transform import perturb_ll
+from pyins.transform import perturb_ll, traj_diff
 
 
 def test_InertialSensor():

@@ -3,8 +3,7 @@ from numpy.testing import assert_allclose
 from pyins import sim
 from pyins.integrate import coning_sculling, Integrator
 from pyins.error_model import propagate_errors
-from pyins.transform import perturb_ll
-from pyins.filt import traj_diff
+from pyins.transform import perturb_ll, traj_diff
 
 
 def test_propagate_errors():

@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from scipy.linalg import cholesky, cho_solve, solve_triangular
 from . import earth, error_model, util
+from .transform import correct_traj
 
 
 class FiltResult:
@@ -1390,60 +1391,3 @@ class FeedbackFilter:
         return FiltResult(traj=traj, sd=sd, gyro_err=gyro_err,
                           gyro_sd=gyro_sd, accel_err=accel_err,
                           accel_sd=accel_sd, P=P, residuals=residuals)
-
-
-def traj_diff(t1, t2):
-    """Compute trajectory difference.
-
-    Parameters
-    ----------
-    t1, t2 : DataFrame
-        Trajectories.
-
-    Returns
-    -------
-    diff : DataFrame
-        Trajectory difference. It can be interpreted as errors in `t1` relative
-        to `t2`.
-    """
-    diff = t1 - t2
-    diff['lat'] *= np.deg2rad(earth.R0)
-    diff['lon'] *= np.deg2rad(earth.R0) * np.cos(0.5 *
-                                                 np.deg2rad(t1.lat + t2.lat))
-    diff['h'] %= 360
-    diff.h[diff.h < -180] += 360
-    diff.h[diff.h > 180] -= 360
-
-    return diff.loc[t1.index.intersection(t2.index)]
-
-
-def correct_traj(traj, error):
-    """Correct trajectory by estimated errors.
-
-    Note that it means subtracting errors from the trajectory.
-
-    Parameters
-    ----------
-    traj : DataFrame
-        Trajectory.
-    error : DataFrame
-        Estimated errors.
-
-    Returns
-    -------
-    traj_corr : DataFrame
-        Corrected trajectory.
-    """
-    traj_corr = traj.copy()
-    traj_corr['lat'] -= np.rad2deg(error.lat / earth.R0)
-    traj_corr['lon'] -= np.rad2deg(error.lon / (earth.R0 *
-                                   np.cos(np.deg2rad(traj_corr['lat']))))
-    traj_corr['alt'] -= error.alt
-    traj_corr['VE'] -= error.VE
-    traj_corr['VN'] -= error.VN
-    traj_corr['VU'] -= error.VU
-    traj_corr['h'] -= error.h
-    traj_corr['p'] -= error.p
-    traj_corr['r'] -= error.r
-
-    return traj_corr.dropna()
