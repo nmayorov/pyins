@@ -167,26 +167,5 @@ def test_from_llw():
     assert_allclose(dcm.from_llw(*llw.T), A, rtol=1e-10, atol=1e-10)
 
 
-def test_to_llw():
-    A = np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]])
-    llw = np.array([0, 0, 0])
-    assert_allclose(dcm.to_llw(A), llw, atol=1e-10)
-
-
-def test_dcm_llw_conversion():
-    rng = np.random.RandomState(0)
-
-    lat = rng.uniform(-90, 90, 20)
-    lon = rng.uniform(-180, 180, 20)
-    wan = rng.uniform(-180, 180, 20)
-
-    A = dcm.from_llw(lat, lon, wan)
-    lat_r, lon_r, wan_r = dcm.to_llw(A)
-
-    assert_allclose(lon_r, lon, rtol=1e-10)
-    assert_allclose(lat_r, lat, rtol=1e-10)
-    assert_allclose(wan_r, wan, rtol=1e-10)
-
-
 if __name__ == '__main__':
     run_module_suite()

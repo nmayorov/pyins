@@ -140,38 +140,3 @@ def to_hpr(dcm):
         h[h < 0] += 360
 
     return h, p, r
-
-
-def to_llw(dcm):
-    """Convert a direction cosine matrix to latitude, longitude and wander.
-
-    The latitude is within [-90, 90], the longitude and the wander are
-    within [-180, 180].
-
-    If ``90 - abs(latitude) < np.rad2deg(1e-3)`` then the longitude is set to
-    0 and the wander is computed accordingly.
-
-    Parameters
-    ----------
-    dcm : array_like, shape (3, 3) or (n, 3, 3)
-        Direction cosine matrices.
-
-    Returns
-    -------
-    lat, lon, wan : float or ndarray with shape (n,)
-        Latitude, longitude and wander. Note that `wan` is always returned
-        even though it can be known to be equal 0.
-    """
-    alpha, beta, wan = Rotation.from_matrix(dcm).as_euler('ZXZ', degrees=True).T
-    lon = alpha - 90.0
-    lat = 90.0 - beta
-    if lon.ndim == 0:
-        if lon < -180:
-            lon += 360
-        elif lon > 180:
-            lon -= 360
-    else:
-        lon[lon < -180] += 360
-        lon[lon > 180] -= 360
-
-    return lat, lon, wan
