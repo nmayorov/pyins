@@ -1,8 +1,8 @@
+import pandas as pd
 from numpy.testing import assert_allclose, run_module_suite
 import numpy as np
-from pyins import earth
+from pyins import sim, filt
 from pyins.integrate import coning_sculling, Integrator
-from pyins import dcm
 
 
 def test_coning_sculling():
@@ -23,64 +23,79 @@ def test_coning_sculling():
     assert_allclose(dv, dv_true, rtol=1e-10)
 
 
-def test_integrate():
-    # Test on the static bench.
+def run_integration_test(reference_trajectory, gyro, accel, dt, sensor_type,
+                         thresholds):
+    theta, dv = coning_sculling(gyro, accel,
+                                dt=dt if sensor_type == 'rate' else None)
+    init = reference_trajectory.iloc[0]
+    integrator = Integrator(dt,
+                            init[['lat', 'lon', 'alt']],
+                            init[['VE', 'VN', 'VU']],
+                            init[['h', 'p', 'r']])
+    result = integrator.integrate(theta, dv)
+    diff = filt.traj_diff(result, reference_trajectory).abs().max(axis=0)
+    assert (diff < thresholds).all()
+
+
+def test_integrate_stationary():
+    total_time = 3600
     dt = 1e-1
-    n = 100
+    n = int(total_time / dt)
 
-    Cnb = dcm.from_hpr(45, -30, 60)
-    gyro = np.array([0, 1/np.sqrt(2), 1/np.sqrt(2)]) * earth.RATE * dt
-    gyro = Cnb.T.dot(gyro)
-    gyro = np.resize(gyro, (n, 3))
+    lat = np.full(n, 55.0)
+    lon = np.full(n, 37.0)
+    alt = np.full(n, 150.0)
+    h = np.full(n, 110.0)
+    p = np.full(n, 10.0)
+    r = np.full(n, -5.0)
 
-    accel = np.array([0, 0, earth.gravity(45)]) * dt
-    accel = Cnb.T.dot(accel)
-    accel = np.resize(accel, (n, 3))
+    thresholds = pd.Series({
+        'lat': 1e-3, 'lon': 1e-3, 'alt': 1e-2,
+        'VE': 1e-6, 'VN': 1e-6, 'VU': 1e-5,
+        'h': 1e-8, 'p': 1e-8, 'r': 1e-8
+    })
 
-    theta, dv = coning_sculling(gyro, accel)
+    ref, gyro, accel = sim.from_position(dt, lat, lon, alt, h, p, r,
+                                         sensor_type='increment')
+    run_integration_test(ref, gyro, accel, dt, 'increment', thresholds)
 
-    Integrator.INITIAL_SIZE = 50
-    I = Integrator(dt, [45, 50, 0], [0, 0, 0], [45, -30, 60])
-    I.integrate(theta[:n//2], dv[:n//2])
-    I.integrate(theta[n//2:], dv[n//2:])
-
-    assert_allclose(I.traj.lat, 45, rtol=1e-12)
-    assert_allclose(I.traj.lon, 50, rtol=1e-12)
-    assert_allclose(I.traj.VE, 0, atol=1e-8)
-    assert_allclose(I.traj.VN, 0, atol=1e-8)
-    assert_allclose(I.traj.h, 45, rtol=1e-12)
-    assert_allclose(I.traj.p, -30, rtol=1e-12)
-    assert_allclose(I.traj.r, 60, rtol=1e-12)
+    ref, gyro, accel = sim.from_position(dt, lat, lon, alt, h, p, r,
+                                         sensor_type='rate')
+    run_integration_test(ref, gyro, accel, dt, 'rate', thresholds)
 
 
-def test_integrate_rate_sensors():
-    # Test on the static bench.
+def test_integrate_constant_velocity():
+    total_time = 3600
     dt = 1e-1
-    n = 100
+    n = int(total_time / dt)
 
-    Cnb = dcm.from_hpr(45, -30, 60)
-    gyro = np.array([0, 1/np.sqrt(2), 1/np.sqrt(2)]) * earth.RATE
-    gyro = Cnb.T.dot(gyro)
-    gyro = np.resize(gyro, (n, 3))
+    lat0 = 55.0
+    lon0 = 37.0
+    alt0 = 150.0
 
-    accel = np.array([0, 0, earth.gravity(45)])
-    accel = Cnb.T.dot(accel)
-    accel = np.resize(accel, (n, 3))
+    VE = np.full(n, 5.0)
+    VN = np.full(n, -3.0)
+    VU = np.full(n, 0.2)
 
-    theta, dv = coning_sculling(gyro, accel, dt=dt)
+    h = np.full(n, 110.0)
+    p = np.full(n, 10.0)
+    r = np.full(n, -5.0)
 
-    Integrator.INITIAL_SIZE = 50
-    I = Integrator(dt, [45, 50, 0], [0, 0, 0], [45, -30, 60])
-    I.integrate(theta[:n//2], dv[:n//2])
-    I.integrate(theta[n//2:], dv[n//2:])
+    thresholds = pd.Series({
+        'lat': 1, 'lon': 1, 'alt': 1,
+        'VE': 1e-3, 'VN': 1e-3, 'VU': 1e-3,
+        'h': 1e-5, 'p': 1e-5, 'r': 1e-5
+    })
 
-    assert_allclose(I.traj.lat, 45, rtol=1e-12)
-    assert_allclose(I.traj.lon, 50, rtol=1e-12)
-    assert_allclose(I.traj.VE, 0, atol=1e-8)
-    assert_allclose(I.traj.VN, 0, atol=1e-8)
-    assert_allclose(I.traj.h, 45, rtol=1e-12)
-    assert_allclose(I.traj.p, -30, rtol=1e-12)
-    assert_allclose(I.traj.r, 60, rtol=1e-12)
+    ref, gyro, accel = sim.from_velocity(dt, lat0, lon0, alt0,
+                                         VE, VN, VU, h, p, r,
+                                         sensor_type='increment')
+    run_integration_test(ref, gyro, accel, dt, 'increment', thresholds)
+
+    ref, gyro, accel = sim.from_velocity(dt, lat0, lon0, alt0,
+                                         VE, VN, VU, h, p, r,
+                                         sensor_type='rate')
+    run_integration_test(ref, gyro, accel, dt, 'rate', thresholds)
 
 
 if __name__ == '__main__':
