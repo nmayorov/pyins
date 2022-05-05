@@ -5,6 +5,7 @@ import pandas as pd
 from pyins.filt import (InertialSensor, LatLonObs, VeVnObs,
                         FeedforwardFilter, FeedbackFilter, traj_diff,
                         _refine_stamps, _kalman_correct, correct_traj)
+from pyins.error_model import propagate_errors
 from pyins import earth
 from pyins import sim
 from pyins.integrate import coning_sculling, Integrator
@@ -109,8 +110,8 @@ def test_LatLonObs():
               np.deg2rad(-0.0001) * earth.R0]
     assert_allclose(z, z_true, rtol=1e-5)
 
-    assert_allclose(H, [[1, 0, 0, 0, 0, 0, 0],
-                        [0, 1, 0, 0, 0, 0, 0]])
+    assert_allclose(H, [[1, 0, 0, 0, 0, 0, 0, 0, 0],
+                        [0, 1, 0, 0, 0, 0, 0, 0, 0]])
 
     assert_allclose(R, [[100, 0], [0, 100]])
 
@@ -135,8 +136,8 @@ def test_VeVnObs():
 
     z, H, R = obs.compute_obs(50, traj_point)
     assert_allclose(z, [1, -1])
-    assert_allclose(H, [[0, 0, 1, 0, 0, 0, -2],
-                        [0, 0, 0, 1, 0, 0, -3]])
+    assert_allclose(H, [[0, 0, 0, 1, 0, 0, 0, 0, -2],
+                        [0, 0, 0, 0, 1, 0, 0, 0, -3]])
 
 
 def test_refine_stamps():
