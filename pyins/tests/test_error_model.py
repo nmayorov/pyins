@@ -12,14 +12,16 @@ def test_propagate_errors():
     dt = 0.5
     t = 0.5 * 3600
     n_samples = int(t / dt)
-    lat = np.full(n_samples, 50.0)
-    lon = np.full(n_samples, 60.0)
-    alt = np.zeros_like(lat)
-    h = np.full(n_samples, 10.0)
-    r = np.full(n_samples, -5.0)
-    p = np.full(n_samples, 3.0)
+    lla = np.empty((n_samples, 3))
+    lla[:, 0] = 50.0
+    lla[:, 1] = 60.0
+    lla[:, 2] = 0
+    hpr = np.empty((n_samples, 3))
+    hpr[:, 0] = 10.0
+    hpr[:, 1] = 3.0
+    hpr[:, 2] = -5.0
 
-    traj, gyro, accel = sim.from_position(dt, lat, lon, alt, h, p, r)
+    traj, gyro, accel = sim.from_position(dt, lla, hpr)
 
     gyro_bias = np.array([1e-8, -2e-8, 3e-8])
     accel_bias = np.array([3e-3, -4e-3, 2e-3])
@@ -39,7 +41,7 @@ def test_propagate_errors():
     d_r = 0.03
 
     lat0, lon0 = perturb_ll(traj.lat[0], traj.lon[0], d_lat, d_lon)
-    alt0 = alt[0] + d_alt
+    alt0 = traj.alt[0] + d_alt
     VE0 = traj.VE[0] + d_VE
     VN0 = traj.VN[0] + d_VN
     VU0 = traj.VU[0] + d_VU

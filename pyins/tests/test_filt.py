@@ -297,8 +297,8 @@ def test_FeedbackFilter():
     traj['p'] = 0
     traj['r'] = 0
 
-    _, gyro, accel = sim.from_position(dt, traj.lat, traj.lon, traj.alt,
-                                       h=traj.h, p=traj.p, r=traj.r)
+    _, gyro, accel = sim.from_position(dt, traj[['lat', 'lon', 'alt']],
+                                       traj[['h', 'p', 'r']])
     theta, dv = coning_sculling(gyro, accel)
 
     np.random.seed(0)

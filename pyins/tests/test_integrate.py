@@ -43,12 +43,15 @@ def test_integrate_stationary():
     dt = 1e-1
     n = int(total_time / dt)
 
-    lat = np.full(n, 55.0)
-    lon = np.full(n, 37.0)
-    alt = np.full(n, 150.0)
-    h = np.full(n, 110.0)
-    p = np.full(n, 10.0)
-    r = np.full(n, -5.0)
+    lla = np.empty((n, 3))
+    lla[:, 0] = 55.0
+    lla[:, 1] = 37.0
+    lla[:, 2] = 150.0
+
+    hpr = np.empty((n, 3))
+    hpr[:, 0] = 110.0
+    hpr[:, 1] = 10.0
+    hpr[:, 2] = -5.0
 
     thresholds = pd.Series({
         'lat': 1e-3, 'lon': 1e-3, 'alt': 1e-2,
@@ -56,12 +59,10 @@ def test_integrate_stationary():
         'h': 1e-8, 'p': 1e-8, 'r': 1e-8
     })
 
-    ref, gyro, accel = sim.from_position(dt, lat, lon, alt, h, p, r,
-                                         sensor_type='increment')
+    ref, gyro, accel = sim.from_position(dt, lla, hpr, sensor_type='increment')
     run_integration_test(ref, gyro, accel, dt, 'increment', thresholds)
 
-    ref, gyro, accel = sim.from_position(dt, lat, lon, alt, h, p, r,
-                                         sensor_type='rate')
+    ref, gyro, accel = sim.from_position(dt, lla, hpr, sensor_type='rate')
     run_integration_test(ref, gyro, accel, dt, 'rate', thresholds)
 
 
@@ -70,17 +71,17 @@ def test_integrate_constant_velocity():
     dt = 1e-1
     n = int(total_time / dt)
 
-    lat0 = 55.0
-    lon0 = 37.0
-    alt0 = 150.0
+    lla0 = [55.0, 37.0, 150.0]
 
-    VE = np.full(n, 5.0)
-    VN = np.full(n, -3.0)
-    VU = np.full(n, 0.2)
+    V_n = np.empty((n, 3))
+    V_n[:, 0] = 5.0
+    V_n[:, 1] = -3.0
+    V_n[:, 2] = 0.2
 
-    h = np.full(n, 110.0)
-    p = np.full(n, 10.0)
-    r = np.full(n, -5.0)
+    hpr = np.empty((n, 3))
+    hpr[:, 0] = 110.0
+    hpr[:, 1] = 10.0
+    hpr[:, 2] = -5.0
 
     thresholds = pd.Series({
         'lat': 1, 'lon': 1, 'alt': 1,
@@ -88,13 +89,11 @@ def test_integrate_constant_velocity():
         'h': 1e-5, 'p': 1e-5, 'r': 1e-5
     })
 
-    ref, gyro, accel = sim.from_velocity(dt, lat0, lon0, alt0,
-                                         VE, VN, VU, h, p, r,
+    ref, gyro, accel = sim.from_velocity(dt, lla0, V_n, hpr,
                                          sensor_type='increment')
     run_integration_test(ref, gyro, accel, dt, 'increment', thresholds)
 
-    ref, gyro, accel = sim.from_velocity(dt, lat0, lon0, alt0,
-                                         VE, VN, VU, h, p, r,
+    ref, gyro, accel = sim.from_velocity(dt, lla0, V_n, hpr,
                                          sensor_type='rate')
     run_integration_test(ref, gyro, accel, dt, 'rate', thresholds)
 

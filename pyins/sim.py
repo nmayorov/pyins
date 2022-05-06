@@ -64,16 +64,16 @@ def _compute_increment_readings(dt, a, b, c, d, e):
     return gyros, accels
 
 
-def from_position(dt, lat, lon, alt, h, p, r, sensor_type='increment'):
+def from_position(dt, lla, hpr, sensor_type='increment'):
     """Generate inertial readings given position and attitude.
 
     Parameters
     ----------
     dt : float
         Time step.
-    lat, lon, alt : array_like, shape (n_points,)
+    lla : array_like, shape (n_points, 3)
         Time series of latitude, longitude and altitude.
-    h, p, r : array_like, shape (n_points,)
+    hpr : array_like, shape (n_points, 3)
         Time series of heading, pitch and roll angles.
     sensor_type: 'increment' or 'rate', optional
         Type of sensor to generate. If 'increment' (default), then integrals
@@ -93,21 +93,15 @@ def from_position(dt, lat, lon, alt, h, p, r, sensor_type='increment'):
     if sensor_type not in ['rate', 'increment']:
         raise ValueError("`sensor_type` must be 'rate' or 'increment'.")
 
-    lat = np.asarray(lat, dtype=float)
-    lon = np.asarray(lon, dtype=float)
-    alt = np.asarray(alt, dtype=float)
-    h = np.asarray(h, dtype=float)
-    p = np.asarray(p, dtype=float)
-    r = np.asarray(r, dtype=float)
-    n_points = lat.shape[0]
+    lla = np.asarray(lla, dtype=float)
+    hpr = np.asarray(hpr, dtype=float)
+    n_points = len(lla)
 
     time = dt * np.arange(n_points)
-    lat_inertial = lat.copy()
-    lon_inertial = lon.copy()
-    lon_inertial += np.rad2deg(earth.RATE) * time
-    Cin = dcm.from_ll(lat_inertial, lon_inertial)
+    lon_inertial = lla[:, 1] + np.rad2deg(earth.RATE) * time
+    Cin = dcm.from_ll(lla[:, 0], lon_inertial)
 
-    R = transform.lla_to_ecef(lat_inertial, lon_inertial, alt)
+    R = transform.lla_to_ecef(lla[:, 0], lon_inertial, lla[:, 2])
     v_s = CubicSpline(time, R).derivative()
     v = v_s(time)
 
@@ -116,11 +110,11 @@ def from_position(dt, lat, lon, alt, h, p, r, sensor_type='increment'):
     V[:, 1] -= earth.RATE * R[:, 0]
     V = util.mv_prod(Cin, V, at=True)
 
-    Cnb = dcm.from_hpr(np.vstack((h, p, r)).T)
+    Cnb = dcm.from_hpr(hpr)
     Cib = util.mm_prod(Cin, Cnb)
 
     Cib_spline = RotationSpline(time, Rotation.from_matrix(Cib))
-    g = earth.gravitation_ecef(lat_inertial, lon_inertial, alt)
+    g = earth.gravitation_ecef(lla[:, 0], lon_inertial, lla[:, 2])
 
     if sensor_type == 'rate':
         gyros = Cib_spline(time, 1)
@@ -142,16 +136,9 @@ def from_position(dt, lat, lon, alt, h, p, r, sensor_type='increment'):
         assert False
 
     traj = pd.DataFrame(index=np.arange(time.shape[0]))
-    traj['lat'] = lat
-    traj['lon'] = lon
-    traj['alt'] = alt
-    traj['VE'] = V[:, 0]
-    traj['VN'] = V[:, 1]
-    traj['VU'] = V[:, 2]
-    traj['h'] = h
-    traj['p'] = p
-    traj['r'] = r
-
+    traj[['lat', 'lon', 'alt']] = lla
+    traj[['VE', 'VN', 'VU']] = V
+    traj[['h', 'p', 'r']] = hpr
     return traj, gyros, accels
 
 
@@ -184,19 +171,18 @@ class _QuadraticSpline(PPoly):
         super(_QuadraticSpline, self).__init__(c, x)
 
 
-def from_velocity(dt, lat0, lon0, alt0, VE, VN, VU, h, p, r,
-                  sensor_type='increment'):
+def from_velocity(dt, lla0, V_n, hpr, sensor_type='increment'):
     """Generate inertial readings given velocity and attitude.
 
     Parameters
     ----------
     dt : float
         Time step.
-    lat0, lon0, alt0 : float
+    lla0 : array_like, shape (3,)
         Initial values of latitude, longitude and altitude.
-    VE, VN, VU : array_like, shape (n_points,)
+    V_n : array_like, shape (n_points, 3)
         Time series of East, North and vertical velocity components.
-    h, p, r : array_like, shape (n_points,)
+    hpr : array_like, shape (n_points, 3)
         Time series of heading, pitch and roll angles.
     sensor_type: 'increment' or 'rate', optional
         Type of sensor to generate. If 'increment' (default), then integrals
@@ -216,27 +202,20 @@ def from_velocity(dt, lat0, lon0, alt0, VE, VN, VU, h, p, r,
     MAX_ITER = 3
     ACCURACY = 0.01
 
-    VE = np.asarray(VE, dtype=float)
-    VN = np.asarray(VN, dtype=float)
-    VU = np.asarray(VU, dtype=float)
-    h = np.asarray(h, dtype=float)
-    p = np.asarray(p, dtype=float)
-    r = np.asarray(r, dtype=float)
-    n_points = VE.shape[0]
+    V_n = np.asarray(V_n, dtype=float)
+    hpr = np.asarray(hpr, dtype=float)
+    n_points = len(V_n)
     time = np.arange(n_points) * dt
 
-    VU_spline = _QuadraticSpline(time, VU)
+    VU_spline = _QuadraticSpline(time, V_n[:, 2])
     alt_spline = VU_spline.antiderivative()
-    alt = alt0 + alt_spline(time)
+    alt = lla0[2] + alt_spline(time)
 
-    lat0 = np.deg2rad(lat0)
-    lon0 = np.deg2rad(lon0)
-    lat = lat0
-
+    lat = lat0 = np.deg2rad(lla0[0])
     for iteration in range(MAX_ITER):
         _, rn = earth.principal_radii(np.rad2deg(lat))
         rn += alt
-        dlat_spline = _QuadraticSpline(time, VN / rn)
+        dlat_spline = _QuadraticSpline(time, V_n[:, 1] / rn)
         lat_spline = dlat_spline.antiderivative()
         lat_new = lat_spline(time) + lat0
         delta = (lat - lat_new) * rn
@@ -246,13 +225,15 @@ def from_velocity(dt, lat0, lon0, alt0, VE, VN, VU, h, p, r,
 
     re, _ = earth.principal_radii(np.rad2deg(lat))
     re += alt
-    dlon_spline = _QuadraticSpline(time, VE / (re * np.cos(lat)))
+    dlon_spline = _QuadraticSpline(time, V_n[:, 0] / (re * np.cos(lat)))
     lon_spline = dlon_spline.antiderivative()
 
-    lat = np.rad2deg(lat)
-    lon = np.rad2deg(lon0 + lon_spline(time))
+    lla = np.empty((n_points, 3))
+    lla[:, 0] = np.rad2deg(lat)
+    lla[:, 1] = lla0[1] + np.rad2deg(lon_spline(time))
+    lla[:, 2] = alt
 
-    return from_position(dt, lat, lon, alt, h, p, r, sensor_type)
+    return from_position(dt, lla, hpr, sensor_type)
 
 
 def stationary_rotation(dt, lat, alt, Cnb, Cbs=None):
