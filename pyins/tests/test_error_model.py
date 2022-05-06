@@ -3,7 +3,7 @@ from numpy.testing import assert_allclose
 from pyins import sim
 from pyins.integrate import coning_sculling, Integrator
 from pyins.error_model import propagate_errors
-from pyins.transform import perturb_ll, traj_diff
+from pyins.transform import perturb_lla, traj_diff
 
 
 def test_propagate_errors():
@@ -40,8 +40,8 @@ def test_propagate_errors():
     d_p = -0.02
     d_r = 0.03
 
-    lat0, lon0 = perturb_ll(traj.lat[0], traj.lon[0], d_lat, d_lon)
-    alt0 = traj.alt[0] + d_alt
+    lla0 = perturb_lla(traj.loc[0, ['lat', 'lon', 'alt']],
+                       [d_lon, d_lat, d_alt])
     VE0 = traj.VE[0] + d_VE
     VN0 = traj.VN[0] + d_VN
     VU0 = traj.VU[0] + d_VU
@@ -49,8 +49,7 @@ def test_propagate_errors():
     p0 = traj.p[0] + d_p
     r0 = traj.r[0] + d_r
 
-    integrator = Integrator(dt, [lat0, lon0, alt0], [VE0, VN0, VU0],
-                            [h0, p0, r0])
+    integrator = Integrator(dt, lla0, [VE0, VN0, VU0], [h0, p0, r0])
     traj_c = integrator.integrate(theta, dv)
     error_true = traj_diff(traj_c, traj)
     error_linear = propagate_errors(dt, traj, d_lat, d_lon, d_alt,

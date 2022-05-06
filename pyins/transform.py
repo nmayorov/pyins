@@ -32,8 +32,8 @@ def lla_to_ecef(lla):
     return r_e.transpose()
 
 
-def perturb_ll(lat, lon, d_lat, d_lon):
-    """Perturb latitude and longitude.
+def perturb_lla(lla, delta_enu):
+    """Perturb latitude, longitude and altitude.
 
     This function recomputes linear displacements in meters to changes in a
     latitude and longitude considering Earth curvature.
@@ -43,26 +43,31 @@ def perturb_ll(lat, lon, d_lat, d_lon):
 
     Parameters
     ----------
-    lat, lon : array_like
-        Latitude and longitude.
-    d_lat, d_lon : array_like
-        Perturbations to `lat` and `lon` respectively in *meters*. It is
-        assumed that `d_lat` and `d_lon` are significantly less than Earth
-        radius.
+    lla : array_like, shape (3,) or (n, 3)
+        Latitude, longitude and altitude.
+    delta_enu : array_like, shape (3,) or (n, 3)
+        Perturbation values in meters resolved in ENU frame.
 
     Returns
     -------
-    lat_new, lon_new
-        Perturbed values of latitude and longitude.
+    lla_new : ndarray, shape (3,) or (n, 3)
+        Perturbed values of latitude, longitude and altitude.
     """
-    slat = np.sin(np.deg2rad(lat))
-    clat = (1 - slat**2) ** 0.5
-    re, rn = earth.principal_radii(lat)
+    lla = np.asarray(lla, dtype=float)
+    delta_enu = np.asarray(delta_enu)
+    return_single = lla.ndim == 1 and delta_enu.ndim == 1
 
-    lat_new = lat + np.rad2deg(d_lat / rn)
-    lon_new = lon + np.rad2deg(d_lon / (re * clat))
+    lla = np.atleast_2d(lla).copy()
+    delta_enu = np.atleast_2d(delta_enu)
 
-    return lat_new, lon_new
+    re, rn = earth.principal_radii(lla[:, 0])
+    cos_lat = np.cos(np.deg2rad(lla[:, 0]))
+
+    lla[:, 0] += np.rad2deg(delta_enu[:, 1] / (rn + lla[:, 2]))
+    lla[:, 1] += np.rad2deg(delta_enu[:, 0] / ((re + lla[:, 2]) * cos_lat))
+    lla[:, 2] += delta_enu[:, 2]
+
+    return lla[0] if return_single else lla
 
 
 def traj_diff(t1, t2):

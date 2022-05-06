@@ -1,5 +1,5 @@
 from numpy.testing import assert_allclose, run_module_suite
-from pyins.transform import lla_to_ecef, perturb_ll
+from pyins.transform import lla_to_ecef, perturb_lla
 from pyins import earth
 
 
@@ -17,11 +17,10 @@ def test_lla_to_ecef():
 
 
 def test_perturb_ll():
-    lat = 40
-    lon = 50
-    lat_new, lon_new = perturb_ll(lat, lon, 10, -20)
-    lat_new, lon_new = perturb_ll(lat_new, lon_new, -10, 20)
-    assert_allclose([lat_new, lon_new], [lat, lon], rtol=1e-11)
+    lla = [40, 50, 0]
+    lla_new = perturb_lla(lla, [10, -20, 5])
+    lla_back = perturb_lla(lla_new, [-10, 20, -5])
+    assert_allclose(lla_back, lla, rtol=1e-11)
 
 
 if __name__ == '__main__':

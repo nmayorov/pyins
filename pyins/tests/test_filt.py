@@ -9,7 +9,7 @@ from pyins.error_model import propagate_errors
 from pyins import earth
 from pyins import sim
 from pyins.integrate import coning_sculling, Integrator
-from pyins.transform import perturb_ll, traj_diff
+from pyins.transform import perturb_lla, traj_diff
 
 
 def test_InertialSensor():
@@ -224,18 +224,10 @@ def test_FeedforwardFilter():
     traj['r'] = 0
 
     np.random.seed(1)
-    obs_data = pd.DataFrame(
-        index=traj.index[::10],
-        data={
-            'lat': traj.lat[::10],
-            'lon': traj.lon[::10]
-        }
-    )
-    obs_data['lat'], obs_data['lon'] = perturb_ll(
-        obs_data.lat, obs_data.lon,
-        10 * np.random.randn(obs_data.shape[0]),
-        10 * np.random.randn(obs_data.shape[0]))
-
+    obs_data = pd.DataFrame(index=traj.index[::10])
+    lla_obs = perturb_lla(traj.loc[::10, ['lat', 'lon', 'alt']],
+                          10 * np.random.randn(len(obs_data), 3))
+    obs_data[['lat', 'lon']] = lla_obs[:, :2]
     obs = LatLonObs(obs_data, 10)
 
     d_lat = 5
@@ -302,18 +294,10 @@ def test_FeedbackFilter():
     theta, dv = coning_sculling(gyro, accel)
 
     np.random.seed(0)
-    obs_data = pd.DataFrame(
-        index=traj.index[::10],
-        data={
-            'lat': traj.lat[::10],
-            'lon': traj.lon[::10]
-        }
-    )
-    obs_data['lat'], obs_data['lon'] = perturb_ll(
-        obs_data.lat, obs_data.lon,
-        10 * np.random.randn(obs_data.shape[0]),
-        10 * np.random.randn(obs_data.shape[0]))
-
+    obs_data = pd.DataFrame(index=traj.index[::10])
+    lla_obs = perturb_lla(traj.loc[::10, ['lat', 'lon', 'alt']],
+                          10 * np.random.randn(len(obs_data), 3))
+    obs_data[['lat', 'lon']] = lla_obs[:, :2]
     obs = LatLonObs(obs_data, 10)
 
     f = FeedbackFilter(dt, 5, 1, 0.2, 0.05)
@@ -328,9 +312,9 @@ def test_FeedbackFilter():
     d_p = 0.03
     d_r = -0.02
 
-    lat0, lon0 = perturb_ll(50, 60, d_lat, d_lon)
-    alt0 = 100 + d_alt
-    integrator = Integrator(dt, [lat0, lon0, alt0], [d_VE, d_VN, d_VU],
+    lla0 = perturb_lla(traj.loc[0, ['lat', 'lon', 'alt']],
+                       [d_lon, d_lat, d_alt])
+    integrator = Integrator(dt, lla0, [d_VE, d_VN, d_VU],
                             [d_h, d_p, d_r])
     res = f.run(integrator, theta, dv, observations=[obs])
     error = traj_diff(res.traj, traj)
@@ -339,7 +323,7 @@ def test_FeedbackFilter():
     assert_allclose(error.lat, 0, rtol=0, atol=10)
     assert_allclose(error.lon, 0, rtol=0, atol=10)
     assert_allclose(error.VE, 0, rtol=0, atol=1e-2)
-    assert_allclose(error.VN, 0, rtol=0, atol=1e-2)
+    assert_allclose(error.VN, 0, rtol=0, atol=2e-2)
     assert_allclose(error.h, 0, rtol=0, atol=1.5e-3)
     assert_allclose(error.p, 0, rtol=0, atol=1e-4)
     assert_allclose(error.r, 0, rtol=0, atol=1e-4)
