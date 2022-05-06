@@ -116,7 +116,7 @@ def from_position(dt, lat, lon, alt, h, p, r, sensor_type='increment'):
     V[:, 1] -= earth.RATE * R[:, 0]
     V = util.mv_prod(Cin, V, at=True)
 
-    Cnb = dcm.from_hpr(h, p, r)
+    Cnb = dcm.from_hpr(np.vstack((h, p, r)).T)
     Cib = util.mm_prod(Cin, Cnb)
 
     Cib_spline = RotationSpline(time, Rotation.from_matrix(Cib))
@@ -432,7 +432,7 @@ class TableRotations:
         self.rest_time = rest_time
 
         self.Cnb = np.empty((1, 3, 3))
-        self.Cnb[0] = dcm.from_hpr(h0, p0, r0)
+        self.Cnb[0] = dcm.from_hpr([h0, p0, r0])
         self._rest_intervals = []
 
     def rotate(self, axis, angle, rot_speed=None):

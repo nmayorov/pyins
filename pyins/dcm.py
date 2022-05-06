@@ -25,7 +25,7 @@ def from_rv(rv):
     return Rotation.from_rotvec(rv).as_matrix()
 
 
-def from_hpr(h, p, r):
+def from_hpr(hpr):
     """Create a direction cosine matrix from heading, pitch and roll angles.
 
     The sequence of elemental rotations is as follows::
@@ -39,7 +39,7 @@ def from_hpr(h, p, r):
 
     Parameters
     ----------
-    h, p, r : float or array_like with shape (n,)
+    hpr : array_like, shape (3,) or (n, 3)
         Heading, pitch and roll.
 
     Returns
@@ -47,23 +47,12 @@ def from_hpr(h, p, r):
     dcm : ndarray, shape (3, 3) or (n, 3, 3)
         Direction cosine matrices.
     """
-    h = np.asarray(h)
-    p = np.asarray(p)
-    r = np.asarray(r)
-    if h.ndim == 0 and p.ndim == 0 and r.ndim == 0:
-        return Rotation.from_euler('yxz', [r, p, -h], degrees=True).as_matrix()
-
-    h = np.atleast_1d(h)
-    p = np.atleast_1d(p)
-    r = np.atleast_1d(r)
-
-    n = max(len(h), len(p), len(r))
-
-    angles = np.empty((n, 3))
-    angles[:, 0] = r
-    angles[:, 1] = p
-    angles[:, 2] = -h
-    return Rotation.from_euler('yxz', angles, degrees=True).as_matrix()
+    angles = np.array(hpr, copy=True)
+    if angles.ndim == 1:
+        angles[0] = -angles[0]
+    else:
+        angles[:, 0] = -angles[:, 0]
+    return Rotation.from_euler('ZXY', angles, degrees=True).as_matrix()
 
 
 def from_ll(lat, lon):

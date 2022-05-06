@@ -127,7 +127,7 @@ def fill_system_matrix(traj):
     rho[:, 1] = traj.VE / earth.R0
     rho[:, 2] = rho[:, 1] * tlat
 
-    Cnb = dcm.from_hpr(traj.h, traj.p, traj.r)
+    Cnb = dcm.from_hpr(traj[['h', 'p', 'r']])
 
     F = np.zeros((n_samples, N_BASE_STATES, N_BASE_STATES))
 

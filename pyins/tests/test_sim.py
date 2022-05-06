@@ -1,5 +1,6 @@
 import numpy as np
 from numpy.testing import assert_allclose, run_module_suite
+from scipy.spatial.transform import Rotation
 from pyins import sim
 from pyins import earth
 from pyins import dcm
@@ -87,10 +88,11 @@ def test_stationary():
     t = dt * np.arange(n_points)
     lat = 58
     alt = -10
-    h = np.full(n_points, 45)
-    p = np.full(n_points, -10)
-    r = np.full(n_points, 5)
-    Cnb = dcm.from_hpr(h, p, r)
+    hpr = np.empty((n_points, 3))
+    hpr[:, 0] = 45
+    hpr[:, 1] = -10
+    hpr[:, 2] = 5
+    Cnb = dcm.from_hpr(hpr)
 
     slat = np.sin(np.deg2rad(lat))
     clat = (1 - slat ** 2) ** 0.5
@@ -117,10 +119,8 @@ def test_stationary():
 
     # Place IMU horizontally and rotate around vertical axis.
     # Gravity components should be identically 0.
-    p = np.full(n_points, 0)
-    r = np.full(n_points, 0)
-    Cnb = dcm.from_hpr(h, p, r)
-    Cbs = dcm.from_hpr(rate * t, 0, 0)
+    Cnb = Rotation.from_euler('Z', -hpr[:, 0], True).as_matrix()
+    Cbs = Rotation.from_euler('Z', rate * t, True).as_matrix()
     gyro, accel = sim.stationary_rotation(0.1, lat, alt, Cnb, Cbs)
     accel_true = np.tile(-g_n * dt, (n_points - 1, 1))
     assert_allclose(accel, accel_true, rtol=1e-5, atol=1e-7)

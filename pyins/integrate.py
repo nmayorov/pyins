@@ -157,7 +157,7 @@ class Integrator:
         self.lla[0, :2] = np.deg2rad(lla[:2])
         self.lla[0, 2] = lla[2]
         self.velocity_n[0] = velocity_n
-        self.Cnb[0] = dcm.from_hpr(*hpr)
+        self.Cnb[0] = dcm.from_hpr(hpr)
         self.traj = pd.DataFrame(
             data=np.atleast_2d(np.hstack((lla, velocity_n, hpr))),
             columns=self.TRAJECTORY_COLUMNS,
