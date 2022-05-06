@@ -4,14 +4,14 @@ from pyins import earth
 
 
 def test_lla_to_ecef():
-    r_e = lla_to_ecef(0, 0, 10)
+    r_e = lla_to_ecef([0, 0, 10])
     assert_allclose(r_e, [earth.R0 + 10, 0, 0])
 
-    r_e = lla_to_ecef(-90, 0, -10)
+    r_e = lla_to_ecef([-90, 0, -10])
     b = (1 - earth.E2) ** 0.5 * earth.R0
     assert_allclose(r_e, [0, 0, -b + 10], atol=1e-9)
 
-    r_e = lla_to_ecef([0, -90], [0, 0], [10, -10])
+    r_e = lla_to_ecef([[0, 0, 10], [-90, 0, -10]])
     assert_allclose(r_e, [[earth.R0 + 10, 0, 0],
                           [0, 0, -b + 10]], atol=1e-9)
 

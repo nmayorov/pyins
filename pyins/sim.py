@@ -96,12 +96,13 @@ def from_position(dt, lla, hpr, sensor_type='increment'):
     lla = np.asarray(lla, dtype=float)
     hpr = np.asarray(hpr, dtype=float)
     n_points = len(lla)
-
     time = dt * np.arange(n_points)
-    lon_inertial = lla[:, 1] + np.rad2deg(earth.RATE) * time
-    Cin = dcm.from_ll(lla[:, 0], lon_inertial)
 
-    R = transform.lla_to_ecef(lla[:, 0], lon_inertial, lla[:, 2])
+    lla_inertial = lla.copy()
+    lla_inertial[:, 1] += np.rad2deg(earth.RATE) * time
+    Cin = dcm.from_ll(lla_inertial[:, 0], lla_inertial[:, 1])
+
+    R = transform.lla_to_ecef(lla_inertial)
     v_s = CubicSpline(time, R).derivative()
     v = v_s(time)
 
@@ -114,7 +115,8 @@ def from_position(dt, lla, hpr, sensor_type='increment'):
     Cib = util.mm_prod(Cin, Cnb)
 
     Cib_spline = RotationSpline(time, Rotation.from_matrix(Cib))
-    g = earth.gravitation_ecef(lla[:, 0], lon_inertial, lla[:, 2])
+    g = earth.gravitation_ecef(lla_inertial[:, 0], lla_inertial[:, 1],
+                               lla_inertial[:, 2])
 
     if sensor_type == 'rate':
         gyros = Cib_spline(time, 1)
@@ -265,7 +267,12 @@ def stationary_rotation(dt, lat, alt, Cnb, Cbs=None):
     lat = np.full_like(lon_inertial, lat)
     Cin = dcm.from_ll(lat, lon_inertial)
 
-    R = transform.lla_to_ecef(lat, lon_inertial, alt)
+    lla = np.empty((n_points, 3))
+    lla[:, 0] = lat
+    lla[:, 1] = np.rad2deg(earth.RATE) * time
+    lla[:, 2] = alt
+
+    R = transform.lla_to_ecef(lla)
     v_s = CubicSpline(time, R).derivative()
 
     if Cbs is None:
