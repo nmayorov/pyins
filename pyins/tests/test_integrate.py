@@ -2,7 +2,7 @@ import pandas as pd
 from numpy.testing import assert_allclose, run_module_suite
 import numpy as np
 from pyins import sim
-from pyins.transform import traj_diff
+from pyins.transform import difference_trajectories
 from pyins.integrate import coning_sculling, Integrator
 
 
@@ -34,7 +34,7 @@ def run_integration_test(reference_trajectory, gyro, accel, dt, sensor_type,
                             init[['VE', 'VN', 'VU']],
                             init[['h', 'p', 'r']])
     result = integrator.integrate(theta, dv)
-    diff = traj_diff(result, reference_trajectory).abs().max(axis=0)
+    diff = difference_trajectories(result, reference_trajectory).abs().max(axis=0)
     assert (diff < thresholds).all()
 
 

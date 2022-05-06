@@ -70,7 +70,7 @@ def perturb_lla(lla, delta_enu):
     return lla[0] if return_single else lla
 
 
-def traj_diff(t1, t2):
+def difference_trajectories(t1, t2):
     """Compute trajectory difference.
 
     Parameters

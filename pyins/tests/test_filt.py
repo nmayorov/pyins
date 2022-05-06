@@ -9,7 +9,7 @@ from pyins.error_model import propagate_errors
 from pyins import earth
 from pyins import sim
 from pyins.integrate import coning_sculling, Integrator
-from pyins.transform import perturb_lla, traj_diff
+from pyins.transform import perturb_lla, difference_trajectories
 
 
 def test_InertialSensor():
@@ -317,7 +317,7 @@ def test_FeedbackFilter():
     integrator = Integrator(dt, lla0, [d_VE, d_VN, d_VU],
                             [d_h, d_p, d_r])
     res = f.run(integrator, theta, dv, observations=[obs])
-    error = traj_diff(res.traj, traj)
+    error = difference_trajectories(res.traj, traj)
     error = error.iloc[3000:]
 
     assert_allclose(error.lat, 0, rtol=0, atol=10)
@@ -330,7 +330,7 @@ def test_FeedbackFilter():
     assert_(np.all(np.abs(res.residuals[0] < 4)))
 
     res = f.run_smoother(integrator, theta, dv, [obs])
-    error = traj_diff(res.traj, traj)
+    error = difference_trajectories(res.traj, traj)
     assert_allclose(error.lat, 0, rtol=0, atol=10)
     assert_allclose(error.lon, 0, rtol=0, atol=10)
     assert_allclose(error.VE, 0, rtol=0, atol=1e-2)
