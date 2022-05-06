@@ -33,17 +33,17 @@ def test_gravity():
 
 def test_gravitation_ecef():
     g = earth.gravity(90, 100)
-    g0_e = earth.gravitation_ecef(90, 0, 100)
+    g0_e = earth.gravitation_ecef([90, 0, 100])
     assert_allclose(g0_e, [0, 0, -g], atol=1e-12)
 
     g = earth.gravity(0)
-    g0_e = earth.gravitation_ecef(0, 90)
+    g0_e = earth.gravitation_ecef([0, 90, 0])
     assert_allclose(g0_e, [0, -g - earth.RATE**2 * earth.R0, 0],
                     atol=1e-12)
 
     g0_true = [[0, 0, -earth.gravity(90, 100)],
                [0, -earth.gravity(0) - earth.RATE**2 * earth.R0, 0]]
-    assert_allclose(earth.gravitation_ecef([90, 0], [0, 90], [100, 0]),
+    assert_allclose(earth.gravitation_ecef([[90, 0, 100], [0, 90, 0]]),
                     g0_true, atol=1e-12)
 
 

@@ -115,8 +115,7 @@ def from_position(dt, lla, hpr, sensor_type='increment'):
     Cib = util.mm_prod(Cin, Cnb)
 
     Cib_spline = RotationSpline(time, Rotation.from_matrix(Cib))
-    g = earth.gravitation_ecef(lla_inertial[:, 0], lla_inertial[:, 1],
-                               lla_inertial[:, 2])
+    g = earth.gravitation_ecef(lla_inertial)
 
     if sensor_type == 'rate':
         gyros = Cib_spline(time, 1)
@@ -261,18 +260,16 @@ def stationary_rotation(dt, lat, alt, Cnb, Cbs=None):
         Gyro and accelerometer readings.
     """
     n_points = Cnb.shape[0]
-
     time = dt * np.arange(n_points)
-    lon_inertial = np.rad2deg(earth.RATE) * time
-    lat = np.full_like(lon_inertial, lat)
-    Cin = dcm.from_ll(lat, lon_inertial)
 
-    lla = np.empty((n_points, 3))
-    lla[:, 0] = lat
-    lla[:, 1] = np.rad2deg(earth.RATE) * time
-    lla[:, 2] = alt
+    lla_inertial = np.empty((n_points, 3))
+    lla_inertial[:, 0] = lat
+    lla_inertial[:, 1] = np.rad2deg(earth.RATE) * time
+    lla_inertial[:, 2] = alt
 
-    R = transform.lla_to_ecef(lla)
+    Cin = dcm.from_ll(lla_inertial[:, 0], lla_inertial[:, 1])
+
+    R = transform.lla_to_ecef(lla_inertial)
     v_s = CubicSpline(time, R).derivative()
 
     if Cbs is None:
@@ -286,7 +283,7 @@ def stationary_rotation(dt, lat, alt, Cnb, Cbs=None):
     b = Cib_spline.interpolator.c[1]
     c = Cib_spline.interpolator.c[0]
 
-    g = earth.gravitation_ecef(lat, lon_inertial, alt)
+    g = earth.gravitation_ecef(lla_inertial)
     a_s = v_s.derivative()
     d = a_s.c[1] - g[:-1]
     e = a_s.c[0] - np.diff(g, axis=0) / dt

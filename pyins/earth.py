@@ -76,7 +76,7 @@ def gravity(lat, alt=0):
     return GE * (1 + F * sin_lat**2) / (1 - E2 * sin_lat**2)**0.5 * (1 - 2 * alt / R0)
 
 
-def gravitation_ecef(lat, lon, alt=0):
+def gravitation_ecef(lla):
     """Compute a vector of the gravitational force in ECEF frame.
 
     It accounts only for Earth mass attraction. It is computed from
@@ -84,16 +84,15 @@ def gravitation_ecef(lat, lon, alt=0):
 
     Parameters
     ----------
-    lat, lon : array_like
-        Latitude and longitude.
-    alt : array_like, optional
-        Altitude. Default is 0.
+    lla : array_like, shape (3,) or (n, 3)
+        Latitude, longitude and altitude.
 
     Returns
     -------
     g0_e: ndarray, shape (3,) or (n, 3)
         Vectors of the gravitational force expressed in ECEF frame.
     """
+    lat, lon, alt = np.asarray(lla).T
 
     sin_lat = np.sin(np.deg2rad(lat))
     cos_lat = np.cos(np.deg2rad(lat))
