@@ -147,3 +147,23 @@ def curvature_matrix(lat, alt):
     result[:, 2, 0] = result[:, 1, 0] * np.tan(np.deg2rad(lat))
 
     return result[0] if re.ndim == 0 else result
+
+
+def rate_n(lat):
+    """Compute Earth rate resolved in ENU frame.
+
+    Parameters
+    ----------
+    lat : array_like
+        Latitude.
+
+    Returns
+    -------
+    earth_rate_n : ndarray
+    """
+    lat = np.asarray(lat)
+    n = 1 if lat.ndim == 0 else len(lat)
+    result = np.zeros((n, 3))
+    result[:, 1] = RATE * np.cos(np.deg2rad(lat))
+    result[:, 2] = RATE * np.sin(np.deg2rad(lat))
+    return result[0] if lat.ndim == 0 else result
