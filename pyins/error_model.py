@@ -31,12 +31,12 @@ def transform_to_output_errors(traj):
     VE = traj.VE
     VN = traj.VN
     VU = traj.VU
-    h = np.deg2rad(traj.h)
-    p = np.deg2rad(traj.p)
+    heading = np.deg2rad(traj.heading)
+    pitch = np.deg2rad(traj.pitch)
 
     tlat = np.tan(lat)
-    sh, ch = np.sin(h), np.cos(h)
-    cp, tp = np.cos(p), np.tan(p)
+    sh, ch = np.sin(heading), np.cos(heading)
+    cp, tp = np.cos(pitch), np.tan(pitch)
 
     T = np.zeros((traj.shape[0], N_BASE_STATES, N_BASE_STATES))
     T[:, DRE, DR1] = 1
@@ -80,9 +80,9 @@ def compute_output_errors(traj, x, P, output_stamps,
     err['VE'] = y[:, DVE]
     err['VN'] = y[:, DVN]
     err['VU'] = y[:, DVU]
-    err['h'] = np.rad2deg(y[:, DHEADING])
-    err['p'] = np.rad2deg(y[:, DPITCH])
-    err['r'] = np.rad2deg(y[:, DROLL])
+    err['roll'] = np.rad2deg(y[:, DROLL])
+    err['pitch'] = np.rad2deg(y[:, DPITCH])
+    err['heading'] = np.rad2deg(y[:, DHEADING])
 
     sd = pd.DataFrame(index=output_stamps)
     sd['lat'] = sd_y[:, DRN]
@@ -91,9 +91,9 @@ def compute_output_errors(traj, x, P, output_stamps,
     sd['VE'] = sd_y[:, DVE]
     sd['VN'] = sd_y[:, DVN]
     sd['VU'] = sd_y[:, DVU]
-    sd['h'] = np.rad2deg(sd_y[:, DHEADING])
-    sd['p'] = np.rad2deg(sd_y[:, DPITCH])
-    sd['r'] = np.rad2deg(sd_y[:, DROLL])
+    sd['roll'] = np.rad2deg(sd_y[:, DROLL])
+    sd['pitch'] = np.rad2deg(sd_y[:, DPITCH])
+    sd['heading'] = np.rad2deg(sd_y[:, DHEADING])
 
     gyro_err = pd.DataFrame(index=output_stamps)
     gyro_sd = pd.DataFrame(index=output_stamps)
@@ -127,7 +127,7 @@ def fill_system_matrix(traj):
     rho[:, 1] = traj.VE / earth.R0
     rho[:, 2] = rho[:, 1] * tlat
 
-    Cnb = dcm.from_rph(traj[['r', 'p', 'h']])
+    Cnb = dcm.from_rph(traj[['roll', 'pitch', 'heading']])
 
     F = np.zeros((n_samples, N_BASE_STATES, N_BASE_STATES))
 
@@ -237,8 +237,8 @@ def propagate_errors(dt, traj,
     error['VE'] = x[:, DVE]
     error['VN'] = x[:, DVN]
     error['VU'] = x[:, DVU]
-    error['h'] = np.rad2deg(x[:, DHEADING])
-    error['p'] = np.rad2deg(x[:, DPITCH])
-    error['r'] = np.rad2deg(x[:, DROLL])
+    error['roll'] = np.rad2deg(x[:, DROLL])
+    error['pitch'] = np.rad2deg(x[:, DPITCH])
+    error['heading'] = np.rad2deg(x[:, DHEADING])
 
     return error

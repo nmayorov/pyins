@@ -88,9 +88,9 @@ def difference_trajectories(t1, t2):
     diff['lat'] *= np.deg2rad(earth.R0)
     diff['lon'] *= np.deg2rad(earth.R0) * np.cos(0.5 *
                                                  np.deg2rad(t1.lat + t2.lat))
-    diff['h'] %= 360
-    diff.h[diff.h < -180] += 360
-    diff.h[diff.h > 180] -= 360
+    diff.heading %= 360
+    diff.heading[diff.heading < -180] += 360
+    diff.heading[diff.heading > 180] -= 360
 
     return diff.loc[t1.index.intersection(t2.index)]
 
@@ -120,8 +120,8 @@ def correct_traj(traj, error):
     traj_corr['VE'] -= error.VE
     traj_corr['VN'] -= error.VN
     traj_corr['VU'] -= error.VU
-    traj_corr['h'] -= error.h
-    traj_corr['p'] -= error.p
-    traj_corr['r'] -= error.r
+    traj_corr['roll'] -= error.roll
+    traj_corr['pitch'] -= error.pitch
+    traj_corr['heading'] -= error.heading
 
     return traj_corr.dropna()

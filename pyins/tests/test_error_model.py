@@ -36,7 +36,7 @@ def test_propagate_errors():
 
     lla0 = perturb_lla(traj.loc[0, ['lat', 'lon', 'alt']], delta_position_n)
     V0_n = traj.loc[0, ['VE', 'VN', 'VU']] + delta_velocity_n
-    rph0 = traj.loc[0, ['r', 'p', 'h']] + delta_rph
+    rph0 = traj.loc[0, ['roll', 'pitch', 'heading']] + delta_rph
 
     integrator = Integrator(dt, lla0, V0_n, rph0)
     traj_c = integrator.integrate(theta, dv)

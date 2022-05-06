@@ -136,7 +136,8 @@ class Integrator:
            Design Part 2: Velocity and Position Algorithms", Journal of
            Guidance, Control, and Dynamics 1998, Vol. 21, no. 2.
     """
-    TRAJECTORY_COLUMNS = ['lat', 'lon', 'alt', 'VE', 'VN', 'VU', 'r', 'p', 'h']
+    TRAJECTORY_COLUMNS = ['lat', 'lon', 'alt', 'VE', 'VN', 'VU',
+                          'roll', 'pitch', 'heading']
     INITIAL_SIZE = 10000
 
     def __init__(self, dt, lla, velocity_n, rph, stamp=0):
@@ -205,7 +206,7 @@ class Integrator:
             self.lla[n_data:n_data + n_readings, :2])
         traj['alt'] = self.lla[n_data:n_data + n_readings, 2]
         traj[['VE', 'VN', 'VU']] = self.velocity_n[n_data:n_data + n_readings]
-        traj[['r', 'p', 'h']] = rph
+        traj[['roll', 'pitch', 'heading']] = rph
 
         self.traj = self.traj.append(traj)
 

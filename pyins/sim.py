@@ -139,7 +139,7 @@ def from_position(dt, lla, rph, sensor_type='increment'):
     traj = pd.DataFrame(index=np.arange(time.shape[0]))
     traj[['lat', 'lon', 'alt']] = lla
     traj[['VE', 'VN', 'VU']] = V
-    traj[['r', 'p', 'h']] = rph
+    traj[['roll', 'pitch', 'heading']] = rph
     return traj, gyros, accels
 
 

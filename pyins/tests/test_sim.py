@@ -28,9 +28,9 @@ def test_sim_on_stationary():
     assert_allclose(traj.lon, 45, rtol=1e-12)
     assert_allclose(traj.VE, 0, atol=1e-7)
     assert_allclose(traj.VN, 0, atol=1e-7)
-    assert_allclose(traj.h, 0, atol=1e-8)
-    assert_allclose(traj.p, 0, atol=1e-8)
-    assert_allclose(traj.r, 0, atol=1e-8)
+    assert_allclose(traj.roll, 0, atol=1e-8)
+    assert_allclose(traj.pitch, 0, atol=1e-8)
+    assert_allclose(traj.heading, 0, atol=1e-8)
 
     for i in range(3):
         assert_allclose(gyro_g[:, i], gyro[i] * dt, atol=1e-14)
@@ -41,9 +41,9 @@ def test_sim_on_stationary():
     assert_allclose(traj.lon, 45, rtol=1e-12)
     assert_allclose(traj.VE, 0, atol=1e-7)
     assert_allclose(traj.VN, 0, atol=1e-7)
-    assert_allclose(traj.h, 0, atol=1e-8)
-    assert_allclose(traj.p, 0, atol=1e-8)
-    assert_allclose(traj.r, 0, atol=1e-8)
+    assert_allclose(traj.roll, 0, atol=1e-8)
+    assert_allclose(traj.pitch, 0, atol=1e-8)
+    assert_allclose(traj.heading, 0, atol=1e-8)
 
     for i in range(3):
         assert_allclose(gyro_g[:, i], gyro[i], atol=1e-14)
@@ -54,9 +54,9 @@ def test_sim_on_stationary():
     assert_allclose(traj.lon, 45, rtol=1e-12)
     assert_allclose(traj.VE, 0, atol=1e-7)
     assert_allclose(traj.VN, 0, atol=1e-7)
-    assert_allclose(traj.h, 0, atol=1e-8)
-    assert_allclose(traj.p, 0, atol=1e-8)
-    assert_allclose(traj.r, 0, atol=1e-8)
+    assert_allclose(traj.roll, 0, atol=1e-8)
+    assert_allclose(traj.pitch, 0, atol=1e-8)
+    assert_allclose(traj.heading, 0, atol=1e-8)
 
     for i in range(3):
         assert_allclose(gyro_g[:, i], gyro[i] * dt, atol=1e-14)
@@ -68,9 +68,9 @@ def test_sim_on_stationary():
     assert_allclose(traj.lon, 45, rtol=1e-12)
     assert_allclose(traj.VE, 0, atol=1e-7)
     assert_allclose(traj.VN, 0, atol=1e-7)
-    assert_allclose(traj.h, 0, atol=1e-8)
-    assert_allclose(traj.p, 0, atol=1e-8)
-    assert_allclose(traj.r, 0, atol=1e-8)
+    assert_allclose(traj.roll, 0, atol=1e-8)
+    assert_allclose(traj.pitch, 0, atol=1e-8)
+    assert_allclose(traj.heading, 0, atol=1e-8)
 
     for i in range(3):
         assert_allclose(gyro_g[:, i], gyro[i], atol=1e-14)

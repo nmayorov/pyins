@@ -219,9 +219,9 @@ def test_FeedforwardFilter():
     traj['VE'] = 0
     traj['VN'] = 0
     traj['VU'] = 0
-    traj['r'] = 0
-    traj['p'] = 0
-    traj['h'] = 0
+    traj['roll'] = 0
+    traj['pitch'] = 0
+    traj['heading'] = 0
 
     np.random.seed(1)
     obs_data = pd.DataFrame(index=traj.index[::10])
@@ -248,9 +248,9 @@ def test_FeedforwardFilter():
     assert_allclose(x.lon, y.lon, rtol=0, atol=10)
     assert_allclose(x.VE, y.VE, rtol=0, atol=1e-2)
     assert_allclose(x.VE, y.VE, rtol=0, atol=1e-2)
-    assert_allclose(x.h, y.h, rtol=0, atol=1.5e-3)
-    assert_allclose(x.p, y.p, rtol=0, atol=1e-4)
-    assert_allclose(x.r, y.r, rtol=0, atol=1e-4)
+    assert_allclose(x.roll, y.roll, rtol=0, atol=1e-4)
+    assert_allclose(x.pitch, y.pitch, rtol=0, atol=1e-4)
+    assert_allclose(x.heading, y.heading, rtol=0, atol=1.5e-3)
     assert_(np.all(np.abs(res.residuals[0] < 4)))
 
     res = f.run_smoother(traj_error, [obs])
@@ -264,9 +264,9 @@ def test_FeedforwardFilter():
     assert_allclose(x.lon, y.lon, rtol=0, atol=10)
     assert_allclose(x.VE, y.VE, rtol=0, atol=1e-2)
     assert_allclose(x.VE, y.VE, rtol=0, atol=1e-2)
-    assert_allclose(x.h, y.h, rtol=0, atol=1.5e-3)
-    assert_allclose(x.p, y.p, rtol=0, atol=1e-4)
-    assert_allclose(x.r, y.r, rtol=0, atol=1e-4)
+    assert_allclose(x.roll, y.roll, rtol=0, atol=1e-4)
+    assert_allclose(x.pitch, y.pitch, rtol=0, atol=1e-4)
+    assert_allclose(x.heading, y.heading, rtol=0, atol=1.5e-3)
     assert_(np.all(np.abs(res.residuals[0] < 4)))
 
 
@@ -279,12 +279,12 @@ def test_FeedbackFilter():
     traj['VE'] = 0
     traj['VN'] = 0
     traj['VU'] = 0
-    traj['r'] = 0
-    traj['p'] = 0
-    traj['h'] = 0
+    traj['roll'] = 0
+    traj['pitch'] = 0
+    traj['heading'] = 0
 
     _, gyro, accel = sim.from_position(dt, traj[['lat', 'lon', 'alt']],
-                                       traj[['r', 'p', 'h']])
+                                       traj[['roll', 'pitch', 'heading']])
     theta, dv = coning_sculling(gyro, accel)
 
     np.random.seed(0)
@@ -318,9 +318,9 @@ def test_FeedbackFilter():
     assert_allclose(error.lon, 0, rtol=0, atol=10)
     assert_allclose(error.VE, 0, rtol=0, atol=1e-2)
     assert_allclose(error.VN, 0, rtol=0, atol=2e-2)
-    assert_allclose(error.h, 0, rtol=0, atol=1.5e-3)
-    assert_allclose(error.p, 0, rtol=0, atol=1e-4)
-    assert_allclose(error.r, 0, rtol=0, atol=1e-4)
+    assert_allclose(error.heading, 0, rtol=0, atol=1.5e-3)
+    assert_allclose(error.pitch, 0, rtol=0, atol=1e-4)
+    assert_allclose(error.roll, 0, rtol=0, atol=1e-4)
     assert_(np.all(np.abs(res.residuals[0] < 4)))
 
     res = f.run_smoother(integrator, theta, dv, [obs])
@@ -329,9 +329,9 @@ def test_FeedbackFilter():
     assert_allclose(error.lon, 0, rtol=0, atol=10)
     assert_allclose(error.VE, 0, rtol=0, atol=1e-2)
     assert_allclose(error.VN, 0, rtol=0, atol=1e-2)
-    assert_allclose(error.h, 0, rtol=0, atol=1.5e-3)
-    assert_allclose(error.p, 0, rtol=0, atol=1e-4)
-    assert_allclose(error.r, 0, rtol=0, atol=1e-4)
+    assert_allclose(error.roll, 0, rtol=0, atol=1e-4)
+    assert_allclose(error.pitch, 0, rtol=0, atol=1e-4)
+    assert_allclose(error.heading, 0, rtol=0, atol=1.5e-3)
     assert_(np.all(np.abs(res.residuals[0] < 4)))
 
 
