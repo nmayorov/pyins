@@ -113,7 +113,7 @@ class Integrator:
         Initial latitude, longitude and altitude.
     velocity_n: array_like, shape (3,)
         Initial velocity in ENU frame.
-    hpr : array_like, shape (3,)
+    rph : array_like, shape (3,)
         Initial heading, pitch and roll.
     stamp : int, optional
         Time stamp of the initial point. Default is 0.
@@ -136,10 +136,10 @@ class Integrator:
            Design Part 2: Velocity and Position Algorithms", Journal of
            Guidance, Control, and Dynamics 1998, Vol. 21, no. 2.
     """
-    TRAJECTORY_COLUMNS = ['lat', 'lon', 'alt', 'VE', 'VN', 'VU', 'h', 'p', 'r']
+    TRAJECTORY_COLUMNS = ['lat', 'lon', 'alt', 'VE', 'VN', 'VU', 'r', 'p', 'h']
     INITIAL_SIZE = 10000
 
-    def __init__(self, dt, lla, velocity_n, hpr, stamp=0):
+    def __init__(self, dt, lla, velocity_n, rph, stamp=0):
         self.dt = dt
 
         self.lla = np.empty((self.INITIAL_SIZE, 3))
@@ -148,18 +148,18 @@ class Integrator:
 
         self.traj = None
 
-        self._init_values = [lla, velocity_n, hpr, stamp]
+        self._init_values = [lla, velocity_n, rph, stamp]
         self.reset()
 
     def reset(self):
         """Clear computed trajectory except the initial point."""
-        lla, velocity_n, hpr, stamp = self._init_values
+        lla, velocity_n, rph, stamp = self._init_values
         self.lla[0, :2] = np.deg2rad(lla[:2])
         self.lla[0, 2] = lla[2]
         self.velocity_n[0] = velocity_n
-        self.Cnb[0] = dcm.from_hpr(hpr)
+        self.Cnb[0] = dcm.from_rph(rph)
         self.traj = pd.DataFrame(
-            data=np.atleast_2d(np.hstack((lla, velocity_n, hpr))),
+            data=np.atleast_2d(np.hstack((lla, velocity_n, rph))),
             columns=self.TRAJECTORY_COLUMNS,
             index=pd.Index([stamp], name='stamp'))
 
@@ -197,7 +197,7 @@ class Integrator:
 
         integrate_fast(self.dt, self.lla, self.velocity_n, self.Cnb,
                        theta, dv, offset=n_data-1)
-        hpr = dcm.to_hpr(self.Cnb[n_data:n_data + n_readings])
+        rph = dcm.to_rph(self.Cnb[n_data:n_data + n_readings])
         index = pd.Index(self.traj.index[-1] + 1 + np.arange(n_readings),
                          name='stamp')
         traj = pd.DataFrame(index=index)
@@ -205,7 +205,7 @@ class Integrator:
             self.lla[n_data:n_data + n_readings, :2])
         traj['alt'] = self.lla[n_data:n_data + n_readings, 2]
         traj[['VE', 'VN', 'VU']] = self.velocity_n[n_data:n_data + n_readings]
-        traj[['h', 'p', 'r']] = hpr
+        traj[['r', 'p', 'h']] = rph
 
         self.traj = self.traj.append(traj)
 
@@ -225,9 +225,9 @@ class Integrator:
         self.velocity_n[i] = Ctp @ (self.velocity_n[i] - x[3:6])
 
         self.Cnb[i] = Ctp @ self.Cnb[i]
-        hpr = dcm.to_hpr(self.Cnb[i])
+        rph = dcm.to_rph(self.Cnb[i])
 
         self.traj.iloc[-1] = np.hstack((np.rad2deg(self.lla[i, :2]),
                                         self.lla[i, 2],
                                         self.velocity_n[i],
-                                        hpr))
+                                        rph))

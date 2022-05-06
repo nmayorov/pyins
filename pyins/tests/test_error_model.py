@@ -16,12 +16,12 @@ def test_propagate_errors():
     lla[:, 0] = 50.0
     lla[:, 1] = 60.0
     lla[:, 2] = 0
-    hpr = np.empty((n_samples, 3))
-    hpr[:, 0] = 10.0
-    hpr[:, 1] = 3.0
-    hpr[:, 2] = -5.0
+    rph = np.empty((n_samples, 3))
+    rph[:, 0] = -5.0
+    rph[:, 1] = 3.0
+    rph[:, 2] = 10.0
 
-    traj, gyro, accel = sim.from_position(dt, lla, hpr)
+    traj, gyro, accel = sim.from_position(dt, lla, rph)
 
     gyro_bias = np.array([1e-8, -2e-8, 3e-8])
     accel_bias = np.array([3e-3, -4e-3, 2e-3])
@@ -32,17 +32,17 @@ def test_propagate_errors():
 
     delta_position_n = [-200, 100, 20]
     delta_velocity_n = [1, -2, -0.5]
-    delta_hpr = [0.01, -0.02, 0.03]
+    delta_rph = [0.03, -0.02, 0.01]
 
     lla0 = perturb_lla(traj.loc[0, ['lat', 'lon', 'alt']], delta_position_n)
     V0_n = traj.loc[0, ['VE', 'VN', 'VU']] + delta_velocity_n
-    hpr0 = traj.loc[0, ['h', 'p', 'r']] + delta_hpr
+    rph0 = traj.loc[0, ['r', 'p', 'h']] + delta_rph
 
-    integrator = Integrator(dt, lla0, V0_n, hpr0)
+    integrator = Integrator(dt, lla0, V0_n, rph0)
     traj_c = integrator.integrate(theta, dv)
     error_true = difference_trajectories(traj_c, traj)
     error_linear = propagate_errors(dt, traj, delta_position_n,
-                                    delta_velocity_n, delta_hpr,
+                                    delta_velocity_n, delta_rph,
                                     gyro_bias, accel_bias)
 
     error_scale = np.mean(np.abs(error_true))

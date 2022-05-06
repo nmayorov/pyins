@@ -53,20 +53,20 @@ def test_from_rv():
     assert_allclose(A, A_true, rtol=1e-10)
 
 
-def test_from_hpr():
-    hpr1 = [30, 0, 0]
+def test_from_rph():
+    rph1 = [0, 0, 30]
     A_true1 = np.array([[np.sqrt(3)/2, 0.5, 0],
                         [-0.5, np.sqrt(3)/2, 0],
                         [0, 0, 1]])
-    assert_allclose(dcm.from_hpr(hpr1), A_true1, rtol=1e-10)
+    assert_allclose(dcm.from_rph(rph1), A_true1, rtol=1e-10)
 
-    hpr2 = np.rad2deg([1e-10, 3e-10, -1e-10])
+    rph2 = np.rad2deg([-1e-10, 3e-10, 1e-10])
     A_true2 = np.array([[1, 1e-10, -1e-10],
                         [-1e-10, 1, -3e-10],
                         [1e-10, 3e-10, 1]])
-    assert_allclose(dcm.from_hpr(hpr2), A_true2, rtol=1e-8)
+    assert_allclose(dcm.from_rph(rph2), A_true2, rtol=1e-8)
 
-    hpr3 = [45, -30, 60]
+    rph3 = [60, -30, 45]
     A_true3 = np.array([
         [-np.sqrt(6)/8 + np.sqrt(2)/4, np.sqrt(6)/4,
          np.sqrt(2)/8 + np.sqrt(6)/4],
@@ -74,61 +74,61 @@ def test_from_hpr():
          -np.sqrt(6)/4 + np.sqrt(2)/8],
         [-0.75, -0.5, np.sqrt(3)/4]
     ])
-    assert_allclose(dcm.from_hpr(hpr3), A_true3, rtol=1e-8)
+    assert_allclose(dcm.from_rph(rph3), A_true3, rtol=1e-8)
 
-    hpr = np.vstack((hpr1, hpr2, hpr3))
+    rph = np.vstack((rph1, rph2, rph3))
     A = np.array((A_true1, A_true2, A_true3))
-    assert_allclose(dcm.from_hpr(hpr), A, rtol=1e-8)
+    assert_allclose(dcm.from_rph(rph), A, rtol=1e-8)
 
 
-def test_to_hpr():
+def test_to_rph():
     A1 = np.identity(3)
-    hpr1 = np.zeros(3)
-    assert_allclose(dcm.to_hpr(A1), hpr1, atol=1e-10)
+    rph1 = np.zeros(3)
+    assert_allclose(dcm.to_rph(A1), rph1, atol=1e-10)
 
     A2 = np.array([[1, 1e-10, -2e-10],
                    [-1e-10, 1, 3e-10],
                    [2e-10, -3e-10, 1]])
-    hpr2 = np.rad2deg([1e-10, -3e-10, -2e-10])
-    assert_allclose(dcm.to_hpr(A2), hpr2, atol=1e-10)
+    rph2 = np.rad2deg([-2e-10, -3e-10, 1e-10])
+    assert_allclose(dcm.to_rph(A2), rph2, atol=1e-10)
 
     A3 = np.array([
         [1/np.sqrt(2), 0, 1/np.sqrt(2)],
         [0, 1, 0],
         [-1/np.sqrt(2), 0, 1/np.sqrt(2)]
     ])
-    hpr3 = np.array([0, 0, 45])
-    assert_allclose(dcm.to_hpr(A3), hpr3, rtol=1e-10)
+    rph3 = np.array([45, 0, 0])
+    assert_allclose(dcm.to_rph(A3), rph3, rtol=1e-10)
 
     A4 = np.array([[-1, 0, 0], [0, 0, -1], [0, -1, 0]])
-    hpr4 = np.array([180, -90, 0])
-    assert_allclose(dcm.to_hpr(A4), hpr4, rtol=1e-7)
+    rph4 = np.array([-180, -90, 0])
+    assert_allclose(dcm.to_rph(A4), rph4, rtol=1e-7)
 
     A = np.empty((20, 3, 3))
     A[:5] = A1
     A[5:10] = A2
     A[10:15] = A3
     A[15:] = A4
-    hpr = np.empty((20, 3))
-    hpr[:5] = hpr1
-    hpr[5:10] = hpr2
-    hpr[10:15] = hpr3
-    hpr[15:20] = hpr4
+    rph = np.empty((20, 3))
+    rph[:5] = rph1
+    rph[5:10] = rph2
+    rph[10:15] = rph3
+    rph[15:20] = rph4
 
-    ret = dcm.to_hpr(A)
-    assert_allclose(ret, hpr)
+    ret = dcm.to_rph(A)
+    assert_allclose(ret, rph)
 
 
 def test_dcm_hpr_conversion():
     rng = np.random.RandomState(0)
 
     hpr = np.empty((20, 3))
-    hpr[:, 0] = rng.uniform(0, 360, 20)
+    hpr[:, 0] = rng.uniform(-180, 180, 20)
     hpr[:, 1] = rng.uniform(-90, 90, 20)
-    hpr[:, 2] = rng.uniform(-180, 180, 20)
+    hpr[:, 2] = rng.uniform(0, 360, 20)
 
-    A = dcm.from_hpr(hpr)
-    hpr_r = dcm.to_hpr(A)
+    A = dcm.from_rph(hpr)
+    hpr_r = dcm.to_rph(A)
 
     assert_allclose(hpr, hpr_r, rtol=1e-10)
 

@@ -21,9 +21,9 @@ DRU = 2
 DVE = 3
 DVN = 4
 DVU = 5
-DH = 6
-DP = 7
-DR = 8
+DROLL = 6
+DPITCH = 7
+DHEADING = 8
 
 
 def transform_to_output_errors(traj):
@@ -53,14 +53,14 @@ def transform_to_output_errors(traj):
     T[:, DVU, DV3] = 1
     T[:, DVU, PHI1] = -VN
     T[:, DVU, PHI2] = VE
-    T[:, DH, DR1] = tlat / earth.R0
-    T[:, DH, PHI1] = -sh * tp
-    T[:, DH, PHI2] = -ch * tp
-    T[:, DH, PSI3] = 1
-    T[:, DP, PHI1] = -ch
-    T[:, DP, PHI2] = sh
-    T[:, DR, PHI1] = -sh / cp
-    T[:, DR, PHI2] = -ch / cp
+    T[:, DHEADING, DR1] = tlat / earth.R0
+    T[:, DHEADING, PHI1] = -sh * tp
+    T[:, DHEADING, PHI2] = -ch * tp
+    T[:, DHEADING, PSI3] = 1
+    T[:, DPITCH, PHI1] = -ch
+    T[:, DPITCH, PHI2] = sh
+    T[:, DROLL, PHI1] = -sh / cp
+    T[:, DROLL, PHI2] = -ch / cp
 
     return T
 
@@ -80,9 +80,9 @@ def compute_output_errors(traj, x, P, output_stamps,
     err['VE'] = y[:, DVE]
     err['VN'] = y[:, DVN]
     err['VU'] = y[:, DVU]
-    err['h'] = np.rad2deg(y[:, DH])
-    err['p'] = np.rad2deg(y[:, DP])
-    err['r'] = np.rad2deg(y[:, DR])
+    err['h'] = np.rad2deg(y[:, DHEADING])
+    err['p'] = np.rad2deg(y[:, DPITCH])
+    err['r'] = np.rad2deg(y[:, DROLL])
 
     sd = pd.DataFrame(index=output_stamps)
     sd['lat'] = sd_y[:, DRN]
@@ -91,9 +91,9 @@ def compute_output_errors(traj, x, P, output_stamps,
     sd['VE'] = sd_y[:, DVE]
     sd['VN'] = sd_y[:, DVN]
     sd['VU'] = sd_y[:, DVU]
-    sd['h'] = np.rad2deg(sd_y[:, DH])
-    sd['p'] = np.rad2deg(sd_y[:, DP])
-    sd['r'] = np.rad2deg(sd_y[:, DR])
+    sd['h'] = np.rad2deg(sd_y[:, DHEADING])
+    sd['p'] = np.rad2deg(sd_y[:, DPITCH])
+    sd['r'] = np.rad2deg(sd_y[:, DROLL])
 
     gyro_err = pd.DataFrame(index=output_stamps)
     gyro_sd = pd.DataFrame(index=output_stamps)
@@ -127,7 +127,7 @@ def fill_system_matrix(traj):
     rho[:, 1] = traj.VE / earth.R0
     rho[:, 2] = rho[:, 1] * tlat
 
-    Cnb = dcm.from_hpr(traj[['h', 'p', 'r']])
+    Cnb = dcm.from_rph(traj[['r', 'p', 'h']])
 
     F = np.zeros((n_samples, N_BASE_STATES, N_BASE_STATES))
 
@@ -184,7 +184,7 @@ def fill_system_matrix(traj):
 def propagate_errors(dt, traj,
                      delta_position_n=np.zeros(3),
                      delta_velocity_n=np.zeros(3),
-                     delta_hpr=np.zeros(3),
+                     delta_rph=np.zeros(3),
                      delta_gyro=np.zeros(3),
                      delta_accel=np.zeros(3)):
     """Deterministic linear propagation of INS errors.
@@ -199,7 +199,7 @@ def propagate_errors(dt, traj,
         Initial position errors in meters resolved in ENU.
     delta_velocity_n : array_like, shape (3,)
         Initial velocity errors resolved in ENU.
-    delta_hpr : array_like, shape (3,)
+    delta_rph : array_like, shape (3,)
         Initial heading, pitch and roll errors.
     delta_gyro, delta_accel : float or array_like
         Gyro and accelerometer errors (in SI units). Can be constant or
@@ -220,7 +220,7 @@ def propagate_errors(dt, traj,
                           delta_accel[1:] + delta_accel[:-1])
 
     T = transform_to_output_errors(traj)
-    x0 = np.hstack([delta_position_n, delta_velocity_n, np.deg2rad(delta_hpr)])
+    x0 = np.hstack([delta_position_n, delta_velocity_n, np.deg2rad(delta_rph)])
     x0 = np.linalg.inv(T[0]).dot(x0)
 
     n_samples = Fi.shape[0]
@@ -237,8 +237,8 @@ def propagate_errors(dt, traj,
     error['VE'] = x[:, DVE]
     error['VN'] = x[:, DVN]
     error['VU'] = x[:, DVU]
-    error['h'] = np.rad2deg(x[:, DH])
-    error['p'] = np.rad2deg(x[:, DP])
-    error['r'] = np.rad2deg(x[:, DR])
+    error['h'] = np.rad2deg(x[:, DHEADING])
+    error['p'] = np.rad2deg(x[:, DPITCH])
+    error['r'] = np.rad2deg(x[:, DROLL])
 
     return error

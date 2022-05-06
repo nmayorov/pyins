@@ -64,7 +64,7 @@ def _compute_increment_readings(dt, a, b, c, d, e):
     return gyros, accels
 
 
-def from_position(dt, lla, hpr, sensor_type='increment'):
+def from_position(dt, lla, rph, sensor_type='increment'):
     """Generate inertial readings given position and attitude.
 
     Parameters
@@ -73,8 +73,8 @@ def from_position(dt, lla, hpr, sensor_type='increment'):
         Time step.
     lla : array_like, shape (n_points, 3)
         Time series of latitude, longitude and altitude.
-    hpr : array_like, shape (n_points, 3)
-        Time series of heading, pitch and roll angles.
+    rph : array_like, shape (n_points, 3)
+        Time series of roll, pitch and heading angles.
     sensor_type: 'increment' or 'rate', optional
         Type of sensor to generate. If 'increment' (default), then integrals
         over sampling intervals are generated (in rad and m/s).
@@ -94,7 +94,7 @@ def from_position(dt, lla, hpr, sensor_type='increment'):
         raise ValueError("`sensor_type` must be 'rate' or 'increment'.")
 
     lla = np.asarray(lla, dtype=float)
-    hpr = np.asarray(hpr, dtype=float)
+    rph = np.asarray(rph, dtype=float)
     n_points = len(lla)
     time = dt * np.arange(n_points)
 
@@ -111,7 +111,7 @@ def from_position(dt, lla, hpr, sensor_type='increment'):
     V[:, 1] -= earth.RATE * R[:, 0]
     V = util.mv_prod(Cin, V, at=True)
 
-    Cnb = dcm.from_hpr(hpr)
+    Cnb = dcm.from_rph(rph)
     Cib = util.mm_prod(Cin, Cnb)
 
     Cib_spline = RotationSpline(time, Rotation.from_matrix(Cib))
@@ -139,7 +139,7 @@ def from_position(dt, lla, hpr, sensor_type='increment'):
     traj = pd.DataFrame(index=np.arange(time.shape[0]))
     traj[['lat', 'lon', 'alt']] = lla
     traj[['VE', 'VN', 'VU']] = V
-    traj[['h', 'p', 'r']] = hpr
+    traj[['r', 'p', 'h']] = rph
     return traj, gyros, accels
 
 
@@ -172,7 +172,7 @@ class _QuadraticSpline(PPoly):
         super(_QuadraticSpline, self).__init__(c, x)
 
 
-def from_velocity(dt, lla0, V_n, hpr, sensor_type='increment'):
+def from_velocity(dt, lla0, V_n, rph, sensor_type='increment'):
     """Generate inertial readings given velocity and attitude.
 
     Parameters
@@ -183,8 +183,8 @@ def from_velocity(dt, lla0, V_n, hpr, sensor_type='increment'):
         Initial values of latitude, longitude and altitude.
     V_n : array_like, shape (n_points, 3)
         Time series of East, North and vertical velocity components.
-    hpr : array_like, shape (n_points, 3)
-        Time series of heading, pitch and roll angles.
+    rph : array_like, shape (n_points, 3)
+        Time series of roll, pitch and heading.
     sensor_type: 'increment' or 'rate', optional
         Type of sensor to generate. If 'increment' (default), then integrals
         over sampling intervals are generated (in rad and m/s).
@@ -204,7 +204,7 @@ def from_velocity(dt, lla0, V_n, hpr, sensor_type='increment'):
     ACCURACY = 0.01
 
     V_n = np.asarray(V_n, dtype=float)
-    hpr = np.asarray(hpr, dtype=float)
+    rph = np.asarray(rph, dtype=float)
     n_points = len(V_n)
     time = np.arange(n_points) * dt
 
@@ -234,7 +234,7 @@ def from_velocity(dt, lla0, V_n, hpr, sensor_type='increment'):
     lla[:, 1] = lla0[1] + np.rad2deg(lon_spline(time))
     lla[:, 2] = alt
 
-    return from_position(dt, lla, hpr, sensor_type)
+    return from_position(dt, lla, rph, sensor_type)
 
 
 def stationary_rotation(dt, lat, alt, Cnb, Cbs=None):
@@ -417,7 +417,7 @@ class TableRotations:
         self.rest_time = rest_time
 
         self.Cnb = np.empty((1, 3, 3))
-        self.Cnb[0] = dcm.from_hpr([h0, p0, r0])
+        self.Cnb[0] = dcm.from_rph([h0, p0, r0])
         self._rest_intervals = []
 
     def rotate(self, axis, angle, rot_speed=None):

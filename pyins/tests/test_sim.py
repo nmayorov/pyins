@@ -87,7 +87,7 @@ def test_stationary():
     hpr[:, 0] = 45
     hpr[:, 1] = -10
     hpr[:, 2] = 5
-    Cnb = dcm.from_hpr(hpr)
+    Cnb = dcm.from_rph(hpr)
 
     slat = np.sin(np.deg2rad(lat))
     clat = (1 - slat ** 2) ** 0.5

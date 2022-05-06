@@ -25,8 +25,8 @@ def from_rv(rv):
     return Rotation.from_rotvec(rv).as_matrix()
 
 
-def from_hpr(hpr):
-    """Create a direction cosine matrix from heading, pitch and roll angles.
+def from_rph(rph):
+    """Create a direction cosine matrix from roll, pitch and heading.
 
     The sequence of elemental rotations is as follows::
 
@@ -39,7 +39,7 @@ def from_hpr(hpr):
 
     Parameters
     ----------
-    hpr : array_like, shape (3,) or (n, 3)
+    rph : array_like, shape (3,) or (n, 3)
         Heading, pitch and roll.
 
     Returns
@@ -47,12 +47,12 @@ def from_hpr(hpr):
     dcm : ndarray, shape (3, 3) or (n, 3, 3)
         Direction cosine matrices.
     """
-    angles = np.array(hpr, copy=True)
+    angles = np.array(rph, copy=True)
     if angles.ndim == 1:
-        angles[0] = -angles[0]
+        angles[2] = -angles[2]
     else:
-        angles[:, 0] = -angles[:, 0]
-    return Rotation.from_euler('ZXY', angles, degrees=True).as_matrix()
+        angles[:, 2] = -angles[:, 2]
+    return Rotation.from_euler('yxz', angles, degrees=True).as_matrix()
 
 
 def from_ll(lat, lon):
@@ -94,8 +94,8 @@ def from_ll(lat, lon):
     return Rotation.from_euler('ZX', angles, degrees=True).as_matrix()
 
 
-def to_hpr(dcm):
-    """Convert a direction cosine matrix to heading, pitch and roll angles.
+def to_rph(dcm):
+    """Convert a direction cosine matrix to roll, pitch, heading angles.
 
     The returned heading is within [0, 360], the pitch is within [-90, 90]
     and the roll is within [-90, 90].
@@ -107,16 +107,16 @@ def to_hpr(dcm):
 
     Returns
     -------
-    hpr : ndarray, with shape (3,) or (n, 3)
+    rph : ndarray, with shape (3,) or (n, 3)
         Heading, pitch and roll.
     """
-    hpr = Rotation.from_matrix(dcm).as_euler('ZXY', degrees=True)
-    if hpr.ndim == 1:
-        hpr[0] = -hpr[0]
-        if hpr[0] < 0:
-            hpr[0] += 360
+    rph = Rotation.from_matrix(dcm).as_euler('yxz', degrees=True)
+    if rph.ndim == 1:
+        rph[2] = -rph[2]
+        if rph[2] < 0:
+            rph[2] += 360
     else:
-        hpr[:, 0] = -hpr[:, 0]
-        hpr[hpr[:, 0] < 0, 0] += 360
+        rph[:, 2] = -rph[:, 2]
+        rph[rph[:, 2] < 0, 2] += 360
 
-    return hpr
+    return rph

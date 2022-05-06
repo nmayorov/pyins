@@ -219,9 +219,9 @@ def test_FeedforwardFilter():
     traj['VE'] = 0
     traj['VN'] = 0
     traj['VU'] = 0
-    traj['h'] = 0
-    traj['p'] = 0
     traj['r'] = 0
+    traj['p'] = 0
+    traj['h'] = 0
 
     np.random.seed(1)
     obs_data = pd.DataFrame(index=traj.index[::10])
@@ -232,10 +232,10 @@ def test_FeedforwardFilter():
 
     delta_position_n = [-3, 5, 0]
     delta_velocity_n = [1, -1, 0]
-    delta_hpr = [0.1, 0.03, -0.02]
+    delta_rph = [-0.02, 0.03, 0.1]
 
     errors = propagate_errors(dt, traj, delta_position_n, delta_velocity_n,
-                              delta_hpr)
+                              delta_rph)
     traj_error = correct_traj(traj, -errors)
 
     f = FeedforwardFilter(dt, traj, 5, 1, 0.2, 0.05)
@@ -279,12 +279,12 @@ def test_FeedbackFilter():
     traj['VE'] = 0
     traj['VN'] = 0
     traj['VU'] = 0
-    traj['h'] = 0
-    traj['p'] = 0
     traj['r'] = 0
+    traj['p'] = 0
+    traj['h'] = 0
 
     _, gyro, accel = sim.from_position(dt, traj[['lat', 'lon', 'alt']],
-                                       traj[['h', 'p', 'r']])
+                                       traj[['r', 'p', 'h']])
     theta, dv = coning_sculling(gyro, accel)
 
     np.random.seed(0)
@@ -302,14 +302,14 @@ def test_FeedbackFilter():
     d_VE = 1
     d_VN = -1
     d_VU = 0
-    d_h = 0.1
-    d_p = 0.03
     d_r = -0.02
+    d_p = 0.03
+    d_h = 0.1
 
     lla0 = perturb_lla(traj.loc[0, ['lat', 'lon', 'alt']],
                        [d_lon, d_lat, d_alt])
     integrator = Integrator(dt, lla0, [d_VE, d_VN, d_VU],
-                            [d_h, d_p, d_r])
+                            [d_r, d_p, d_h])
     res = f.run(integrator, theta, dv, observations=[obs])
     error = difference_trajectories(res.traj, traj)
     error = error.iloc[3000:]
