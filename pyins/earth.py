@@ -38,8 +38,12 @@ def principal_radii(lat, alt):
 
     Returns
     -------
-    re, rn : ndarray
-        Radii of curvature in East and North directions respectively.
+    re : ndarray
+        Principle radius in East direction.
+    rn : ndarray
+        Principle radius in North direction.
+    rp : ndarray
+        Radius of cross-section along the parallel.
 
     References
     ----------
@@ -47,12 +51,13 @@ def principal_radii(lat, alt):
            Integrated Navigation Systems".
     """
     sin_lat = np.sin(np.deg2rad(lat))
+    cos_lat = np.sqrt(1 - sin_lat**2)
 
     x = 1 - E2 * sin_lat ** 2
     re = R0 / np.sqrt(x)
     rn = re * (1 - E2) / x
 
-    return re + alt, rn + alt
+    return re + alt, rn + alt, (re + alt) * cos_lat
 
 
 def gravity(lat, alt=0):
@@ -99,8 +104,7 @@ def gravitation_ecef(lla):
     sin_lat = np.sin(np.deg2rad(lat))
     cos_lat = np.cos(np.deg2rad(lat))
 
-    re, _ = principal_radii(lat, alt)
-    rp = re * cos_lat
+    _, _, rp = principal_radii(lat, alt)
 
     g0_g = np.zeros((3,) + sin_lat.shape)
     g0_g[1] = RATE**2 * rp * sin_lat
@@ -134,7 +138,7 @@ def curvature_matrix(lat, alt):
     F: ndarray, shape (n, 3, 3)
         Curvature matrix.
     """
-    re, rn = principal_radii(lat, alt)
+    re, rn, _ = principal_radii(lat, alt)
     n = 1 if re.ndim == 0 else len(re)
 
     result = np.zeros((n, 3, 3))

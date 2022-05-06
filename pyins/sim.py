@@ -214,7 +214,7 @@ def from_velocity(dt, lla0, V_n, rph, sensor_type='increment'):
 
     lat = lat0 = np.deg2rad(lla0[0])
     for iteration in range(MAX_ITER):
-        _, rn = earth.principal_radii(np.rad2deg(lat), alt)
+        _, rn, _ = earth.principal_radii(np.rad2deg(lat), alt)
         dlat_spline = _QuadraticSpline(time, V_n[:, 1] / rn)
         lat_spline = dlat_spline.antiderivative()
         lat_new = lat_spline(time) + lat0
@@ -223,8 +223,8 @@ def from_velocity(dt, lla0, V_n, rph, sensor_type='increment'):
         if np.all(np.abs(delta) < ACCURACY):
             break
 
-    re, _ = earth.principal_radii(np.rad2deg(lat), alt)
-    dlon_spline = _QuadraticSpline(time, V_n[:, 0] / (re * np.cos(lat)))
+    _, _, rp = earth.principal_radii(np.rad2deg(lat), alt)
+    dlon_spline = _QuadraticSpline(time, V_n[:, 0] / rp)
     lon_spline = dlon_spline.antiderivative()
 
     lla = np.empty((n_points, 3))

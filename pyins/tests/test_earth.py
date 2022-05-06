@@ -4,15 +4,18 @@ from pyins import earth
 
 def test_principal_radii():
     lat = 0
-    re, rn = earth.principal_radii(lat, 0)
+    re, rn, rp = earth.principal_radii(lat, 0)
     assert_allclose(re, earth.R0, rtol=1e-10)
     assert_allclose(rn, earth.R0 * (1 - earth.E2), rtol=1e-10)
+    assert_allclose(rp, earth.R0, rtol=1e-10)
 
     lat = [0, 90]
-    re, rn = earth.principal_radii(lat, 0)
+    re, rn, rp = earth.principal_radii(lat, 0)
     assert_allclose(re[0], earth.R0, rtol=1e-10)
     assert_allclose(rn[0], earth.R0 * (1 - earth.E2), rtol=1e-10)
     assert_allclose(re[1], rn[1], rtol=1e-10)
+    assert_allclose(rp[0], earth.R0, rtol=1e-10)
+    assert_allclose(rp[1], 0, atol=1e-10)
 
 
 def test_gravity():
