@@ -105,7 +105,7 @@ def from_position(dt, lat, lon, alt, h, p, r, sensor_type='increment'):
     lat_inertial = lat.copy()
     lon_inertial = lon.copy()
     lon_inertial += np.rad2deg(earth.RATE) * time
-    Cin = dcm.from_llw(lat_inertial, lon_inertial)
+    Cin = dcm.from_ll(lat_inertial, lon_inertial)
 
     R = transform.lla_to_ecef(lat_inertial, lon_inertial, alt)
     v_s = CubicSpline(time, R).derivative()
@@ -282,7 +282,7 @@ def stationary_rotation(dt, lat, alt, Cnb, Cbs=None):
     time = dt * np.arange(n_points)
     lon_inertial = np.rad2deg(earth.RATE) * time
     lat = np.full_like(lon_inertial, lat)
-    Cin = dcm.from_llw(lat, lon_inertial)
+    Cin = dcm.from_ll(lat, lon_inertial)
 
     R = transform.lla_to_ecef(lat, lon_inertial, alt)
     v_s = CubicSpline(time, R).derivative()

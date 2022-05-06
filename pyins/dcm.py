@@ -66,26 +66,22 @@ def from_hpr(h, p, r):
     return Rotation.from_euler('yxz', angles, degrees=True).as_matrix()
 
 
-def from_llw(lat, lon, wan=0):
-    """Create a direction cosine matrix from latitude and longitude and wander angle.
+def from_ll(lat, lon):
+    """Create a direction cosine matrix from latitude and longitude.
 
     The sequence of elemental rotations is as follows::
 
-           pi/2+lon    pi/2-lan     wan
-        E ----------> ----------> ------> N
-               3           1         3
+           pi/2+lon    pi/2-lan
+        E ----------> ----------> N
+               3           1
 
-    Here E denotes the ECEF frame and N denotes the local level wander-angle
-    frame. The resulting DCM projects from N frame to E frame.
-
-    If ``wan=0`` then the 2nd axis of N frame points to North.
+    Here E denotes the ECEF frame and N denotes the local level
+    north-pointing frame. The resulting DCM projects from N frame to E frame.
 
     Parameters
     ----------
     lat, lon : float or array_like with shape (n,)
         Latitude and longitude.
-    wan : float or array_like with shape (n,), optional
-        Wander angle, default is 0.
 
     Returns
     -------
@@ -94,22 +90,19 @@ def from_llw(lat, lon, wan=0):
     """
     lat = np.asarray(lat)
     lon = np.asarray(lon)
-    wan = np.asarray(wan)
 
-    if lat.ndim == 0 and lon.ndim == 0 and wan.ndim == 0:
-        return Rotation.from_euler('ZXZ', [90 + lon, 90 - lat, wan], degrees=True).as_matrix()
+    if lat.ndim == 0 and lon.ndim == 0:
+        return Rotation.from_euler('ZX', [90 + lon, 90 - lat],
+                                   degrees=True).as_matrix()
 
     lat = np.atleast_1d(lat)
     lon = np.atleast_1d(lon)
-    wan = np.atleast_1d(wan)
 
-    n = max(len(lat), len(lon), len(wan))
-
-    angles = np.empty((n, 3))
+    n = max(len(lat), len(lon))
+    angles = np.empty((n, 2))
     angles[:, 0] = 90 + lon
     angles[:, 1] = 90 - lat
-    angles[:, 2] = wan
-    return Rotation.from_euler('ZXZ', angles, degrees=True).as_matrix()
+    return Rotation.from_euler('ZX', angles, degrees=True).as_matrix()
 
 
 def to_hpr(dcm):

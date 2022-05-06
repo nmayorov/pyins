@@ -106,6 +106,6 @@ def gravitation_ecef(lat, lon, alt=0):
     g0_g[2] = -gravity(lat, alt) - RATE ** 2 * rp * cos_lat
     g0_g = g0_g.T
 
-    Ceg = dcm.from_llw(lat, lon)
+    Ceg = dcm.from_ll(lat, lon)
 
     return mv_prod(Ceg, g0_g)

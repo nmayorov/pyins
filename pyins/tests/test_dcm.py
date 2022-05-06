@@ -134,37 +134,24 @@ def test_dcm_hpr_conversion():
     assert_allclose(r, r_r, rtol=1e-10)
 
 
-def test_from_llw():
-    llw1 = np.array([90, -90, 0])
+def test_from_ll():
+    ll1 = np.array([90, -90])
     A1 = np.identity(3)
-    assert_allclose(dcm.from_llw(*llw1), A1, rtol=1e-10, atol=1e-10)
-    assert_allclose(dcm.from_llw(*llw1[:2]), A1, rtol=1e-10, atol=1e-10)
+    assert_allclose(dcm.from_ll(*ll1), A1, rtol=1e-10, atol=1e-10)
 
-    llw2 = np.array([90, -90, np.rad2deg(1e-9)])
-    A2 = np.array([[1, -1e-9, 0], [1e-9, 1, 0], [0, 0, 1]])
-    assert_allclose(dcm.from_llw(*llw2), A2, rtol=1e-10, atol=1e-10)
-
-    llw3 = np.array([-30, -45, 90])
-    A3 = np.array([[np.sqrt(2)/4, -np.sqrt(2)/2, np.sqrt(6)/4],
-                   [-np.sqrt(2)/4, -np.sqrt(2)/2, -np.sqrt(6)/4],
-                   [np.sqrt(3)/2, 0, -0.5]])
-
-    assert_allclose(dcm.from_llw(*llw3), A3, rtol=1e-10, atol=1e-10)
-
-    A4 = np.array([[2**0.5/2, 2**0.5/4, 6**0.5/4],
+    ll2 = np.array([-30, -45])
+    A2 = np.array([[2**0.5/2, 2**0.5/4, 6**0.5/4],
                    [2**0.5/2, -2**0.5/4, -6**0.5/4],
                    [0, 3**0.5/2, -0.5]])
-    assert_allclose(dcm.from_llw(*llw3[:2]), A4, rtol=1e-10, atol=1e-10)
+    assert_allclose(dcm.from_ll(*ll2), A2, rtol=1e-10, atol=1e-10)
 
-    llw = np.empty((15, 3))
-    llw[:5] = llw1
-    llw[5:10] = llw2
-    llw[10:] = llw3
-    A = np.empty((15, 3, 3))
+    ll = np.empty((10, 2))
+    ll[:5] = ll1
+    ll[5:10] = ll2
+    A = np.empty((10, 3, 3))
     A[:5] = A1
     A[5:10] = A2
-    A[10:] = A3
-    assert_allclose(dcm.from_llw(*llw.T), A, rtol=1e-10, atol=1e-10)
+    assert_allclose(dcm.from_ll(*ll.T), A, rtol=1e-10, atol=1e-10)
 
 
 if __name__ == '__main__':
