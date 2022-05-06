@@ -24,7 +24,7 @@ F = R0 * (1 - E2) ** 0.5 * GP / (GE * R0) - 1
 MU = 3.986004418e14
 
 
-def principal_radii(lat):
+def principal_radii(lat, alt):
     """Compute the principal radii of curvature of Earth ellipsoid.
 
     See [1]_ (p. 41) for the definition and formulas.
@@ -33,6 +33,8 @@ def principal_radii(lat):
     ----------
     lat : array_like
         Latitude.
+    alt : array_like
+        Altitude.
 
     Returns
     -------
@@ -50,7 +52,7 @@ def principal_radii(lat):
     re = R0 / np.sqrt(x)
     rn = re * (1 - E2) / x
 
-    return re, rn
+    return re + alt, rn + alt
 
 
 def gravity(lat, alt=0):
@@ -97,8 +99,8 @@ def gravitation_ecef(lla):
     sin_lat = np.sin(np.deg2rad(lat))
     cos_lat = np.cos(np.deg2rad(lat))
 
-    re, _ = principal_radii(lat)
-    rp = (re + alt) * cos_lat
+    re, _ = principal_radii(lat, alt)
+    rp = re * cos_lat
 
     g0_g = np.zeros((3,) + sin_lat.shape)
     g0_g[1] = RATE**2 * rp * sin_lat
@@ -132,12 +134,12 @@ def curvature_matrix(lat, alt):
     F: ndarray, shape (n, 3, 3)
         Curvature matrix.
     """
-    re, rn = principal_radii(lat)
+    re, rn = principal_radii(lat, alt)
     n = 1 if re.ndim == 0 else len(re)
 
     result = np.zeros((n, 3, 3))
-    result[:, 0, 1] = -1 / (rn + alt)
-    result[:, 1, 0] = 1 / (re + alt)
+    result[:, 0, 1] = -1 / rn
+    result[:, 1, 0] = 1 / re
     result[:, 2, 0] = result[:, 1, 0] * np.tan(np.deg2rad(lat))
 
     return result[0] if re.ndim == 0 else result

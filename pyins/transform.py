@@ -23,7 +23,7 @@ def lla_to_ecef(lla):
     sin_lon = np.sin(np.deg2rad(lon))
     cos_lon = np.cos(np.deg2rad(lon))
 
-    re, _ = earth.principal_radii(lat)
+    re, _ = earth.principal_radii(lat, 0)
     r_e = np.empty((3,) + lat.shape)
     r_e[0] = (re + alt) * cos_lat * cos_lon
     r_e[1] = (re + alt) * cos_lat * sin_lon
@@ -60,7 +60,7 @@ def perturb_lla(lla, delta_enu):
     lla = np.atleast_2d(lla).copy()
     delta_enu = np.atleast_2d(delta_enu)
 
-    re, rn = earth.principal_radii(lla[:, 0])
+    re, rn = earth.principal_radii(lla[:, 0], lla[:, 2])
     cos_lat = np.cos(np.deg2rad(lla[:, 0]))
 
     lla[:, 0] += np.rad2deg(delta_enu[:, 1] / (rn + lla[:, 2]))
