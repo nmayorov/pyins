@@ -108,3 +108,36 @@ def gravitation_ecef(lla):
     Ceg = dcm.from_ll(lat, lon)
 
     return mv_prod(Ceg, g0_g)
+
+
+def curvature_matrix(lat, alt):
+    """Compute Earth curvature matrix.
+
+    Curvature matrix `F` links linear displacement and angular rotation of
+    ENU frame as `rotation_n = F @ translation_n`, where `translation_n` is
+    linear translation in ENU and `rotation_n` is the corresponding small
+    rotation vector of ENU.
+
+    For example `transport_rate_n = F @ velocity_n`.
+
+    Parameters
+    ----------
+    lat : array_like, shape (n,)
+        Latitude.
+    alt : array_like, shape (n,)
+        Altitude.
+
+    Returns
+    -------
+    F: ndarray, shape (n, 3, 3)
+        Curvature matrix.
+    """
+    re, rn = principal_radii(lat)
+    n = 1 if re.ndim == 0 else len(re)
+
+    result = np.zeros((n, 3, 3))
+    result[:, 0, 1] = -1 / (rn + alt)
+    result[:, 1, 0] = 1 / (re + alt)
+    result[:, 2, 0] = result[:, 1, 0] * np.tan(np.deg2rad(lat))
+
+    return result[0] if re.ndim == 0 else result
