@@ -230,18 +230,12 @@ def test_FeedforwardFilter():
     obs_data[['lat', 'lon']] = lla_obs[:, :2]
     obs = LatLonObs(obs_data, 10)
 
-    d_lat = 5
-    d_lon = -3
-    d_alt = 0
-    d_VE = 1
-    d_VN = -1
-    d_VU = 0
-    d_h = 0.1
-    d_p = 0.03
-    d_r = -0.02
+    delta_position_n = [-3, 5, 0]
+    delta_velocity_n = [1, -1, 0]
+    delta_hpr = [0.1, 0.03, -0.02]
 
-    errors = propagate_errors(dt, traj, d_lat, d_lon, d_alt, d_VE, d_VN, d_VU,
-                              d_h, d_p, d_r)
+    errors = propagate_errors(dt, traj, delta_position_n, delta_velocity_n,
+                              delta_hpr)
     traj_error = correct_traj(traj, -errors)
 
     f = FeedforwardFilter(dt, traj, 5, 1, 0.2, 0.05)

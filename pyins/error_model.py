@@ -181,9 +181,12 @@ def fill_system_matrix(traj):
     return F, B_gyro, B_accel
 
 
-def propagate_errors(dt, traj, d_lat=0, d_lon=0, d_alt=0,
-                     d_VE=0, d_VN=0, d_VU=0,
-                     d_h=0, d_p=0, d_r=0, d_gyro=0, d_accel=0):
+def propagate_errors(dt, traj,
+                     delta_position_n=np.zeros(3),
+                     delta_velocity_n=np.zeros(3),
+                     delta_hpr=np.zeros(3),
+                     delta_gyro=np.zeros(3),
+                     delta_accel=np.zeros(3)):
     """Deterministic linear propagation of INS errors.
 
     Parameters
@@ -192,13 +195,13 @@ def propagate_errors(dt, traj, d_lat=0, d_lon=0, d_alt=0,
         Time step per stamp.
     traj : DataFrame
         Trajectory.
-    d_lat, d_lon, d_alt : float
-        Initial position errors in meters.
-    d_VE, d_VN, d_VU : float
-        Initial velocity errors.
-    d_h, d_p, d_r : float
+    delta_position_n : array_like, shape (3,)
+        Initial position errors in meters resolved in ENU.
+    delta_velocity_n : array_like, shape (3,)
+        Initial velocity errors resolved in ENU.
+    delta_hpr : array_like, shape (3,)
         Initial heading, pitch and roll errors.
-    d_gyro, d_accel : array_like
+    delta_gyro, delta_accel : float or array_like
         Gyro and accelerometer errors (in SI units). Can be constant or
         specified for each time stamp in `traj`.
 
@@ -211,29 +214,20 @@ def propagate_errors(dt, traj, d_lat=0, d_lon=0, d_alt=0,
     Phi = 0.5 * (Fi[1:] + Fi[:-1]) * dt
     Phi[:] += np.identity(Phi.shape[-1])
 
-    d_gyro = np.asarray(d_gyro)
-    d_accel = np.asarray(d_accel)
-    if d_gyro.ndim == 0:
-        d_gyro = np.resize(d_gyro, 3)
-    if d_accel.ndim == 0:
-        d_accel = np.resize(d_accel, 3)
-
-    d_gyro = util.mv_prod(Fig, d_gyro)
-    d_accel = util.mv_prod(Fia, d_accel)
-    d_sensor = 0.5 * (d_gyro[1:] + d_gyro[:-1] + d_accel[1:] + d_accel[:-1])
+    delta_gyro = util.mv_prod(Fig, delta_gyro)
+    delta_accel = util.mv_prod(Fia, delta_accel)
+    delta_sensor = 0.5 * (delta_gyro[1:] + delta_gyro[:-1] +
+                          delta_accel[1:] + delta_accel[:-1])
 
     T = transform_to_output_errors(traj)
-    d_h = np.deg2rad(d_h)
-    d_p = np.deg2rad(d_p)
-    d_r = np.deg2rad(d_r)
-    x0 = np.array([d_lon, d_lat, d_alt, d_VE, d_VN, d_VU, d_h, d_p, d_r])
+    x0 = np.hstack([delta_position_n, delta_velocity_n, np.deg2rad(delta_hpr)])
     x0 = np.linalg.inv(T[0]).dot(x0)
 
     n_samples = Fi.shape[0]
     x = np.empty((n_samples, N_BASE_STATES))
     x[0] = x0
     for i in range(n_samples - 1):
-        x[i + 1] = Phi[i].dot(x[i]) + d_sensor[i] * dt
+        x[i + 1] = Phi[i].dot(x[i]) + delta_sensor[i] * dt
 
     x = util.mv_prod(T, x)
     error = pd.DataFrame(index=traj.index)

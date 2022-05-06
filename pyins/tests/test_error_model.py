@@ -30,30 +30,19 @@ def test_propagate_errors():
     accel += accel_bias * dt
     theta, dv = coning_sculling(gyro, accel)
 
-    d_lat = 100
-    d_lon = -200
-    d_alt = 20.0
-    d_VE = 1
-    d_VN = -2
-    d_VU = -0.5
-    d_h = 0.01
-    d_p = -0.02
-    d_r = 0.03
+    delta_position_n = [-200, 100, 20]
+    delta_velocity_n = [1, -2, -0.5]
+    delta_hpr = [0.01, -0.02, 0.03]
 
-    lla0 = perturb_lla(traj.loc[0, ['lat', 'lon', 'alt']],
-                       [d_lon, d_lat, d_alt])
-    VE0 = traj.VE[0] + d_VE
-    VN0 = traj.VN[0] + d_VN
-    VU0 = traj.VU[0] + d_VU
-    h0 = traj.h[0] + d_h
-    p0 = traj.p[0] + d_p
-    r0 = traj.r[0] + d_r
+    lla0 = perturb_lla(traj.loc[0, ['lat', 'lon', 'alt']], delta_position_n)
+    V0_n = traj.loc[0, ['VE', 'VN', 'VU']] + delta_velocity_n
+    hpr0 = traj.loc[0, ['h', 'p', 'r']] + delta_hpr
 
-    integrator = Integrator(dt, lla0, [VE0, VN0, VU0], [h0, p0, r0])
+    integrator = Integrator(dt, lla0, V0_n, hpr0)
     traj_c = integrator.integrate(theta, dv)
     error_true = difference_trajectories(traj_c, traj)
-    error_linear = propagate_errors(dt, traj, d_lat, d_lon, d_alt,
-                                    d_VE, d_VN, d_VU, d_h, d_p, d_r,
+    error_linear = propagate_errors(dt, traj, delta_position_n,
+                                    delta_velocity_n, delta_hpr,
                                     gyro_bias, accel_bias)
 
     error_scale = np.mean(np.abs(error_true))
