@@ -197,7 +197,7 @@ class Integrator:
 
         integrate_fast(self.dt, self.lla, self.velocity_n, self.Cnb,
                        theta, dv, offset=n_data-1)
-        h, p, r = dcm.to_hpr(self.Cnb[n_data:n_data + n_readings])
+        hpr = dcm.to_hpr(self.Cnb[n_data:n_data + n_readings])
         index = pd.Index(self.traj.index[-1] + 1 + np.arange(n_readings),
                          name='stamp')
         traj = pd.DataFrame(index=index)
@@ -205,9 +205,7 @@ class Integrator:
             self.lla[n_data:n_data + n_readings, :2])
         traj['alt'] = self.lla[n_data:n_data + n_readings, 2]
         traj[['VE', 'VN', 'VU']] = self.velocity_n[n_data:n_data + n_readings]
-        traj['h'] = h
-        traj['p'] = p
-        traj['r'] = r
+        traj[['h', 'p', 'r']] = hpr
 
         self.traj = self.traj.append(traj)
 
@@ -227,9 +225,9 @@ class Integrator:
         self.velocity_n[i] = Ctp @ (self.velocity_n[i] - x[3:6])
 
         self.Cnb[i] = Ctp @ self.Cnb[i]
-        h, p, r = dcm.to_hpr(self.Cnb[i])
+        hpr = dcm.to_hpr(self.Cnb[i])
 
         self.traj.iloc[-1] = np.hstack((np.rad2deg(self.lla[i, :2]),
                                         self.lla[i, 2],
                                         self.velocity_n[i],
-                                        h, p, r))
+                                        hpr))

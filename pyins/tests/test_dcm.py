@@ -116,24 +116,21 @@ def test_to_hpr():
     hpr[15:20] = hpr4
 
     ret = dcm.to_hpr(A)
-    for i in range(3):
-        assert_allclose(ret[i], hpr[:, i], rtol=1e-7)
+    assert_allclose(ret, hpr)
 
 
-@pytest.mark.skip
 def test_dcm_hpr_conversion():
     rng = np.random.RandomState(0)
 
-    h = rng.uniform(0, 360, 20)
-    p = rng.uniform(-90, 90, 20)
-    r = rng.uniform(-180, 180, 20)
+    hpr = np.empty((20, 3))
+    hpr[:, 0] = rng.uniform(0, 360, 20)
+    hpr[:, 1] = rng.uniform(-90, 90, 20)
+    hpr[:, 2] = rng.uniform(-180, 180, 20)
 
-    A = dcm.from_hpr(h, p, r)
-    h_r, p_r, r_r = dcm.to_hpr(A)
+    A = dcm.from_hpr(hpr)
+    hpr_r = dcm.to_hpr(A)
 
-    assert_allclose(h, h_r, rtol=1e-10)
-    assert_allclose(p, p_r, rtol=1e-10)
-    assert_allclose(r, r_r, rtol=1e-10)
+    assert_allclose(hpr, hpr_r, rtol=1e-10)
 
 
 def test_from_ll():

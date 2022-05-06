@@ -100,9 +100,6 @@ def to_hpr(dcm):
     The returned heading is within [0, 360], the pitch is within [-90, 90]
     and the roll is within [-90, 90].
 
-    If ``90 - abs(pitch) < np.rad2deg(1e-3)`` then the roll is set to 0 and
-    the heading is computed accordingly.
-
     Parameters
     ----------
     dcm : array_like, shape (3, 3) or (n, 3, 3)
@@ -110,15 +107,16 @@ def to_hpr(dcm):
 
     Returns
     -------
-    h, p, r : float or ndarray with shape (n,)
+    hpr : ndarray, with shape (3,) or (n, 3)
         Heading, pitch and roll.
     """
-    h, p, r = Rotation.from_matrix(dcm).as_euler('ZXY', degrees=True).T
-    h = -h
-    if h.ndim == 0:
-        if h < 0:
-            h += 360
+    hpr = Rotation.from_matrix(dcm).as_euler('ZXY', degrees=True)
+    if hpr.ndim == 1:
+        hpr[0] = -hpr[0]
+        if hpr[0] < 0:
+            hpr[0] += 360
     else:
-        h[h < 0] += 360
+        hpr[:, 0] = -hpr[:, 0]
+        hpr[hpr[:, 0] < 0, 0] += 360
 
-    return h, p, r
+    return hpr
