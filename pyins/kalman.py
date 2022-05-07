@@ -4,6 +4,32 @@ from scipy.linalg import cholesky, cho_solve, solve_triangular
 
 
 def correct(x, P, z, H, R):
+    """Perform Kalman correction.
+
+    The correction obtains a posteriori state and covariance given observation
+    of the form::
+
+        z = H @ x + v, with v ~ N(0, R)
+
+    Parameters
+    ----------
+    x : ndarray, shape (n_states,)
+        State vector. On exit will contain corrected value.
+    P : ndarray, shape (n_states, n_states)
+        Covariance matrix. On exit will contain corrected value.
+    z : ndarray, shape (n_obs,)
+        Observation vector.
+    H : ndarray, shape (n_obs, n_states)
+        Matrix which relates state and observation vectors.
+    R : ndarray, shape (n_obs, n_obs)
+        Positive definite observation noise matrix.
+
+    Returns
+    -------
+    innovation : ndarray, shape (n_obs,)
+        Standardized innovation vector with theoretical zero mean and identity
+        covariance matrix.
+    """
     HP = H @ P
     S = HP @ H.T + R
 
