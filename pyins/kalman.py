@@ -4,12 +4,12 @@ from scipy.linalg import cholesky, cho_solve, solve_triangular
 
 
 def correct(x, P, z, H, R):
-    PHT = np.dot(P, H.T)
+    HP = H @ P
+    S = HP @ H.T + R
 
-    S = np.dot(H, PHT) + R
     e = z - H.dot(x)
     L = cholesky(S, lower=True)
-    K = cho_solve((L, True), PHT.T, overwrite_b=True).T
+    K = cho_solve((L, True), HP, overwrite_b=True).transpose()
 
     U = -K.dot(H)
     U[np.diag_indices_from(U)] += 1
