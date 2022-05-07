@@ -3,7 +3,7 @@ from collections import OrderedDict
 import numpy as np
 import pandas as pd
 from scipy.linalg import cholesky, cho_solve, solve_triangular
-from . import earth, error_model, util
+from . import earth, error_models, util
 from .transform import correct_traj
 
 
@@ -316,8 +316,9 @@ class LatLonObs(Observation):
     """
     def __init__(self, data, sd, gain_curve=None):
         super(LatLonObs, self).__init__(data, gain_curve)
+        error_model = error_models.ModifiedPhiModel()
         self.R = np.diag([sd, sd]) ** 2
-        H = np.zeros((2, error_model.N_BASE_STATES))
+        H = np.zeros((2, error_model.N_STATES))
         H[0, error_model.DR1] = 1
         H[1, error_model.DR2] = 1
         self.H = H
@@ -387,8 +388,10 @@ class VeVnObs(Observation):
         VE = self.data.VE.loc[stamp]
         VN = self.data.VN.loc[stamp]
 
+        error_model = error_models.ModifiedPhiModel()
+
         z = np.array([traj_point.VE - VE, traj_point.VN - VN])
-        H = np.zeros((2, error_model.N_BASE_STATES))
+        H = np.zeros((2, error_model.N_STATES))
 
         H[0, error_model.DV1] = 1
         H[0, error_model.PHI3] = VN
@@ -493,6 +496,7 @@ class FeedforwardFilter:
         Dictionary mapping state names to their indices.
     """
     def __init__(self, dt, traj_ref, pos_sd, vel_sd, azimuth_sd, level_sd,
+                 error_model=error_models.ModifiedPhiModel(),
                  gyro_model=None, accel_model=None, gyro=None, accel=None):
         if gyro_model is None:
             gyro_model = InertialSensor()
@@ -509,7 +513,7 @@ class FeedforwardFilter:
         self.traj_ref = traj_ref
 
         n_points = traj_ref.shape[0]
-        n_states = error_model.N_BASE_STATES + gyro_model.n_states + \
+        n_states = error_model.N_STATES + gyro_model.n_states + \
                    accel_model.n_states
         n_noises = (gyro_model.n_noises + accel_model.n_noises +
                     3 * (gyro_model.noise is not None) +
@@ -520,21 +524,11 @@ class FeedforwardFilter:
         q = np.zeros(n_noises)
         P0 = np.zeros((n_states, n_states))
 
-        n = error_model.N_BASE_STATES
+        n = error_model.N_STATES
         n1 = gyro_model.n_states
         n2 = accel_model.n_states
 
-        states = OrderedDict((
-            ('DR1', error_model.DR1),
-            ('DR2', error_model.DR2),
-            ('DR3', error_model.DR3),
-            ('DV1', error_model.DV1),
-            ('DV2', error_model.DV2),
-            ('DV3', error_model.DV3),
-            ('PHI1', error_model.PHI1),
-            ('PHI2', error_model.PHI2),
-            ('PHI3', error_model.PHI3)
-        ))
+        states = error_model.STATES
         for name, state in gyro_model.states.items():
             states['GYRO_' + name] = n + state
         for name, state in accel_model.states.items():
@@ -558,7 +552,7 @@ class FeedforwardFilter:
 
         self.P0 = P0
 
-        Fi, Fig, Fia = error_model.fill_system_matrix(traj_ref)
+        Fi, Fig, Fia = error_model.system_matrix(traj_ref)
         F[:, :n, :n] = Fi
         F[:, n: n + n1, n: n + n1] = gyro_model.F
         F[:, n + n1:n + n1 + n2, n + n1: n + n1 + n2] = accel_model.F
@@ -605,6 +599,7 @@ class FeedforwardFilter:
         self.n_noises = n_noises
         self.states = states
 
+        self.error_model = error_model
         self.gyro_model = gyro_model
         self.accel_model = accel_model
 
@@ -694,7 +689,7 @@ class FeedforwardFilter:
                 ret = obs.compute_obs(stamp, traj.loc[stamp])
                 if ret is not None:
                     z, H, R = ret
-                    H_max[:H.shape[0], :error_model.N_BASE_STATES] = H
+                    H_max[:H.shape[0], :self.error_model.N_STATES] = H
                     res = _kalman_correct(xc, Pc, z, H_max[:H.shape[0]], R,
                                           gain_factor, obs.gain_curve)
                     obs_stamps[i_obs].append(stamp)
@@ -786,10 +781,11 @@ class FeedforwardFilter:
             traj, observations, gain_factor, stamps, record_stamps)
 
         err, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
-            error_model.compute_output_errors(self.traj_ref, x, P,
-                                              record_stamps,
-                                              self.gyro_model,
-                                              self.accel_model)
+            error_models.compute_output_errors(self.traj_ref, self.error_model,
+                                               x, P,
+                                               record_stamps,
+                                               self.gyro_model,
+                                               self.accel_model)
 
         traj_corr = correct_traj(traj, err)
 
@@ -870,10 +866,11 @@ class FeedforwardFilter:
         P = P[ind]
 
         err, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
-            error_model.compute_output_errors(self.traj_ref, x, P,
-                                              record_stamps,
-                                              self.gyro_model,
-                                              self.accel_model)
+            error_models.compute_output_errors(self.traj_ref, self.error_model,
+                                               x, P,
+                                               record_stamps,
+                                               self.gyro_model,
+                                               self.accel_model)
 
         traj_corr = correct_traj(traj, err)
 
@@ -911,13 +908,14 @@ class FeedbackFilter:
         Dictionary mapping state names to their indices.
     """
     def __init__(self, dt, pos_sd, vel_sd, azimuth_sd, level_sd,
+                 error_model=error_models.ModifiedPhiModel(),
                  gyro_model=None, accel_model=None):
         if gyro_model is None:
             gyro_model = InertialSensor()
         if accel_model is None:
             accel_model = InertialSensor()
 
-        n_states = error_model.N_BASE_STATES + gyro_model.n_states + \
+        n_states = error_model.N_STATES + gyro_model.n_states + \
                    accel_model.n_states
         n_noises = (gyro_model.n_noises + accel_model.n_noises +
                     3 * (gyro_model.noise is not None) +
@@ -926,7 +924,7 @@ class FeedbackFilter:
         q = np.zeros(n_noises)
         P0 = np.zeros((n_states, n_states))
 
-        n = error_model.N_BASE_STATES
+        n = error_model.N_STATES
         n1 = gyro_model.n_states
         n2 = accel_model.n_states
 
@@ -961,17 +959,7 @@ class FeedbackFilter:
 
         self.q = q
 
-        states = OrderedDict((
-            ('DR1', error_model.DR1),
-            ('DR2', error_model.DR2),
-            ('DR3', error_model.DR3),
-            ('DV1', error_model.DV1),
-            ('DV2', error_model.DV2),
-            ('DV3', error_model.DV3),
-            ('PHI1', error_model.PHI1),
-            ('PHI2', error_model.PHI2),
-            ('PHI3', error_model.PHI3)
-        ))
+        states = error_model.STATES
         for name, state in gyro_model.states.items():
             states['GYRO_' + name] = n + state
         for name, state in accel_model.states.items():
@@ -982,6 +970,7 @@ class FeedbackFilter:
         self.n_noises = n_noises
         self.states = states
 
+        self.error_model = error_model
         self.gyro_model = gyro_model
         self.accel_model = accel_model
 
@@ -1068,7 +1057,7 @@ class FeedbackFilter:
         # Index of current position in x and P arrays for saving xc and Pc.
         i_save = 0
 
-        n = error_model.N_BASE_STATES
+        n = self.error_model.N_STATES
         n1 = self.gyro_model.n_states
         n2 = self.accel_model.n_states
 
@@ -1116,7 +1105,7 @@ class FeedbackFilter:
             dv_b = dv[i_reading: i_reading + feedback_period]
 
             traj_b = integrator.integrate(theta_b, dv_b)
-            Fi, Fig, Fia = error_model.fill_system_matrix(traj_b)
+            Fi, Fig, Fia = self.error_model.system_matrix(traj_b)
             i = 0
 
             while i < theta_b.shape[0]:
@@ -1133,7 +1122,7 @@ class FeedbackFilter:
                     ret = obs.compute_obs(stamp, traj_b.iloc[i])
                     if ret is not None:
                         z, H, R = ret
-                        H_max[:H.shape[0], :error_model.N_BASE_STATES] = H
+                        H_max[:H.shape[0], :self.error_model.N_STATES] = H
                         res = _kalman_correct(xc, Pc, z,
                                               H_max[:H.shape[0]], R,
                                               gain_factor, obs.gain_curve)
@@ -1194,8 +1183,8 @@ class FeedbackFilter:
                 i_stamp += 1
 
             i_reading += feedback_period
-            integrator._correct(xc[:error_model.N_BASE_STATES].copy())
-            xc[:error_model.N_BASE_STATES] = 0
+            integrator._correct(xc[:self.error_model.N_STATES].copy())
+            xc[:self.error_model.N_STATES] = 0
 
         if record_stamps[i_save] == stamps[i_stamp]:
             x[i_save] = xc
@@ -1282,9 +1271,10 @@ class FeedbackFilter:
 
         traj = integrator.traj.loc[record_stamps]
         err, sd, accel_err, accel_sd, gyro_err, gyro_sd = \
-            error_model.compute_output_errors(traj, x, P, record_stamps,
-                                              self.gyro_model,
-                                              self.accel_model)
+            error_models.compute_output_errors(traj, self.error_model,
+                                               x, P, record_stamps,
+                                               self.gyro_model,
+                                               self.accel_model)
 
         traj_corr = correct_traj(integrator.traj, err)
 
@@ -1368,12 +1358,14 @@ class FeedbackFilter:
 
         traj = integrator.traj.loc[record_stamps]
         err, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
-            error_model.compute_output_errors(traj, x, P, record_stamps,
-                                              self.gyro_model, self.accel_model)
+            error_models.compute_output_errors(traj, self.error_model,
+                                               x, P, record_stamps,
+                                               self.gyro_model,
+                                               self.accel_model)
 
         traj = correct_traj(traj, err)
-        xa[:, :error_model.N_BASE_STATES] -= x[:, :error_model.N_BASE_STATES]
-        x[:, :error_model.N_BASE_STATES] = 0
+        xa[:, :self.error_model.N_STATES] -= x[:, :self.error_model.N_STATES]
+        x[:, :self.error_model.N_STATES] = 0
 
         x, P = _rts_pass(x, P, xa, Pa, Phi_arr)
 
@@ -1383,8 +1375,10 @@ class FeedbackFilter:
         traj = traj.iloc[ind]
 
         err, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
-            error_model.compute_output_errors(traj, x, P, record_stamps[ind],
-                                              self.gyro_model, self.accel_model)
+            error_models.compute_output_errors(traj, self.error_model,
+                                               x, P, record_stamps[ind],
+                                               self.gyro_model,
+                                               self.accel_model)
 
         traj = correct_traj(traj, err)
 

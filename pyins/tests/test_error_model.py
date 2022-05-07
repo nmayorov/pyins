@@ -1,8 +1,8 @@
 import numpy as np
 from numpy.testing import assert_allclose
 from pyins import sim
+from pyins.error_models import propagate_errors
 from pyins.integrate import coning_sculling, Integrator
-from pyins.error_model import propagate_errors
 from pyins.transform import perturb_lla, difference_trajectories
 
 
@@ -41,6 +41,7 @@ def test_propagate_errors():
     integrator = Integrator(dt, lla0, V0_n, rph0)
     traj_c = integrator.integrate(theta, dv)
     error_true = difference_trajectories(traj_c, traj)
+
     error_linear = propagate_errors(dt, traj, delta_position_n,
                                     delta_velocity_n, delta_rph,
                                     gyro_bias, accel_bias)

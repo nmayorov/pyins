@@ -1,0 +1,220 @@
+"""Navigation error models to use in EKF-like estimation filters."""
+from collections import OrderedDict
+import numpy as np
+import pandas as pd
+from . import dcm, earth, util
+
+
+class ErrorModel:
+    N_OUTPUT_STATES = 9
+    DRE = 0
+    DRN = 1
+    DRU = 2
+    DVE = 3
+    DVN = 4
+    DVU = 5
+    DROLL = 6
+    DPITCH = 7
+    DHEADING = 8
+    STATES = None
+
+    def system_matrix(self, trajectory):
+        raise NotImplementedError
+
+    def transform_to_output(self, trajectory):
+        raise NotImplementedError
+
+
+class ModifiedPhiModel(ErrorModel):
+    N_STATES = 9
+    DR1 = 0
+    DR2 = 1
+    DR3 = 2
+    DV1 = 3
+    DV2 = 4
+    DV3 = 5
+    PHI1 = 6
+    PHI2 = 7
+    PHI3 = 8
+
+    DR = [DR1, DR2, DR3]
+    DV = [DV1, DV2, DV3]
+    PHI = [PHI1, PHI2, PHI3]
+
+    STATES = OrderedDict(DR1=DR1, DR2=DR2, DR3=DR3,
+                         DV1=DV1, DV2=DV2, DV3=DV3,
+                         PHI1=PHI1, PHI2=PHI2, PHI3=PHI3)
+
+    def system_matrix(self, trajectory):
+        n_samples = trajectory.shape[0]
+
+        V_skew = dcm.skew_matrix(trajectory[['VE', 'VN', 'VU']])
+        R = earth.curvature_matrix(trajectory.lat, trajectory.alt)
+        Omega_n = earth.rate_n(trajectory.lat)
+        rho_n = util.mv_prod(R, trajectory[['VE', 'VN', 'VU']])
+        g_n = earth.gravity_n(trajectory.lat, trajectory.alt)
+        Cnb = dcm.from_rph(trajectory[['roll', 'pitch', 'heading']])
+
+        F = np.zeros((n_samples, self.N_STATES, self.N_STATES))
+        samples = np.arange(n_samples)
+
+        F[np.ix_(samples, self.DR, self.DV)] = np.eye(3)
+        F[np.ix_(samples, self.DR, self.PHI)] = V_skew
+
+        F[np.ix_(samples, self.DV, self.DV)] = -dcm.skew_matrix(
+            2 * Omega_n + rho_n)
+        F[np.ix_(samples, self.DV, self.PHI)] = -dcm.skew_matrix(g_n)
+        F[:, self.DV3, self.DR3] = 2 * earth.gravity(trajectory.lat,
+                                                     trajectory.alt) / earth.R0
+
+        F[np.ix_(samples, self.PHI, self.DR)] = util.mm_prod(
+            dcm.skew_matrix(Omega_n), R)
+        F[np.ix_(samples, self.PHI, self.DV)] = R
+        F[np.ix_(samples, self.PHI, self.PHI)] = \
+            -dcm.skew_matrix(rho_n + Omega_n) + util.mm_prod(R, V_skew)
+
+        B_gyro = np.zeros((n_samples, self.N_STATES, 3))
+        B_gyro[np.ix_(samples, self.DV, [0, 1, 2])] = util.mm_prod(V_skew, Cnb)
+        B_gyro[np.ix_(samples, self.PHI, [0, 1, 2])] = -Cnb
+
+        B_accel = np.zeros((n_samples, self.N_STATES, 3))
+        B_accel[np.ix_(samples, self.DV, [0, 1, 2])] = Cnb
+
+        return F, B_gyro, B_accel
+
+    def transform_to_output(self, trajectory):
+        heading = np.deg2rad(trajectory.heading)
+        pitch = np.deg2rad(trajectory.pitch)
+
+        sh, ch = np.sin(heading), np.cos(heading)
+        cp, tp = np.cos(pitch), np.tan(pitch)
+
+        T = np.zeros((trajectory.shape[0], self.N_STATES, self.N_STATES))
+        samples = np.arange(len(trajectory))
+        T[np.ix_(samples, self.DR, self.DR)] = np.eye(3)
+        T[np.ix_(samples, self.DV, self.DV)] = np.eye(3)
+        T[np.ix_(samples, self.DV, self.PHI)] = dcm.skew_matrix(
+            trajectory[['VE', 'VN', 'VU']])
+
+        T[:, self.DHEADING, self.PHI1] = -sh * tp
+        T[:, self.DHEADING, self.PHI2] = -ch * tp
+        T[:, self.DHEADING, self.PHI3] = 1
+        T[:, self.DPITCH, self.PHI1] = -ch
+        T[:, self.DPITCH, self.PHI2] = sh
+        T[:, self.DROLL, self.PHI1] = -sh / cp
+        T[:, self.DROLL, self.PHI2] = -ch / cp
+
+        return T
+
+
+def compute_output_errors(traj, error_model, x, P, output_stamps,
+                          gyro_model, accel_model):
+    T = error_model.transform_to_output(traj.loc[output_stamps])
+    y = util.mv_prod(T, x[:, :error_model.N_STATES])
+    Py = util.mm_prod(T, P[:, :error_model.N_STATES, :error_model.N_STATES])
+    Py = util.mm_prod(Py, T, bt=True)
+    sd_y = np.diagonal(Py, axis1=1, axis2=2) ** 0.5
+
+    err = pd.DataFrame(index=output_stamps)
+    err['lat'] = y[:, error_model.DRN]
+    err['lon'] = y[:, error_model.DRE]
+    err['alt'] = y[:, error_model.DRU]
+    err['VE'] = y[:, error_model.DVE]
+    err['VN'] = y[:, error_model.DVN]
+    err['VU'] = y[:, error_model.DVU]
+    err['roll'] = np.rad2deg(y[:, error_model.DROLL])
+    err['pitch'] = np.rad2deg(y[:, error_model.DPITCH])
+    err['heading'] = np.rad2deg(y[:, error_model.DHEADING])
+
+    sd = pd.DataFrame(index=output_stamps)
+    sd['lat'] = sd_y[:, error_model.DRN]
+    sd['lon'] = sd_y[:, error_model.DRE]
+    sd['alt'] = sd_y[:, error_model.DRU]
+    sd['VE'] = sd_y[:, error_model.DVE]
+    sd['VN'] = sd_y[:, error_model.DVN]
+    sd['VU'] = sd_y[:, error_model.DVU]
+    sd['roll'] = np.rad2deg(sd_y[:, error_model.DROLL])
+    sd['pitch'] = np.rad2deg(sd_y[:, error_model.DPITCH])
+    sd['heading'] = np.rad2deg(sd_y[:, error_model.DHEADING])
+
+    gyro_err = pd.DataFrame(index=output_stamps)
+    gyro_sd = pd.DataFrame(index=output_stamps)
+    n = error_model.N_STATES
+    for i, name in enumerate(gyro_model.states):
+        gyro_err[name] = x[:, n + i]
+        gyro_sd[name] = P[:, n + i, n + i] ** 0.5
+
+    accel_err = pd.DataFrame(index=output_stamps)
+    accel_sd = pd.DataFrame(index=output_stamps)
+    ng = gyro_model.n_states
+    for i, name in enumerate(accel_model.states):
+        accel_err[name] = x[:, n + ng + i]
+        accel_sd[name] = P[:, n + ng + i, n + ng + i] ** 0.5
+
+    return err, sd, gyro_err, gyro_sd, accel_err, accel_sd
+
+
+def propagate_errors(dt, traj,
+                     delta_position_n=np.zeros(3),
+                     delta_velocity_n=np.zeros(3),
+                     delta_rph=np.zeros(3),
+                     delta_gyro=np.zeros(3),
+                     delta_accel=np.zeros(3),
+                     error_model=ModifiedPhiModel()):
+    """Deterministic linear propagation of INS errors.
+
+    Parameters
+    ----------
+    dt : float
+        Time step per stamp.
+    traj : DataFrame
+        Trajectory.
+    delta_position_n : array_like, shape (3,)
+        Initial position errors in meters resolved in ENU.
+    delta_velocity_n : array_like, shape (3,)
+        Initial velocity errors resolved in ENU.
+    delta_rph : array_like, shape (3,)
+        Initial heading, pitch and roll errors.
+    delta_gyro, delta_accel : float or array_like
+        Gyro and accelerometer errors (in SI units). Can be constant or
+        specified for each time stamp in `traj`.
+    error_model : ErrorModel
+        Error model object to use for the propagation.
+
+    Returns
+    -------
+    traj_err : DataFrame
+        Trajectory errors.
+    """
+    Fi, Fig, Fia = error_model.system_matrix(traj)
+    Phi = 0.5 * (Fi[1:] + Fi[:-1]) * dt
+    Phi[:] += np.identity(Phi.shape[-1])
+
+    delta_gyro = util.mv_prod(Fig, delta_gyro)
+    delta_accel = util.mv_prod(Fia, delta_accel)
+    delta_sensor = 0.5 * (delta_gyro[1:] + delta_gyro[:-1] +
+                          delta_accel[1:] + delta_accel[:-1])
+
+    T = error_model.transform_to_output(traj)
+    x0 = np.hstack([delta_position_n, delta_velocity_n, np.deg2rad(delta_rph)])
+    x0 = np.linalg.inv(T[0]).dot(x0)
+
+    n_samples = Fi.shape[0]
+    x = np.empty((n_samples, error_model.N_STATES))
+    x[0] = x0
+    for i in range(n_samples - 1):
+        x[i + 1] = Phi[i].dot(x[i]) + delta_sensor[i] * dt
+
+    x = util.mv_prod(T, x)
+    error = pd.DataFrame(index=traj.index)
+    error['lat'] = x[:, error_model.DRN]
+    error['lon'] = x[:, error_model.DRE]
+    error['alt'] = x[:, error_model.DRU]
+    error['VE'] = x[:, error_model.DVE]
+    error['VN'] = x[:, error_model.DVN]
+    error['VU'] = x[:, error_model.DVU]
+    error['roll'] = np.rad2deg(x[:, error_model.DROLL])
+    error['pitch'] = np.rad2deg(x[:, error_model.DPITCH])
+    error['heading'] = np.rad2deg(x[:, error_model.DHEADING])
+
+    return error

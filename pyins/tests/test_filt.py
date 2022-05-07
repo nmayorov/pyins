@@ -5,7 +5,7 @@ import pandas as pd
 from pyins.filt import (InertialSensor, LatLonObs, VeVnObs,
                         FeedforwardFilter, FeedbackFilter,
                         _refine_stamps, _kalman_correct, correct_traj)
-from pyins.error_model import propagate_errors
+from pyins.error_models import propagate_errors
 from pyins import earth
 from pyins import sim
 from pyins.integrate import coning_sculling, Integrator
