@@ -2,8 +2,7 @@
 from collections import OrderedDict
 import numpy as np
 import pandas as pd
-from scipy.linalg import cholesky, cho_solve, solve_triangular
-from . import earth, error_models, util
+from . import earth, error_models, kalman, util
 from .transform import correct_traj
 
 
@@ -401,33 +400,6 @@ class VeVnObs(Observation):
         return z, H, self.R
 
 
-def _kalman_correct(x, P, z, H, R, gain_factor, gain_curve):
-    PHT = np.dot(P, H.T)
-
-    S = np.dot(H, PHT) + R
-    e = z - H.dot(x)
-    L = cholesky(S, lower=True)
-    inn = solve_triangular(L, e, lower=True)
-
-    if gain_curve is not None:
-        q = (np.dot(inn, inn) / inn.shape[0]) ** 0.5
-        f = gain_curve(q)
-        if f == 0:
-            return inn
-        L *= (q / f) ** 0.5
-
-    K = cho_solve((L, True), PHT.T, overwrite_b=True).T
-    if gain_factor is not None:
-        K *= gain_factor[:, None]
-
-    U = -K.dot(H)
-    U[np.diag_indices_from(U)] += 1
-    x += K.dot(z - H.dot(x))
-    P[:] = U.dot(P).dot(U.T) + K.dot(R).dot(K.T)
-
-    return inn
-
-
 def _refine_stamps(stamps, max_step):
     stamps = np.sort(np.unique(stamps))
     ds = np.diff(stamps)
@@ -443,21 +415,6 @@ def _refine_stamps(stamps, max_step):
     ds_new = np.hstack(ds_new)
     stamps_new = stamps[0] + np.cumsum(ds_new)
     return np.hstack((stamps[0], stamps_new))
-
-
-def _rts_pass(x, P, xa, Pa, Phi):
-    n_points, n_states = x.shape
-    I = np.identity(n_states)
-    for i in reversed(range(n_points - 1)):
-        L = cholesky(Pa[i + 1], check_finite=False)
-        Pa_inv = cho_solve((L, False), I, check_finite=False)
-
-        C = P[i].dot(Phi[i].T).dot(Pa_inv)
-
-        x[i] += C.dot(x[i + 1] - xa[i + 1])
-        P[i] += C.dot(P[i + 1] - Pa[i + 1]).dot(C.T)
-
-    return x, P
 
 
 def _compute_output_errors(traj, x, P, output_stamps,
@@ -737,8 +694,8 @@ class FeedforwardFilter:
                 if ret is not None:
                     z, H, R = ret
                     H_max[:H.shape[0], :self.error_model.N_STATES] = H
-                    res = _kalman_correct(xc, Pc, z, H_max[:H.shape[0]], R,
-                                          gain_factor, obs.gain_curve)
+                    res = kalman.correct(xc, Pc, z, H_max[:H.shape[0]], R,
+                                         gain_factor, obs.gain_curve)
                     obs_stamps[i_obs].append(stamp)
                     obs_residuals[i_obs].append(res)
 
@@ -904,7 +861,7 @@ class FeedforwardFilter:
             traj, observations, gain_factor, stamps, record_stamps,
             data_for_backward=True)
 
-        x, P = _rts_pass(x, P, xa, Pa, Phi_arr)
+        x, P = kalman.rts_pass(x, P, xa, Pa, Phi_arr)
 
         ind = np.searchsorted(stamps, record_stamps)
         x = x[ind]
@@ -1166,9 +1123,8 @@ class FeedbackFilter:
                     if ret is not None:
                         z, H, R = ret
                         H_max[:H.shape[0], :self.error_model.N_STATES] = H
-                        res = _kalman_correct(xc, Pc, z,
-                                              H_max[:H.shape[0]], R,
-                                              gain_factor, obs.gain_curve)
+                        res = kalman.correct(xc, Pc, z, H_max[:H.shape[0]], R,
+                                             gain_factor, obs.gain_curve)
                         obs_stamps[i_obs].append(stamp)
                         obs_residuals[i_obs].append(res)
 
@@ -1408,7 +1364,7 @@ class FeedbackFilter:
         xa[:, :self.error_model.N_STATES] -= x[:, :self.error_model.N_STATES]
         x[:, :self.error_model.N_STATES] = 0
 
-        x, P = _rts_pass(x, P, xa, Pa, Phi_arr)
+        x, P = kalman.rts_pass(x, P, xa, Pa, Phi_arr)
 
         ind = np.searchsorted(stamps, record_stamps)
         x = x[ind]
