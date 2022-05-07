@@ -83,6 +83,30 @@ def gravity(lat, alt=0):
     return GE * (1 + F * sin_lat**2) / (1 - E2 * sin_lat**2)**0.5 * (1 - 2 * alt / R0)
 
 
+def gravity_n(lat, alt):
+    """Compute gravity vector in ENU frame.
+
+    Parameters
+    ----------
+    lat : array_like
+        Latitude.
+    alt : array_like
+        Altitude.
+
+    Returns
+    -------
+    g_n : ndarray, shape (3,) or (n, 3)
+        Vector of the gravity.
+    """
+    g = gravity(lat, alt)
+    if g.ndim == 0:
+        return np.array([0, 0, -g])
+    else:
+        result = np.zeros((len(g), 3))
+        result[:, 2] = -g
+        return result
+
+
 def gravitation_ecef(lla):
     """Compute a vector of the gravitational force in ECEF frame.
 
