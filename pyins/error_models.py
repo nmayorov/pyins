@@ -6,6 +6,8 @@ from . import dcm, earth, util, transform
 
 
 class ErrorModel:
+    """Error model interface."""
+
     N_OUTPUT_STATES = 9
     DRE = 0
     DRN = 1
@@ -19,21 +21,79 @@ class ErrorModel:
     STATES = None
 
     def system_matrix(self, trajectory):
+        """Compute error ODE system matrix.
+
+        Parameters
+        ----------
+        trajectory : pd.DataFrame
+            Trajectory.
+
+        Returns
+        -------
+        system_matrix : ndarray, shape (n_points, n_states, n_states)
+        """
         raise NotImplementedError
 
     def transform_to_output(self, trajectory):
+        """Compute matrix which transform internal states into output states.
+
+        Parameters
+        ----------
+        trajectory : pd.DataFrame
+            Trajectory.
+
+        Returns
+        -------
+        transform_matrix : ndarray, shape (n_points, n_states, n_states)
+        """
         raise NotImplementedError
 
     def correct_state(self, error, lla, velocity_n, Cnb):
         raise NotImplementedError
 
     def position_error_jacobian(self, trajectory_point):
+        """Compute position error Jacobian matrix.
+
+        The position error is assumed to be resolved in ENU frame.
+
+        Parameters
+        ----------
+        trajectory_point : pd.Series
+            Point of trajectory.
+
+        Returns
+        -------
+        jacobian : ndarray, shape (3, n_states)
+        """
         raise NotImplementedError
 
     def enu_velocity_error_jacobian(self, trajectory_point):
+        """Compute ENU velocity error Jacobian matrix.
+
+        Parameters
+        ----------
+        trajectory_point : pd.Series
+            Point of trajectory.
+
+        Returns
+        -------
+        jacobian : ndarray, shape (3, n_states)
+        """
+
         raise NotImplementedError
 
     def body_velocity_error_jacobian(self, trajectory_point):
+        """Compute body velocity error Jacobian matrix.
+
+        Parameters
+        ----------
+        trajectory_point : pd.Series
+            Point of trajectory.
+
+        Returns
+        -------
+        jacobian : ndarray, shape (3, n_states)
+        """
         raise NotImplementedError
 
 
