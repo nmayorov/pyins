@@ -607,23 +607,13 @@ class FeedforwardFilter:
         self.gyro_model = gyro_model
         self.accel_model = accel_model
 
-    def _validate_parameters(self, traj, observations, gain_factor,
-                             max_step, record_stamps):
+    def _validate_parameters(self, traj, observations, max_step, record_stamps):
         if traj is None:
             traj = self.traj_ref
 
         if not np.all(traj.index == self.traj_ref.index):
             raise ValueError("Time stamps of reference and computed "
                              "trajectories don't match.")
-
-        if gain_factor is not None:
-            gain_factor = np.asarray(gain_factor)
-            if gain_factor.shape != (self.n_states,):
-                raise ValueError("`gain_factor` is expected to have shape {}, "
-                                 "but actually has {}."
-                                 .format((self.n_states,), gain_factor.shape))
-            if np.any(gain_factor < 0):
-                raise ValueError("`gain_factor` must contain positive values.")
 
         if observations is None:
             observations = []
@@ -649,9 +639,9 @@ class FeedforwardFilter:
         if record_stamps is None:
             record_stamps = stamps
 
-        return traj, observations, stamps, record_stamps, gain_factor
+        return traj, observations, stamps, record_stamps
 
-    def _forward_pass(self, traj, observations, gain_factor, stamps,
+    def _forward_pass(self, traj, observations, stamps,
                       record_stamps, data_for_backward=False):
         inds = stamps - stamps[0]
 
@@ -695,7 +685,7 @@ class FeedforwardFilter:
                     z, H, R = ret
                     H_max[:H.shape[0], :self.error_model.N_STATES] = H
                     res = kalman.correct(xc, Pc, z, H_max[:H.shape[0]], R,
-                                         gain_factor, obs.gain_curve)
+                                         obs.gain_curve)
                     obs_stamps[i_obs].append(stamp)
                     obs_residuals[i_obs].append(res)
 
@@ -730,8 +720,7 @@ class FeedforwardFilter:
 
         return x, P, xa, Pa, Phi_arr, residuals
 
-    def run(self, traj=None, observations=[], gain_factor=None, max_step=1,
-            record_stamps=None):
+    def run(self, traj=None, observations=[], max_step=1, record_stamps=None):
         """Run the filter.
 
         Parameters
@@ -741,12 +730,6 @@ class FeedforwardFilter:
             If None (default), use `traj_ref` from the constructor.
         observations : list of `Observation`
             Observations which will be processed. Empty by default.
-        gain_factor : array_like with shape (n_states,) or None
-            Factor for Kalman gain for each filter state. It might be
-            beneficial in some practical situations to set factors less than 1
-            in order to decrease influence of measurements on some states.
-            Setting values higher than 1 is unlikely to be reasonable. If None
-            (default), use standard optimal Kalman gain.
         max_step : float, optional
             Maximum allowed time step in seconds for errors propagation.
             Default is 1 second. Set to 0 if you desire the smallest possible
@@ -777,12 +760,12 @@ class FeedforwardFilter:
             observations residuals for each component of the observation
             vector `z`.
         """
-        traj, observations, stamps, record_stamps, gain_factor = \
-            self._validate_parameters(traj, observations, gain_factor,
-                                      max_step, record_stamps)
+        traj, observations, stamps, record_stamps = \
+            self._validate_parameters(traj, observations, max_step,
+                                      record_stamps)
 
-        x, P, _, _, _, residuals = self._forward_pass(
-            traj, observations, gain_factor, stamps, record_stamps)
+        x, P, _, _, _, residuals = self._forward_pass(traj, observations,
+                                                      stamps, record_stamps)
 
         err, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
             _compute_output_errors(self.traj_ref, x, P, record_stamps,
@@ -795,8 +778,8 @@ class FeedforwardFilter:
                           gyro_sd=gyro_sd, accel_err=accel_err,
                           accel_sd=accel_sd, x=x, P=P, residuals=residuals)
 
-    def run_smoother(self, traj=None, observations=[], gain_factor=None,
-                     max_step=1, record_stamps=None):
+    def run_smoother(self, traj=None, observations=[], max_step=1,
+                     record_stamps=None):
         """Run the smoother.
 
         It means that observations during the whole time is used to estimate
@@ -810,12 +793,6 @@ class FeedforwardFilter:
             If None (default), use `traj_ref` from the constructor.
         observations : list of `Observation`
             Observations which will be processed. Empty by default.
-        gain_factor : array_like with shape (n_states,) or None
-            Factor for Kalman gain for each filter state. It might be
-            beneficial in some practical situations to set factors less than 1
-            in order to decrease influence of measurements on some states.
-            Setting values higher than 1 is unlikely to be reasonable. If None
-            (default), use standard optimal Kalman gain.
         max_step : float, optional
             Maximum allowed time step in seconds for errors propagation.
             Default is 1 second. Set to 0 if you desire the smallest possible
@@ -853,13 +830,12 @@ class FeedforwardFilter:
                Estimates of Linear Dynamic Systems", AIAA Journal, Vol. 3,
                No. 8, August 1965.
         """
-        traj, observations, stamps, record_stamps, gain_factor = \
-            self._validate_parameters(traj, observations, gain_factor,
-                                      max_step, record_stamps)
+        traj, observations, stamps, record_stamps = \
+            self._validate_parameters(traj, observations, max_step,
+                                      record_stamps)
 
         x, P, xa, Pa, Phi_arr, residuals = self._forward_pass(
-            traj, observations, gain_factor, stamps, record_stamps,
-            data_for_backward=True)
+            traj, observations, stamps, record_stamps, data_for_backward=True)
 
         kalman.smooth_rts(x, P, xa, Pa, Phi_arr)
 
@@ -975,17 +951,7 @@ class FeedbackFilter:
         self.accel_model = accel_model
 
     def _validate_parameters(self, integrator, theta, dv, observations,
-                             gain_factor, max_step, record_stamps,
-                             feedback_period):
-        if gain_factor is not None:
-            gain_factor = np.asarray(gain_factor)
-            if gain_factor.shape != (self.n_states,):
-                raise ValueError("`gain_factor` is expected to have shape {}, "
-                                 "but actually has {}."
-                                 .format((self.n_states,), gain_factor.shape))
-            if np.any(gain_factor < 0):
-                raise ValueError("`gain_factor` must contain positive values.")
-
+                             max_step, record_stamps, feedback_period):
         stamps = pd.Index([])
         for obs in observations:
             stamps = stamps.union(obs.data.index)
@@ -1023,12 +989,10 @@ class FeedbackFilter:
         if record_stamps is None:
             record_stamps = stamps
 
-        return (theta, dv, observations, stamps, record_stamps, gain_factor,
-                feedback_period)
+        return theta, dv, observations, stamps, record_stamps, feedback_period
 
-    def _forward_pass(self, integrator, theta, dv, observations, gain_factor,
-                      stamps, record_stamps, feedback_period,
-                      data_for_backward=False):
+    def _forward_pass(self, integrator, theta, dv, observations, stamps,
+                      record_stamps, feedback_period, data_for_backward=False):
         start = integrator.traj.index[0]
 
         if data_for_backward:
@@ -1124,7 +1088,7 @@ class FeedbackFilter:
                         z, H, R = ret
                         H_max[:H.shape[0], :self.error_model.N_STATES] = H
                         res = kalman.correct(xc, Pc, z, H_max[:H.shape[0]], R,
-                                             gain_factor, obs.gain_curve)
+                                             obs.gain_curve)
                         obs_stamps[i_obs].append(stamp)
                         obs_residuals[i_obs].append(res)
 
@@ -1201,8 +1165,8 @@ class FeedbackFilter:
 
         return x, P, xa, Pa, Phi_arr, residuals
 
-    def run(self, integrator, theta, dv, observations=[], gain_factor=None,
-            max_step=1, feedback_period=500, record_stamps=None):
+    def run(self, integrator, theta, dv, observations=[], max_step=1,
+            feedback_period=500, record_stamps=None):
         """Run the filter.
 
         Parameters
@@ -1216,12 +1180,6 @@ class FeedbackFilter:
             corrections.
         observations : list of `Observation`
             Measurements which will be processed. Empty by default.
-        gain_factor : array_like with shape (n_states,) or None, optional
-            Factor for Kalman gain for each filter's state. It might be
-            beneficial in some practical situations to set factors less than 1
-            in order to decrease influence of measurements on some states.
-            Setting values higher than 1 is unlikely to be reasonable. If None
-            (default), use standard optimal Kalman gain.
         max_step : float, optional
             Maximum allowed time step. Default is 1 second. Set to 0 if you
             desire the smallest possible step.
@@ -1259,16 +1217,14 @@ class FeedbackFilter:
         returned because they are computed relative to partially corrected
         trajectory and are not useful for interpretation.
         """
-        (theta, dv, observations, stamps, record_stamps,
-         gain_factor, feedback_period) = \
+        theta, dv, observations, stamps, record_stamps, feedback_period = \
             self._validate_parameters(integrator, theta, dv, observations,
-                                      gain_factor, max_step, record_stamps,
-                                      feedback_period)
+                                      max_step, record_stamps, feedback_period)
 
-        x, P, _, _, _, residuals = \
-            self._forward_pass(integrator, theta, dv, observations,
-                               gain_factor, stamps, record_stamps,
-                               feedback_period)
+        x, P, _, _, _, residuals = self._forward_pass(integrator, theta, dv,
+                                                      observations, stamps,
+                                                      record_stamps,
+                                                      feedback_period)
 
         traj = integrator.traj.loc[record_stamps]
         err, sd, accel_err, accel_sd, gyro_err, gyro_sd = \
@@ -1281,9 +1237,8 @@ class FeedbackFilter:
                           gyro_sd=gyro_sd, accel_err=accel_err,
                           accel_sd=accel_sd, P=P, residuals=residuals)
 
-    def run_smoother(self, integrator, theta, dv, observations=[],
-                     gain_factor=None, max_step=1, feedback_period=500,
-                     record_stamps=None):
+    def run_smoother(self, integrator, theta, dv, observations=[], max_step=1,
+                     feedback_period=500, record_stamps=None):
         """Run the smoother.
 
         It means that observations during the whole time is used to estimate
@@ -1301,12 +1256,6 @@ class FeedbackFilter:
             corrections.
         observations : list of `Observation`
             Measurements which will be processed. Empty by default.
-        gain_factor : array_like with shape (n_states,) or None, optional
-            Factor for Kalman gain for each filter's state. It might be
-            beneficial in some practical situations to set factors less than 1
-            in order to decrease influence of measurements on some states.
-            Setting values higher than 1 is unlikely to be reasonable. If None
-            (default), use standard optimal Kalman gain.
         max_step : float, optional
             Maximum allowed time step. Default is 1 second. Set to 0 if you
             desire the smallest possible step.
@@ -1344,16 +1293,13 @@ class FeedbackFilter:
         returned because they are computed relative to partially corrected
         trajectory and are not useful for interpretation.
         """
-        (theta, dv, observations, stamps, record_stamps,
-         gain_factor, feedback_period) = \
+        theta, dv, observations, stamps, record_stamps, feedback_period = \
             self._validate_parameters(integrator, theta, dv, observations,
-                                      gain_factor, max_step, record_stamps,
-                                      feedback_period)
+                                      max_step, record_stamps, feedback_period)
 
-        x, P, xa, Pa, Phi_arr, residuals = \
-            self._forward_pass(integrator, theta, dv, observations,
-                               gain_factor, stamps, record_stamps,
-                               feedback_period, data_for_backward=True)
+        x, P, xa, Pa, Phi_arr, residuals = self._forward_pass(
+            integrator, theta, dv, observations, stamps, record_stamps,
+            feedback_period, data_for_backward=True)
 
         traj = integrator.traj.loc[record_stamps]
         err, sd, gyro_err, gyro_sd, accel_err, accel_sd = \

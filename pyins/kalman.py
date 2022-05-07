@@ -3,7 +3,7 @@ import numpy as np
 from scipy.linalg import cholesky, cho_solve, solve_triangular
 
 
-def correct(x, P, z, H, R, gain_factor, gain_curve):
+def correct(x, P, z, H, R, gain_curve):
     PHT = np.dot(P, H.T)
 
     S = np.dot(H, PHT) + R
@@ -19,8 +19,6 @@ def correct(x, P, z, H, R, gain_factor, gain_curve):
         L *= (q / f) ** 0.5
 
     K = cho_solve((L, True), PHT.T, overwrite_b=True).T
-    if gain_factor is not None:
-        K *= gain_factor[:, None]
 
     U = -K.dot(H)
     U[np.diag_indices_from(U)] += 1
