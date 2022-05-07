@@ -210,13 +210,12 @@ class Integrator:
         return self.traj.iloc[-n_readings - 1:]
 
     def get_state(self):
-        i = len(self.traj) - 1
-        return self.lla[i].copy(), self.velocity_n[i].copy(), self.Cnb[i].copy()
+        return self.traj.iloc[-1]
 
-    def set_state(self, lla, velocity_n, Cnb):
+    def set_state(self, trajectory_point):
         i = len(self.traj) - 1
-        self.lla[i] = lla
-        self.velocity_n[i] = velocity_n
-        self.Cnb[i] = Cnb
-
-        self.traj.iloc[-1] = np.hstack((lla, velocity_n, dcm.to_rph(Cnb)))
+        self.lla[i] = trajectory_point[['lat', 'lon', 'alt']]
+        self.velocity_n[i] = trajectory_point[['VE', 'VN', 'VU']]
+        self.Cnb[i] = dcm.from_rph(
+            trajectory_point[['roll', 'pitch', 'heading']])
+        self.traj.iloc[-1] = trajectory_point

@@ -48,7 +48,7 @@ class ErrorModel:
         """
         raise NotImplementedError
 
-    def correct_state(self, error, lla, velocity_n, Cnb):
+    def correct_state(self, trajectory_point, error):
         raise NotImplementedError
 
     def position_error_jacobian(self, trajectory_point):
@@ -178,11 +178,17 @@ class ModifiedPhiModel(ErrorModel):
 
         return T
 
-    def correct_state(self, error, lla, velocity_n, Cnb):
+    def correct_state(self, trajectory_point, error):
         Ctp = dcm.from_rv(error[self.PHI])
-        return (transform.perturb_lla(lla, -error[self.DR]),
-                Ctp @ (velocity_n - error[self.DV]),
-                Ctp @ Cnb)
+        lla = transform.perturb_lla(trajectory_point[['lat', 'lon', 'alt']],
+                                    -error[self.DR])
+        velocity_n = Ctp @ (trajectory_point[['VE', 'VN', 'VU']]
+                            - error[self.DV])
+        rph = dcm.to_rph(
+            Ctp @ dcm.from_rph(trajectory_point[['roll', 'pitch', 'heading']]))
+
+        return pd.Series(data=np.hstack((lla, velocity_n, rph)),
+                         index=trajectory_point.index)
 
     def position_error_jacobian(self, trajectory_point):
         result = np.zeros((3, self.N_STATES))
