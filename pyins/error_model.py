@@ -13,7 +13,11 @@ DV2 = 4
 DV3 = 5
 PHI1 = 6
 PHI2 = 7
-PSI3 = 8
+PHI3 = 8
+
+DR = [DR1, DR2, DR3]
+DV = [DV1, DV2, DV3]
+PHI = [PHI1, PHI2, PHI3]
 
 DRE = 0
 DRN = 1
@@ -27,36 +31,21 @@ DHEADING = 8
 
 
 def transform_to_output_errors(traj):
-    lat = np.deg2rad(traj.lat)
-    VE = traj.VE
-    VN = traj.VN
-    VU = traj.VU
     heading = np.deg2rad(traj.heading)
     pitch = np.deg2rad(traj.pitch)
 
-    tlat = np.tan(lat)
     sh, ch = np.sin(heading), np.cos(heading)
     cp, tp = np.cos(pitch), np.tan(pitch)
 
     T = np.zeros((traj.shape[0], N_BASE_STATES, N_BASE_STATES))
-    T[:, DRE, DR1] = 1
-    T[:, DRN, DR2] = 1
-    T[:, DRU, DR3] = 1
-    T[:, DVE, DR1] = VN * tlat / earth.R0
-    T[:, DVE, DV1] = 1
-    T[:, DVE, PHI2] = -VU
-    T[:, DVE, PSI3] = VN
-    T[:, DVN, DR1] = -VE * tlat / earth.R0
-    T[:, DVN, DV2] = 1
-    T[:, DVN, PHI1] = VU
-    T[:, DVN, PSI3] = -VE
-    T[:, DVU, DV3] = 1
-    T[:, DVU, PHI1] = -VN
-    T[:, DVU, PHI2] = VE
-    T[:, DHEADING, DR1] = tlat / earth.R0
+    samples = np.arange(len(traj))
+    T[np.ix_(samples, DR, DR)] = np.eye(3)
+    T[np.ix_(samples, DV, DV)] = np.eye(3)
+    T[np.ix_(samples, DV, PHI)] = dcm.skew_matrix(traj[['VE', 'VN', 'VU']])
+
     T[:, DHEADING, PHI1] = -sh * tp
     T[:, DHEADING, PHI2] = -ch * tp
-    T[:, DHEADING, PSI3] = 1
+    T[:, DHEADING, PHI3] = 1
     T[:, DPITCH, PHI1] = -ch
     T[:, DPITCH, PHI2] = sh
     T[:, DROLL, PHI1] = -sh / cp
@@ -114,69 +103,35 @@ def compute_output_errors(traj, x, P, output_stamps,
 
 def fill_system_matrix(traj):
     n_samples = traj.shape[0]
-    lat = np.deg2rad(traj.lat)
-    slat, clat = np.sin(lat), np.cos(lat)
-    tlat = slat / clat
 
-    u = np.zeros((n_samples, 3))
-    u[:, 1] = earth.RATE * clat
-    u[:, 2] = earth.RATE * slat
-
-    rho = np.empty((n_samples, 3))
-    rho[:, 0] = -traj.VN / earth.R0
-    rho[:, 1] = traj.VE / earth.R0
-    rho[:, 2] = rho[:, 1] * tlat
-
+    V_skew = dcm.skew_matrix(traj[['VE', 'VN', 'VU']])
+    R = earth.curvature_matrix(traj.lat, traj.alt)
+    Omega_n = earth.rate_n(traj.lat)
+    rho_n = util.mv_prod(R, traj[['VE', 'VN', 'VU']])
+    g_n = earth.gravity_n(traj.lat, traj.alt)
     Cnb = dcm.from_rph(traj[['roll', 'pitch', 'heading']])
 
     F = np.zeros((n_samples, N_BASE_STATES, N_BASE_STATES))
+    rows = np.arange(n_samples)
 
-    F[:, DR1, DR2] = rho[:, 2]
-    F[:, DR1, DV1] = 1
-    F[:, DR1, PHI2] = -traj.VU
-    F[:, DR1, PSI3] = traj.VN
+    F[np.ix_(rows, DR, DV)] = np.eye(3)
+    F[np.ix_(rows, DR, PHI)] = V_skew
 
-    F[:, DR2, DR1] = -rho[:, 2]
-    F[:, DR2, DV2] = 1
-    F[:, DR2, PHI1] = traj.VU
-    F[:, DR2, PSI3] = -traj.VE
+    F[np.ix_(rows, DV, DV)] = -dcm.skew_matrix(2 * Omega_n + rho_n)
+    F[np.ix_(rows, DV, PHI)] = -dcm.skew_matrix(g_n)
+    F[:, DV3, DR3] = 2 * earth.gravity(traj.lat, traj.alt) / earth.R0
 
-    F[:, DR3, DV3] = 1
-    F[:, DR3, PHI1] = -traj.VN
-    F[:, DR3, PHI2] = traj.VE
-
-    F[:, DV1, DV2] = 2 * u[:, 2] + rho[:, 2]
-    F[:, DV1, PHI2] = -earth.G0
-
-    F[:, DV2, DV1] = -2 * u[:, 2] - rho[:, 2]
-    F[:, DV2, PHI1] = earth.G0
-
-    F[:, DV3, DR3] = 2 * earth.G0 / earth.R0
-    F[:, DV3, DV1] = 2 * u[:, 1] + rho[:, 1]
-    F[:, DV3, DV2] = -2 * u[:, 0] - rho[:, 0]
-
-    F[:, PHI1, DR1] = -u[:, 2] / earth.R0
-    F[:, PHI1, DV2] = -1 / earth.R0
-    F[:, PHI1, PHI1] = -traj.VU / earth.R0
-    F[:, PHI1, PHI2] = u[:, 2] + rho[:, 2]
-    F[:, PHI1, PSI3] = -u[:, 1]
-
-    F[:, PHI2, DR2] = -u[:, 2] / earth.R0
-    F[:, PHI2, DV1] = 1 / earth.R0
-    F[:, PHI2, PHI1] = -u[:, 2] - rho[:, 2]
-    F[:, PHI2, PHI2] = -traj.VU / earth.R0
-    F[:, PHI2, PSI3] = u[:, 0]
-
-    F[:, PSI3, DR1] = (u[:, 0] + rho[:, 0]) / earth.R0
-    F[:, PSI3, DR2] = (u[:, 1] + rho[:, 1]) / earth.R0
-    F[:, PSI3, PHI1] = u[:, 1] + rho[:, 1]
-    F[:, PSI3, PHI2] = -u[:, 0] - rho[:, 0]
+    F[np.ix_(rows, PHI, DR)] = util.mm_prod(dcm.skew_matrix(Omega_n), R)
+    F[np.ix_(rows, PHI, DV)] = R
+    F[np.ix_(rows, PHI, PHI)] = \
+        -dcm.skew_matrix(rho_n + Omega_n) + util.mm_prod(R, V_skew)
 
     B_gyro = np.zeros((n_samples, N_BASE_STATES, 3))
-    B_gyro[np.ix_(np.arange(n_samples), [PHI1, PHI2, PSI3], [0, 1, 2])] = -Cnb
+    B_gyro[np.ix_(rows, DV, [0, 1, 2])] = util.mm_prod(V_skew, Cnb)
+    B_gyro[np.ix_(rows, PHI, [0, 1, 2])] = -Cnb
 
     B_accel = np.zeros((n_samples, N_BASE_STATES, 3))
-    B_accel[np.ix_(np.arange(n_samples), [DV1, DV2, DV3], [0, 1, 2])] = Cnb
+    B_accel[np.ix_(rows, DV, [0, 1, 2])] = Cnb
 
     return F, B_gyro, B_accel
 

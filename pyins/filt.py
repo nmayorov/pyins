@@ -391,9 +391,9 @@ class VeVnObs(Observation):
         H = np.zeros((2, error_model.N_BASE_STATES))
 
         H[0, error_model.DV1] = 1
-        H[0, error_model.PSI3] = VN
+        H[0, error_model.PHI3] = VN
         H[1, error_model.DV2] = 1
-        H[1, error_model.PSI3] = -VE
+        H[1, error_model.PHI3] = -VE
 
         return z, H, self.R
 
@@ -533,7 +533,7 @@ class FeedforwardFilter:
             ('DV3', error_model.DV3),
             ('PHI1', error_model.PHI1),
             ('PHI2', error_model.PHI2),
-            ('PSI3', error_model.PSI3)
+            ('PHI3', error_model.PHI3)
         ))
         for name, state in gyro_model.states.items():
             states['GYRO_' + name] = n + state
@@ -551,7 +551,7 @@ class FeedforwardFilter:
         P0[error_model.DV3, error_model.DV3] = vel_sd ** 2
         P0[error_model.PHI1, error_model.PHI1] = level_sd ** 2
         P0[error_model.PHI2, error_model.PHI2] = level_sd ** 2
-        P0[error_model.PSI3, error_model.PSI3] = azimuth_sd ** 2
+        P0[error_model.PHI3, error_model.PHI3] = azimuth_sd ** 2
 
         P0[n: n + n1, n: n + n1] = gyro_model.P
         P0[n + n1: n + n1 + n2, n + n1: n + n1 + n2] = accel_model.P
@@ -941,7 +941,7 @@ class FeedbackFilter:
         P0[error_model.DV3, error_model.DV3] = vel_sd ** 2
         P0[error_model.PHI1, error_model.PHI1] = level_sd ** 2
         P0[error_model.PHI2, error_model.PHI2] = level_sd ** 2
-        P0[error_model.PSI3, error_model.PSI3] = azimuth_sd ** 2
+        P0[error_model.PHI3, error_model.PHI3] = azimuth_sd ** 2
 
         P0[n: n + n1, n: n + n1] = gyro_model.P
         P0[n + n1: n + n1 + n2, n + n1: n + n1 + n2] = accel_model.P
@@ -970,7 +970,7 @@ class FeedbackFilter:
             ('DV3', error_model.DV3),
             ('PHI1', error_model.PHI1),
             ('PHI2', error_model.PHI2),
-            ('PSI3', error_model.PSI3)
+            ('PHI3', error_model.PHI3)
         ))
         for name, state in gyro_model.states.items():
             states['GYRO_' + name] = n + state
