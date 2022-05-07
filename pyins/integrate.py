@@ -155,8 +155,7 @@ class Integrator:
     def reset(self):
         """Clear computed trajectory except the initial point."""
         lla, velocity_n, rph, stamp = self._init_values
-        self.lla[0, :2] = np.deg2rad(lla[:2])
-        self.lla[0, 2] = lla[2]
+        self.lla[0] = lla
         self.velocity_n[0] = velocity_n
         self.Cnb[0] = dcm.from_rph(rph)
         self.traj = pd.DataFrame(
@@ -202,9 +201,7 @@ class Integrator:
         index = pd.Index(self.traj.index[-1] + 1 + np.arange(n_readings),
                          name='stamp')
         traj = pd.DataFrame(index=index)
-        traj[['lat', 'lon']] = np.rad2deg(
-            self.lla[n_data:n_data + n_readings, :2])
-        traj['alt'] = self.lla[n_data:n_data + n_readings, 2]
+        traj[['lat', 'lon', 'alt']] = self.lla[n_data:n_data + n_readings]
         traj[['VE', 'VN', 'VU']] = self.velocity_n[n_data:n_data + n_readings]
         traj[['roll', 'pitch', 'heading']] = rph
 
@@ -214,14 +211,11 @@ class Integrator:
 
     def get_state(self):
         i = len(self.traj) - 1
-        lla = self.lla[i].copy()
-        lla[:2] = np.rad2deg(lla[:2])
-        return lla, self.velocity_n[i].copy(), self.Cnb[i].copy()
+        return self.lla[i].copy(), self.velocity_n[i].copy(), self.Cnb[i].copy()
 
     def set_state(self, lla, velocity_n, Cnb):
         i = len(self.traj) - 1
-        self.lla[i, :2] = np.deg2rad(lla[:2])
-        self.lla[i, 2] = lla[2]
+        self.lla[i] = lla
         self.velocity_n[i] = velocity_n
         self.Cnb[i] = Cnb
 

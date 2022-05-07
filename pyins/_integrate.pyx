@@ -7,7 +7,8 @@ cimport cython
 from scipy.linalg.cython_blas cimport dgemv, dgemm
 from libc cimport math
 
-
+cdef double DEG2RAD = math.pi / 180.0
+cdef double RAD2DEG = 180.0 / math.pi
 cdef double RATE = 7.2921157e-5
 cdef double R0 = 6378137.0
 cdef double E2 = 6.6943799901413e-3
@@ -68,7 +69,7 @@ cdef mm(double[:, :] A, double[:, :] B, double[:, :] ret):
 
 
 cdef double gravity(double lat, double alt):
-    s2 = math.sin(lat) ** 2
+    s2 = math.sin(lat * DEG2RAD) ** 2
     return GE * (1 + F * s2) / (1 - E2 * s2) ** 0.5 * (1 - 2 * alt / R0)
 
 
@@ -101,7 +102,7 @@ def integrate_fast(double dt, double[:, :] lla, double[:, :] velocity_n,
         lat = lla[j, 0]
         alt = lla[j, 2]
 
-        slat = math.sin(lat)
+        slat = math.sin(lat * DEG2RAD)
         clat = math.sqrt(1 - slat * slat)
         tlat = slat / clat
 
@@ -153,8 +154,8 @@ def integrate_fast(double dt, double[:, :] lla, double[:, :] velocity_n,
         chi2 = Omega2 + rho2
         chi3 = Omega3 + rho3
 
-        lla[j + 1, 0] = lla[j, 0] - rho1 * dt
-        lla[j + 1, 1] = lla[j, 1] + rho2 / clat * dt
+        lla[j + 1, 0] = lla[j, 0] - RAD2DEG * rho1 * dt
+        lla[j + 1, 1] = lla[j, 1] + RAD2DEG * rho2 / clat * dt
         lla[j + 1, 2] = lla[j, 2] + V3 * dt
 
         xi[0] = -chi1 * dt
