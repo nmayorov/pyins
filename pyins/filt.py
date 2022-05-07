@@ -202,21 +202,6 @@ class Observation:
     ----------
     data : DataFrame
         Observed values as a DataFrame. Index must contain time stamps.
-    gain_curve : None, callable or 3-tuple
-        Kalman correction gain curve. It determines the proportionality of
-        a state correction and a normalized measurement residual (by its
-        theoretical covariance). In the standard Kalman correction it is an
-        identity function. To make the filter robust to outliers a sublinear
-        function can be provided. A convenient parametrization of such function
-        is supported. It described by 3 numbers [L, F, C], if q is a normalized
-        residual then:
-
-            * If q < L: standard Kalman correction is used.
-            * If L <= q < F: correction is kept constant on a level of q = L.
-            * If F <= q < C: correction decays to 0 as ~1/q.
-            * IF q >= C: the measurement is rejected completely.
-
-        If None (default), the standard Kalman correction will be used.
 
     Attributes
     ----------
@@ -228,31 +213,8 @@ class Observation:
     LatLonObs
     VeVnObs
     """
-    def __init__(self, data, gain_curve=None):
-        if callable(gain_curve):
-            self.gain_curve = gain_curve
-        elif gain_curve is not None:
-            self.gain_curve = self._create_gain_curve(gain_curve)
-        else:
-            self.gain_curve = None
-
+    def __init__(self, data):
         self.data = data
-
-    @staticmethod
-    def _create_gain_curve(params):
-        L, F, C = params
-
-        def gain_curve(q):
-            if q > C:
-                return 0
-            if F < q <= C:
-                return L * F * (C - q) / ((C - F) * q)
-            elif L < q <= F:
-                return L
-            else:
-                return q
-
-        return gain_curve
 
     def compute_obs(self, stamp, traj_point):
         """Compute ingredients for a single linearized observation.
@@ -279,7 +241,7 @@ class Observation:
         R : ndarray, shape (n_obs, n_obs)
             Covariance matrix of the observation error.
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
 
 class LatLonObs(Observation):
@@ -292,29 +254,14 @@ class LatLonObs(Observation):
         Index must contain time stamps.
     sd : float
         Measurement accuracy in meters.
-    gain_curve : None, callable or 3-tuple
-        Kalman correction gain curve. It determines the proportionality of
-        a state correction and a normalized measurement residual (by its
-        theoretical covariance). In the standard Kalman correction it is an
-        identity function. To make the filter robust to outliers a sublinear
-        function can be provided. A convenient parametrization of such function
-        is supported. It described by 3 numbers [L, F, C], if q is a normalized
-        residual then:
-
-            * If q < L: standard Kalman correction is used.
-            * If L <= q < F: correction is kept constant on a level of q = L.
-            * If F <= q < C: correction decays to 0 as ~1/q.
-            * IF q >= C: the measurement is rejected completely.
-
-        If None (default), the standard Kalman correction will be used.
 
     Attributes
     ----------
     data : DataFrame
         Data saved from the constructor.
     """
-    def __init__(self, data, sd, gain_curve=None):
-        super(LatLonObs, self).__init__(data, gain_curve)
+    def __init__(self, data, sd):
+        super(LatLonObs, self).__init__(data)
         error_model = error_models.ModifiedPhiModel()
         self.R = np.diag([sd, sd]) ** 2
         H = np.zeros((2, error_model.N_STATES))
@@ -351,29 +298,14 @@ class VeVnObs(Observation):
         components. Index must contain time stamps.
     sd : float
         Measurement accuracy in m/s.
-    gain_curve : None, callable or 3-tuple
-        Kalman correction gain curve. It determines the proportionality of
-        a state correction and a normalized measurement residual (by its
-        theoretical covariance). In the standard Kalman correction it is an
-        identity function. To make the filter robust to outliers a sublinear
-        function can be provided. A convenient parametrization of such function
-        is supported. It described by 3 numbers [L, F, C], if q is a normalized
-        residual then:
-
-            * If q < L: standard Kalman correction is used.
-            * If L <= q < F: correction is kept constant on a level of q = L.
-            * If F <= q < C: correction decays to 0 as ~1/q.
-            * IF q >= C: the measurement is rejected completely.
-
-        If None (default), the standard Kalman correction will be used.
 
     Attributes
     ----------
     data : DataFrame
         Data saved from the constructor.
     """
-    def __init__(self, data, sd, gain_curve=None):
-        super(VeVnObs, self).__init__(data, gain_curve)
+    def __init__(self, data, sd):
+        super(VeVnObs, self).__init__(data)
         self.R = np.diag([sd, sd]) ** 2
 
     def compute_obs(self, stamp, traj_point):
@@ -684,8 +616,7 @@ class FeedforwardFilter:
                 if ret is not None:
                     z, H, R = ret
                     H_max[:H.shape[0], :self.error_model.N_STATES] = H
-                    res = kalman.correct(xc, Pc, z, H_max[:H.shape[0]], R,
-                                         obs.gain_curve)
+                    res = kalman.correct(xc, Pc, z, H_max[:H.shape[0]], R)
                     obs_stamps[i_obs].append(stamp)
                     obs_residuals[i_obs].append(res)
 
@@ -1087,8 +1018,7 @@ class FeedbackFilter:
                     if ret is not None:
                         z, H, R = ret
                         H_max[:H.shape[0], :self.error_model.N_STATES] = H
-                        res = kalman.correct(xc, Pc, z, H_max[:H.shape[0]], R,
-                                             obs.gain_curve)
+                        res = kalman.correct(xc, Pc, z, H_max[:H.shape[0]], R)
                         obs_stamps[i_obs].append(stamp)
                         obs_residuals[i_obs].append(res)
 

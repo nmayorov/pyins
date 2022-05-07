@@ -3,21 +3,12 @@ import numpy as np
 from scipy.linalg import cholesky, cho_solve, solve_triangular
 
 
-def correct(x, P, z, H, R, gain_curve):
+def correct(x, P, z, H, R):
     PHT = np.dot(P, H.T)
 
     S = np.dot(H, PHT) + R
     e = z - H.dot(x)
     L = cholesky(S, lower=True)
-    inn = solve_triangular(L, e, lower=True)
-
-    if gain_curve is not None:
-        q = (np.dot(inn, inn) / inn.shape[0]) ** 0.5
-        f = gain_curve(q)
-        if f == 0:
-            return inn
-        L *= (q / f) ** 0.5
-
     K = cho_solve((L, True), PHT.T, overwrite_b=True).T
 
     U = -K.dot(H)
@@ -25,7 +16,7 @@ def correct(x, P, z, H, R, gain_curve):
     x += K.dot(z - H.dot(x))
     P[:] = U.dot(P).dot(U.T) + K.dot(R).dot(K.T)
 
-    return inn
+    return solve_triangular(L, e, lower=True)
 
 
 def smooth_rts(x, P, xa, Pa, Phi):

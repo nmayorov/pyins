@@ -19,34 +19,6 @@ def test_kalman_correct():
 
     x = x0.copy()
     P = P0.copy()
-    kalman.correct(x, P, z, H, R, None)
+    kalman.correct(x, P, z, H, R)
     assert_allclose(x, x_true)
-    assert_allclose(P, P_true)
-
-    def create_gain_curve(params):
-        L, F, C = params
-
-        def gain_curve(q):
-            if q > C:
-                return 0
-            if F < q <= C:
-                return L * F * (C - q) / ((C - F) * q)
-            elif L < q <= F:
-                return L
-            else:
-                return q
-
-        return gain_curve
-
-    curve = create_gain_curve([0.5, 1, 5])
-    x = x0.copy()
-    P = P0.copy()
-    kalman.correct(x, P, z, H, R, curve)
-
-    K1 = 0.4 * 0.5 / (23 / 30)**0.5
-    K2 = 1/3 * 0.5 / (23 / 30)**0.5
-    P_true = np.diag([(1 - K1)**2 * 2 + K1**2 * 3,
-                      (1 - K2)**2 * 1 + K2**2 * 2])
-
-    assert_allclose(x, [K1 * z[0], K2 * z[1]])
     assert_allclose(P, P_true)
