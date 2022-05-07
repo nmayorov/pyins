@@ -30,7 +30,7 @@ def correct(x, P, z, H, R, gain_factor, gain_curve):
     return inn
 
 
-def rts_pass(x, P, xa, Pa, Phi):
+def smooth_rts(x, P, xa, Pa, Phi):
     n_points, n_states = x.shape
     I = np.identity(n_states)
     for i in reversed(range(n_points - 1)):

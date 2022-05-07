@@ -861,7 +861,7 @@ class FeedforwardFilter:
             traj, observations, gain_factor, stamps, record_stamps,
             data_for_backward=True)
 
-        x, P = kalman.rts_pass(x, P, xa, Pa, Phi_arr)
+        x, P = kalman.smooth_rts(x, P, xa, Pa, Phi_arr)
 
         ind = np.searchsorted(stamps, record_stamps)
         x = x[ind]
@@ -1364,7 +1364,7 @@ class FeedbackFilter:
         xa[:, :self.error_model.N_STATES] -= x[:, :self.error_model.N_STATES]
         x[:, :self.error_model.N_STATES] = 0
 
-        x, P = kalman.rts_pass(x, P, xa, Pa, Phi_arr)
+        x, P = kalman.smooth_rts(x, P, xa, Pa, Phi_arr)
 
         ind = np.searchsorted(stamps, record_stamps)
         x = x[ind]
