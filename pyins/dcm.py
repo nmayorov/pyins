@@ -3,6 +3,33 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 
 
+def skew_matrix(vec):
+    """Compute a skew matrix corresponding to a vector.
+
+    Parameters
+    ----------
+    vec : array_like, shape (3,) or (n, 3)
+        Vector.
+
+    Returns
+    -------
+    skew_matrix : ndarray, shape (3, 3) or (n, 3)
+        Corresponding skew matrix.
+    """
+    vec = np.asarray(vec)
+    single = vec.ndim == 1
+    n = 1 if single else len(vec)
+    vec = np.atleast_2d(vec)
+    result = np.zeros((n, 3, 3))
+    result[:, 0, 1] = -vec[:, 2]
+    result[:, 0, 2] = vec[:, 1]
+    result[:, 1, 0] = vec[:, 2]
+    result[:, 1, 2] = -vec[:, 0]
+    result[:, 2, 0] = -vec[:, 1]
+    result[:, 2, 1] = vec[:, 0]
+    return result[0] if single else result
+
+
 def from_rv(rv):
     """Create a direction cosine matrix from a rotation vector.
 
