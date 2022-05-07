@@ -31,6 +31,32 @@ def correct(x, P, z, H, R, gain_factor, gain_curve):
 
 
 def smooth_rts(x, P, xa, Pa, Phi):
+    """Smooth state according to Rauch-Tung-Striebel algorithm [1]_.
+
+    Parameters
+    ----------
+    x : ndarray, shape (n_points, n_states)
+        States from the forward pass. On exit will contain smoothed, improved
+        estimates.
+    P : ndarray, shape (n_points, n_states, n_states)
+        Covariance from forward pass. On exit will contain smoothed, improved
+        covariances.
+    xa : ndarray, shape (n_points, n_states)
+        States from the forward pass before measurements at each point
+        was applied, i. e. `x[i]` is `xa[i]` after measurement at `i` was
+        applied.
+    Pa : ndarray, shape (n_points, n_states, n_states)
+        Covariances from forward pass before measurements at each point was
+        applied, i. e. `P[i]` is `Pa[i]` after measurement at `i` was applied.
+    Phi : ndarray, shape (n_points - 1, n_states, n_states)
+        Transition matrices between states.
+
+    References
+    ----------
+    .. [1] H. E. Rauch, F. Tung and C.T. Striebel, "Maximum Likelihood
+           Estimates of Linear Dynamic Systems", AIAA Journal, Vol. 3,
+           No. 8, August 1965.
+    """
     n_points, n_states = x.shape
     I = np.identity(n_states)
     for i in reversed(range(n_points - 1)):
