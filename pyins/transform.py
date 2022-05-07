@@ -69,6 +69,34 @@ def perturb_lla(lla, delta_enu):
     return lla[0] if return_single else lla
 
 
+def difference_lla(lla1, lla2):
+    """Compute difference between lla points resolved in ENU in meters.
+
+    Parameters
+    ----------
+    lla1, lla2 : array_like
+        Points with latitude, longitude and altitude.
+
+    Returns
+    -------
+    difference_enu : ndarray
+        Difference in meters resolved in ENU.
+    """
+    lla1 = np.asarray(lla1)
+    lla2 = np.asarray(lla2)
+    single = lla1.ndim == 1 and lla2.ndim == 1
+    lla1 = np.atleast_2d(lla1)
+    lla2 = np.atleast_2d(lla2)
+    _, rn, rp = earth.principal_radii(0.5 * (lla1[:, 0] + lla2[:, 0]),
+                                      0.5 * (lla1[:, 2] + lla2[:, 2]))
+    diff = lla1 - lla2
+    result = np.empty_like(diff)
+    result[:, 0] = np.deg2rad(diff[:, 1]) * rp
+    result[:, 1] = np.deg2rad(diff[:, 0]) * rn
+    result[:, 2] = diff[:, 2]
+    return result[0] if single else result
+
+
 def difference_trajectories(t1, t2):
     """Compute trajectory difference.
 
