@@ -49,6 +49,21 @@ class ErrorModel:
         raise NotImplementedError
 
     def correct_state(self, trajectory_point, error):
+        """Correct navigation state with estimated errors.
+
+        Parameters
+        ----------
+        trajectory_point : pd.Series
+            Point of trajectory.
+
+        error : ndarray
+            Estimates errors. First n_states components are assumed to
+            contain error states.
+
+        Returns
+        -------
+        corrected_trajectory_point : pd.Series
+        """
         raise NotImplementedError
 
     def position_error_jacobian(self, trajectory_point):
