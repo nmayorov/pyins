@@ -2,7 +2,7 @@
 from collections import OrderedDict
 import numpy as np
 import pandas as pd
-from . import dcm, earth, util
+from . import dcm, earth, util, transform
 
 
 class ErrorModel:
@@ -22,6 +22,9 @@ class ErrorModel:
         raise NotImplementedError
 
     def transform_to_output(self, trajectory):
+        raise NotImplementedError
+
+    def correct_state(self, error, lla, velocity_n, Cnb):
         raise NotImplementedError
 
 
@@ -105,6 +108,12 @@ class ModifiedPhiModel(ErrorModel):
         T[:, self.DROLL, self.PHI2] = -ch / cp
 
         return T
+
+    def correct_state(self, error, lla, velocity_n, Cnb):
+        Ctp = dcm.from_rv(error[self.PHI])
+        return (transform.perturb_lla(lla, -error[self.DR]),
+                Ctp @ (velocity_n - error[self.DV]),
+                Ctp @ Cnb)
 
 
 def compute_output_errors(traj, error_model, x, P, output_stamps,

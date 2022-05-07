@@ -1183,7 +1183,9 @@ class FeedbackFilter:
                 i_stamp += 1
 
             i_reading += feedback_period
-            integrator._correct(xc[:self.error_model.N_STATES].copy())
+
+            integrator.set_state(*self.error_model.correct_state(
+                xc, *integrator.get_state()))
             xc[:self.error_model.N_STATES] = 0
 
         if record_stamps[i_save] == stamps[i_stamp]:

@@ -212,23 +212,17 @@ class Integrator:
 
         return self.traj.iloc[-n_readings - 1:]
 
-    def _correct(self, x):
-        i = self.traj.shape[0] - 1
-        d_lon = x[0] / (earth.R0 * np.cos(self.lla[i, 0]))
-        self.lla[i, 0] -= x[1] / earth.R0
-        self.lla[i, 1] -= d_lon
-        self.lla[i, 2] -= x[2]
+    def get_state(self):
+        i = len(self.traj) - 1
+        lla = self.lla[i].copy()
+        lla[:2] = np.rad2deg(lla[:2])
+        return lla, self.velocity_n[i].copy(), self.Cnb[i].copy()
 
-        phi = x[6:9]
-        phi[2] += d_lon * np.sin(self.lla[i, 0])
+    def set_state(self, lla, velocity_n, Cnb):
+        i = len(self.traj) - 1
+        self.lla[i, :2] = np.deg2rad(lla[:2])
+        self.lla[i, 2] = lla[2]
+        self.velocity_n[i] = velocity_n
+        self.Cnb[i] = Cnb
 
-        Ctp = dcm.from_rv(phi)
-        self.velocity_n[i] = Ctp @ (self.velocity_n[i] - x[3:6])
-
-        self.Cnb[i] = Ctp @ self.Cnb[i]
-        rph = dcm.to_rph(self.Cnb[i])
-
-        self.traj.iloc[-1] = np.hstack((np.rad2deg(self.lla[i, :2]),
-                                        self.lla[i, 2],
-                                        self.velocity_n[i],
-                                        rph))
+        self.traj.iloc[-1] = np.hstack((lla, velocity_n, dcm.to_rph(Cnb)))
