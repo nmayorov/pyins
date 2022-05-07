@@ -41,5 +41,3 @@ def smooth_rts(x, P, xa, Pa, Phi):
 
         x[i] += C.dot(x[i + 1] - xa[i + 1])
         P[i] += C.dot(P[i + 1] - Pa[i + 1]).dot(C.T)
-
-    return x, P
