@@ -2,7 +2,7 @@
 from collections import OrderedDict
 import numpy as np
 import pandas as pd
-from . import earth, error_models, kalman, util
+from . import error_models, kalman, util, transform
 from .transform import correct_traj
 
 
@@ -216,7 +216,7 @@ class Observation:
     def __init__(self, data):
         self.data = data
 
-    def compute_obs(self, stamp, traj_point):
+    def compute_obs(self, stamp, trajectory_point, error_model):
         """Compute ingredients for a single linearized observation.
 
         It must compute the observation model (z, H, R) at a given time stamp.
@@ -227,8 +227,10 @@ class Observation:
         ----------
         stamp : int
             Time stamp.
-        traj_point : Series
+        trajectory_point : Series
             Point of INS trajectory at `stamp`.
+        error_model : ErrorModel
+            Error model object.
 
         Returns
         -------
@@ -244,14 +246,14 @@ class Observation:
         raise NotImplementedError
 
 
-class LatLonObs(Observation):
+class PositionObs(Observation):
     """Observation of latitude and longitude (from GPS or any other source).
 
     Parameters
     ----------
     data : DataFrame
-        Must contain columns 'lat' and 'lon' for latitude and longitude.
-        Index must contain time stamps.
+        Must contain columns 'lat', 'lon' and `alt` columns for latitude,
+        longitude and altitude. Index must contain time stamps.
     sd : float
         Measurement accuracy in meters.
 
@@ -261,41 +263,29 @@ class LatLonObs(Observation):
         Data saved from the constructor.
     """
     def __init__(self, data, sd):
-        super(LatLonObs, self).__init__(data)
-        error_model = error_models.ModifiedPhiModel()
-        self.R = np.diag([sd, sd]) ** 2
-        H = np.zeros((2, error_model.N_STATES))
-        H[0, error_model.DR1] = 1
-        H[1, error_model.DR2] = 1
-        self.H = H
+        super(PositionObs, self).__init__(data)
+        self.R = sd**2 * np.eye(3)
 
-    def compute_obs(self, stamp, traj_point):
-        """Compute ingredients for a single observation.
-
-        See `Observation.compute_obs`.
-        """
+    def compute_obs(self, stamp, trajectory_point, error_model):
         if stamp not in self.data.index:
             return None
 
-        d_lat = traj_point.lat - self.data.lat.loc[stamp]
-        d_lon = traj_point.lon - self.data.lon.loc[stamp]
-        clat = np.cos(np.deg2rad(self.data.lat.loc[stamp]))
-        z = np.array([
-            np.deg2rad(d_lon) * earth.R0 * clat,
-            np.deg2rad(d_lat) * earth.R0
-        ])
+        z = transform.difference_lla(trajectory_point[['lat', 'lon', 'alt']],
+                                     self.data.loc[stamp,
+                                                   ['lat', 'lon', 'alt']])
+        H = error_model.position_error_jacobian(trajectory_point)
 
-        return z, self.H, self.R
+        return z, H, self.R
 
 
-class VeVnObs(Observation):
-    """Observation of East and North velocity (from GPS or any other source).
+class EnuVelocityObs(Observation):
+    """Observation of velocity resolved in ENU frame.
 
     Parameters
     ----------
     data : DataFrame
-        Must contain columns 'VE' and 'VN' for East and North velocity
-        components. Index must contain time stamps.
+        Must contain columns 'VE', 'VN' and 'VU' columns.
+        Index must contain time stamps.
     sd : float
         Measurement accuracy in m/s.
 
@@ -305,29 +295,16 @@ class VeVnObs(Observation):
         Data saved from the constructor.
     """
     def __init__(self, data, sd):
-        super(VeVnObs, self).__init__(data)
-        self.R = np.diag([sd, sd]) ** 2
+        super(EnuVelocityObs, self).__init__(data)
+        self.R = sd**2 * np.eye(3)
 
-    def compute_obs(self, stamp, traj_point):
-        """Compute ingredients for a single observation.
-
-        See `Observation.compute_obs`.
-        """
+    def compute_obs(self, stamp, trajectory_point, error_model):
         if stamp not in self.data.index:
             return None
 
-        VE = self.data.VE.loc[stamp]
-        VN = self.data.VN.loc[stamp]
-
-        error_model = error_models.ModifiedPhiModel()
-
-        z = np.array([traj_point.VE - VE, traj_point.VN - VN])
-        H = np.zeros((2, error_model.N_STATES))
-
-        H[0, error_model.DV1] = 1
-        H[0, error_model.PHI3] = VN
-        H[1, error_model.DV2] = 1
-        H[1, error_model.PHI3] = -VE
+        z = trajectory_point[['VE', 'VN', 'VU']] - \
+            self.data.loc[stamp,  ['VE', 'VN', 'VU']]
+        H = error_model.enu_velocity_jacobian(trajectory_point)
 
         return z, H, self.R
 
@@ -612,7 +589,7 @@ class FeedforwardFilter:
                 Pa[i_save] = Pc
 
             for i_obs, obs in enumerate(observations):
-                ret = obs.compute_obs(stamp, traj.loc[stamp])
+                ret = obs.compute_obs(stamp, traj.loc[stamp], self.error_model)
                 if ret is not None:
                     z, H, R = ret
                     H_max[:H.shape[0], :self.error_model.N_STATES] = H
@@ -1014,7 +991,8 @@ class FeedbackFilter:
                     Pa[i_save] = Pc
 
                 for i_obs, obs in enumerate(observations):
-                    ret = obs.compute_obs(stamp, traj_b.iloc[i])
+                    ret = obs.compute_obs(stamp, traj_b.iloc[i],
+                                          self.error_model)
                     if ret is not None:
                         z, H, R = ret
                         H_max[:H.shape[0], :self.error_model.N_STATES] = H

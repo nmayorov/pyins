@@ -2,7 +2,7 @@ from numpy.testing import (assert_, assert_allclose, run_module_suite,
                            assert_equal)
 import numpy as np
 import pandas as pd
-from pyins.filt import (InertialSensor, LatLonObs, VeVnObs,
+from pyins.filt import (InertialSensor, PositionObs, EnuVelocityObs,
                         FeedforwardFilter, FeedbackFilter,
                         _refine_stamps, correct_traj)
 from pyins.error_models import propagate_errors
@@ -87,59 +87,6 @@ def test_InertialSensor():
                            [0, 0, 1, 0, 0, 0.5, 0, 0, 1]])
 
 
-def test_LatLonObs():
-    traj_point = pd.Series(data={
-        'lat': 40,
-        'lon': 30,
-        'VE': 4,
-        'VN': -3,
-        'h': 15,
-        'p': 0,
-        'r': 0
-    })
-    obs_data = pd.DataFrame(index=[50])
-    obs_data['lat'] = [40.0001]
-    obs_data['lon'] = [30.0002]
-    obs = LatLonObs(obs_data, 10)
-
-    ret = obs.compute_obs(55, traj_point)
-    assert_(ret is None)
-
-    z, H, R = obs.compute_obs(50, traj_point)
-    z_true = [np.deg2rad(-0.0002) * earth.R0 * np.cos(np.deg2rad(40)),
-              np.deg2rad(-0.0001) * earth.R0]
-    assert_allclose(z, z_true, rtol=1e-5)
-
-    assert_allclose(H, [[1, 0, 0, 0, 0, 0, 0, 0, 0],
-                        [0, 1, 0, 0, 0, 0, 0, 0, 0]])
-
-    assert_allclose(R, [[100, 0], [0, 100]])
-
-
-def test_VeVnObs():
-    traj_point = pd.Series(data={
-        'lat': 40,
-        'lon': 30,
-        'VE': 4,
-        'VN': -3,
-        'h': 15,
-        'p': 0,
-        'r': 0
-    })
-    obs_data = pd.DataFrame(index=[50])
-    obs_data['VE'] = [3]
-    obs_data['VN'] = [-2]
-    obs = VeVnObs(obs_data, 10)
-
-    ret = obs.compute_obs(55, traj_point)
-    assert_(ret is None)
-
-    z, H, R = obs.compute_obs(50, traj_point)
-    assert_allclose(z, [1, -1])
-    assert_allclose(H, [[0, 0, 0, 1, 0, 0, 0, 0, -2],
-                        [0, 0, 0, 0, 1, 0, 0, 0, -3]])
-
-
 def test_refine_stamps():
     stamps = [2, 2, 5, 1, 10, 20]
     stamps = _refine_stamps(stamps, 2)
@@ -163,10 +110,10 @@ def test_FeedforwardFilter():
 
     np.random.seed(1)
     obs_data = pd.DataFrame(index=traj.index[::10])
-    lla_obs = perturb_lla(traj.loc[::10, ['lat', 'lon', 'alt']],
-                          10 * np.random.randn(len(obs_data), 3))
-    obs_data[['lat', 'lon']] = lla_obs[:, :2]
-    obs = LatLonObs(obs_data, 10)
+    obs_data[['lat', 'lon', 'alt']] = perturb_lla(
+        traj.loc[::10, ['lat', 'lon', 'alt']],
+        10 * np.random.randn(len(obs_data), 3))
+    position_obs = PositionObs(obs_data, 10)
 
     delta_position_n = [-3, 5, 0]
     delta_velocity_n = [1, -1, 0]
@@ -177,7 +124,7 @@ def test_FeedforwardFilter():
     traj_error = correct_traj(traj, -errors)
 
     f = FeedforwardFilter(dt, traj, 5, 1, 0.2, 0.05)
-    res = f.run(traj_error, [obs])
+    res = f.run(traj_error, [position_obs])
 
     x = errors.loc[3000:]
     y = res.err.loc[3000:]
@@ -191,7 +138,7 @@ def test_FeedforwardFilter():
     assert_allclose(x.heading, y.heading, rtol=0, atol=1.5e-3)
     assert_(np.all(np.abs(res.residuals[0] < 4)))
 
-    res = f.run_smoother(traj_error, [obs])
+    res = f.run_smoother(traj_error, [position_obs])
 
     # This smoother we don't need to wait until the filter converges,
     # the estimation accuracy is also improved some
@@ -227,10 +174,10 @@ def test_FeedbackFilter():
 
     np.random.seed(0)
     obs_data = pd.DataFrame(index=traj.index[::10])
-    lla_obs = perturb_lla(traj.loc[::10, ['lat', 'lon', 'alt']],
-                          10 * np.random.randn(len(obs_data), 3))
-    obs_data[['lat', 'lon']] = lla_obs[:, :2]
-    obs = LatLonObs(obs_data, 10)
+    obs_data[['lat', 'lon', 'alt']] = perturb_lla(
+        traj.loc[::10, ['lat', 'lon', 'alt']],
+        10 * np.random.randn(len(obs_data), 3))
+    position_obs = PositionObs(obs_data, 10)
 
     f = FeedbackFilter(dt, 5, 1, 0.2, 0.05)
 
@@ -248,7 +195,7 @@ def test_FeedbackFilter():
                        [d_lon, d_lat, d_alt])
     integrator = Integrator(dt, lla0, [d_VE, d_VN, d_VU],
                             [d_r, d_p, d_h])
-    res = f.run(integrator, theta, dv, observations=[obs])
+    res = f.run(integrator, theta, dv, observations=[position_obs])
     error = difference_trajectories(res.traj, traj)
     error = error.iloc[3000:]
 
@@ -261,7 +208,7 @@ def test_FeedbackFilter():
     assert_allclose(error.roll, 0, rtol=0, atol=1e-4)
     assert_(np.all(np.abs(res.residuals[0] < 4)))
 
-    res = f.run_smoother(integrator, theta, dv, [obs])
+    res = f.run_smoother(integrator, theta, dv, [position_obs])
     error = difference_trajectories(res.traj, traj)
     assert_allclose(error.lat, 0, rtol=0, atol=10)
     assert_allclose(error.lon, 0, rtol=0, atol=10)
