@@ -460,8 +460,8 @@ def _rts_pass(x, P, xa, Pa, Phi):
     return x, P
 
 
-def _compute_output_errors(traj, error_model, x, P, output_stamps,
-                           gyro_model, accel_model):
+def _compute_output_errors(traj, x, P, output_stamps,
+                           error_model, gyro_model, accel_model):
     T = error_model.transform_to_output(traj.loc[output_stamps])
     y = util.mv_prod(T, x[:, :error_model.N_STATES])
     Py = util.mm_prod(T, P[:, :error_model.N_STATES, :error_model.N_STATES])
@@ -828,8 +828,8 @@ class FeedforwardFilter:
             traj, observations, gain_factor, stamps, record_stamps)
 
         err, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
-            _compute_output_errors(self.traj_ref, self.error_model, x, P,
-                                   record_stamps, self.gyro_model,
+            _compute_output_errors(self.traj_ref, x, P, record_stamps,
+                                   self.error_model, self.gyro_model,
                                    self.accel_model)
 
         traj_corr = correct_traj(traj, err)
@@ -911,8 +911,8 @@ class FeedforwardFilter:
         P = P[ind]
 
         err, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
-            _compute_output_errors(self.traj_ref, self.error_model, x, P,
-                                   record_stamps, self.gyro_model,
+            _compute_output_errors(self.traj_ref, x, P, record_stamps,
+                                   self.error_model, self.gyro_model,
                                    self.accel_model)
 
         traj_corr = correct_traj(traj, err)
@@ -1316,7 +1316,7 @@ class FeedbackFilter:
 
         traj = integrator.traj.loc[record_stamps]
         err, sd, accel_err, accel_sd, gyro_err, gyro_sd = \
-            _compute_output_errors(traj, self.error_model, x, P, record_stamps,
+            _compute_output_errors(traj, x, P, record_stamps, self.error_model,
                                    self.gyro_model, self.accel_model)
 
         traj_corr = correct_traj(integrator.traj, err)
@@ -1401,7 +1401,7 @@ class FeedbackFilter:
 
         traj = integrator.traj.loc[record_stamps]
         err, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
-            _compute_output_errors(traj, self.error_model, x, P, record_stamps,
+            _compute_output_errors(traj, x, P, record_stamps, self.error_model,
                                    self.gyro_model, self.accel_model)
 
         traj = correct_traj(traj, err)
@@ -1416,8 +1416,8 @@ class FeedbackFilter:
         traj = traj.iloc[ind]
 
         err, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
-            _compute_output_errors(traj, self.error_model, x, P,
-                                   record_stamps[ind], self.gyro_model,
+            _compute_output_errors(traj, x, P, record_stamps[ind],
+                                   self.error_model, self.gyro_model,
                                    self.accel_model)
 
         traj = correct_traj(traj, err)
