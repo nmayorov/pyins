@@ -27,6 +27,15 @@ class ErrorModel:
     def correct_state(self, error, lla, velocity_n, Cnb):
         raise NotImplementedError
 
+    def position_error_jacobian(self, trajectory_point):
+        raise NotImplementedError
+
+    def enu_velocity_error_jacobian(self, trajectory_point):
+        raise NotImplementedError
+
+    def body_velocity_error_jacobian(self, trajectory_point):
+        raise NotImplementedError
+
 
 class ModifiedPhiModel(ErrorModel):
     N_STATES = 9
@@ -114,6 +123,24 @@ class ModifiedPhiModel(ErrorModel):
         return (transform.perturb_lla(lla, -error[self.DR]),
                 Ctp @ (velocity_n - error[self.DV]),
                 Ctp @ Cnb)
+
+    def position_error_jacobian(self, trajectory_point):
+        result = np.zeros((3, self.N_STATES))
+        result[:, self.DR] = np.eye(3)
+        return result
+
+    def enu_velocity_error_jacobian(self, trajectory_point):
+        result = np.zeros((3, self.N_STATES))
+        result[:, self.DV] = np.eye(3)
+        result[:, self.PHI] = dcm.skew_matrix(
+            trajectory_point[['VE', 'VN', 'VU']])
+        return result
+
+    def body_velocity_error_jacobian(self, trajectory_point):
+        Cnb = dcm.from_rph(trajectory_point[['roll', 'pitch', 'heading']])
+        result = np.zeros((3, self.N_STATES))
+        result[:, self.DV] = Cnb.transpose()
+        return result
 
 
 def propagate_errors(dt, traj,
