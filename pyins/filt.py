@@ -460,6 +460,53 @@ def _rts_pass(x, P, xa, Pa, Phi):
     return x, P
 
 
+def _compute_output_errors(traj, error_model, x, P, output_stamps,
+                           gyro_model, accel_model):
+    T = error_model.transform_to_output(traj.loc[output_stamps])
+    y = util.mv_prod(T, x[:, :error_model.N_STATES])
+    Py = util.mm_prod(T, P[:, :error_model.N_STATES, :error_model.N_STATES])
+    Py = util.mm_prod(Py, T, bt=True)
+    sd_y = np.diagonal(Py, axis1=1, axis2=2) ** 0.5
+
+    err = pd.DataFrame(index=output_stamps)
+    err['lat'] = y[:, error_model.DRN]
+    err['lon'] = y[:, error_model.DRE]
+    err['alt'] = y[:, error_model.DRU]
+    err['VE'] = y[:, error_model.DVE]
+    err['VN'] = y[:, error_model.DVN]
+    err['VU'] = y[:, error_model.DVU]
+    err['roll'] = np.rad2deg(y[:, error_model.DROLL])
+    err['pitch'] = np.rad2deg(y[:, error_model.DPITCH])
+    err['heading'] = np.rad2deg(y[:, error_model.DHEADING])
+
+    sd = pd.DataFrame(index=output_stamps)
+    sd['lat'] = sd_y[:, error_model.DRN]
+    sd['lon'] = sd_y[:, error_model.DRE]
+    sd['alt'] = sd_y[:, error_model.DRU]
+    sd['VE'] = sd_y[:, error_model.DVE]
+    sd['VN'] = sd_y[:, error_model.DVN]
+    sd['VU'] = sd_y[:, error_model.DVU]
+    sd['roll'] = np.rad2deg(sd_y[:, error_model.DROLL])
+    sd['pitch'] = np.rad2deg(sd_y[:, error_model.DPITCH])
+    sd['heading'] = np.rad2deg(sd_y[:, error_model.DHEADING])
+
+    gyro_err = pd.DataFrame(index=output_stamps)
+    gyro_sd = pd.DataFrame(index=output_stamps)
+    n = error_model.N_STATES
+    for i, name in enumerate(gyro_model.states):
+        gyro_err[name] = x[:, n + i]
+        gyro_sd[name] = P[:, n + i, n + i] ** 0.5
+
+    accel_err = pd.DataFrame(index=output_stamps)
+    accel_sd = pd.DataFrame(index=output_stamps)
+    ng = gyro_model.n_states
+    for i, name in enumerate(accel_model.states):
+        accel_err[name] = x[:, n + ng + i]
+        accel_sd[name] = P[:, n + ng + i, n + ng + i] ** 0.5
+
+    return err, sd, gyro_err, gyro_sd, accel_err, accel_sd
+
+
 class FeedforwardFilter:
     """INS Kalman filter in a feedforward form.
 
@@ -781,11 +828,9 @@ class FeedforwardFilter:
             traj, observations, gain_factor, stamps, record_stamps)
 
         err, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
-            error_models.compute_output_errors(self.traj_ref, self.error_model,
-                                               x, P,
-                                               record_stamps,
-                                               self.gyro_model,
-                                               self.accel_model)
+            _compute_output_errors(self.traj_ref, self.error_model, x, P,
+                                   record_stamps, self.gyro_model,
+                                   self.accel_model)
 
         traj_corr = correct_traj(traj, err)
 
@@ -866,11 +911,9 @@ class FeedforwardFilter:
         P = P[ind]
 
         err, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
-            error_models.compute_output_errors(self.traj_ref, self.error_model,
-                                               x, P,
-                                               record_stamps,
-                                               self.gyro_model,
-                                               self.accel_model)
+            _compute_output_errors(self.traj_ref, self.error_model, x, P,
+                                   record_stamps, self.gyro_model,
+                                   self.accel_model)
 
         traj_corr = correct_traj(traj, err)
 
@@ -1273,10 +1316,8 @@ class FeedbackFilter:
 
         traj = integrator.traj.loc[record_stamps]
         err, sd, accel_err, accel_sd, gyro_err, gyro_sd = \
-            error_models.compute_output_errors(traj, self.error_model,
-                                               x, P, record_stamps,
-                                               self.gyro_model,
-                                               self.accel_model)
+            _compute_output_errors(traj, self.error_model, x, P, record_stamps,
+                                   self.gyro_model, self.accel_model)
 
         traj_corr = correct_traj(integrator.traj, err)
 
@@ -1360,10 +1401,8 @@ class FeedbackFilter:
 
         traj = integrator.traj.loc[record_stamps]
         err, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
-            error_models.compute_output_errors(traj, self.error_model,
-                                               x, P, record_stamps,
-                                               self.gyro_model,
-                                               self.accel_model)
+            _compute_output_errors(traj, self.error_model, x, P, record_stamps,
+                                   self.gyro_model, self.accel_model)
 
         traj = correct_traj(traj, err)
         xa[:, :self.error_model.N_STATES] -= x[:, :self.error_model.N_STATES]
@@ -1377,10 +1416,9 @@ class FeedbackFilter:
         traj = traj.iloc[ind]
 
         err, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
-            error_models.compute_output_errors(traj, self.error_model,
-                                               x, P, record_stamps[ind],
-                                               self.gyro_model,
-                                               self.accel_model)
+            _compute_output_errors(traj, self.error_model, x, P,
+                                   record_stamps[ind], self.gyro_model,
+                                   self.accel_model)
 
         traj = correct_traj(traj, err)
 
