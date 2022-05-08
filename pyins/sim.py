@@ -236,9 +236,16 @@ def from_velocity(dt, lla0, velocity_n, rph, sensor_type='increment'):
     return from_position(dt, lla, rph, sensor_type)
 
 
-def constant_velocity_motion(dt, total_time, lla0, velocity_n,
+def sinusoid_velocity_motion(dt, total_time, lla0, velocity_mean,
+                             velocity_change_amplitude=0,
+                             velocity_change_period=60,
+                             velocity_change_phase_offset=[0, 90, 0],
                              sensor_type='increment'):
-    """Generate trajectory with constant ENU velocity.
+    """Generate trajectory with ENU velocity changing as sinus.
+
+    The ENU velocity changes as::
+
+        V = V_mean + V_ampl * sin(2 * pi * t / period + phase_offset)
 
     Roll is set to zero, pitch and heading angles are computed with zero
     lateral and vertical velocity assumptions.
@@ -251,8 +258,16 @@ def constant_velocity_motion(dt, total_time, lla0, velocity_n,
         Total motion time.
     lla0 : array_like, shape (3,)
         Initial latitude, longitude and altitude.
-    velocity_n : array_like, shape (3,)
-        Velocity resolved in ENU.
+    velocity_mean : array_like, shape (3,)
+        Mean velocity resolved in ENU.
+    velocity_change_amplitude : array_like, optional
+        Velocity change amplitude. Default is 0.
+    velocity_change_period : float, optional
+        Period of sinusoidal velocity change in seconds. Default is 60.
+    velocity_change_phase_offset : array_like, shape (3,), optional
+        Phase offset for sinusoid part in degrees. Default is [0, 90, 0]
+        which will create an ellipse for latitude-longitude trajectory when
+        the mean velocity is zero.
     sensor_type: 'increment' or 'rate', optional
         Type of sensor to generate. If 'increment' (default), then integrals
         over sampling intervals are generated (in rad and m/s).
@@ -268,8 +283,11 @@ def constant_velocity_motion(dt, total_time, lla0, velocity_n,
     accel : ndarray, shape (n_points - 1, 3)
         Accelerometer readings.
     """
-    n_points = int(total_time / dt)
-    velocity_n = np.tile(velocity_n, (n_points, 1))
+    time = np.arange(0, total_time, dt)
+    phase = 2 * np.pi * time[:, None] / velocity_change_period + \
+            np.deg2rad(velocity_change_phase_offset)
+    velocity_n = (np.atleast_2d(velocity_mean) +
+                  np.atleast_2d(velocity_change_amplitude) * np.sin(phase))
     rph = np.zeros_like(velocity_n)
     rph[:, 1] = np.rad2deg(np.arctan2(
         velocity_n[:, 2], np.hypot(velocity_n[:, 0], velocity_n[:, 1])))

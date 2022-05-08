@@ -80,12 +80,12 @@ def test_integrate_constant_velocity():
         'roll': 1e-4, 'pitch': 1e-4, 'heading': 1e-4
     })
 
-    ref, gyro, accel = sim.constant_velocity_motion(dt, total_time,
+    ref, gyro, accel = sim.sinusoid_velocity_motion(dt, total_time,
                                                     lla0, velocity_n,
                                                     sensor_type='increment')
     run_integration_test(ref, gyro, accel, dt, 'increment', thresholds)
 
-    ref, gyro, accel = sim.constant_velocity_motion(dt, total_time,
+    ref, gyro, accel = sim.sinusoid_velocity_motion(dt, total_time,
                                                     lla0, velocity_n,
                                                     sensor_type='rate')
     run_integration_test(ref, gyro, accel, dt, 'rate', thresholds)
