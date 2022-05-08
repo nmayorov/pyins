@@ -68,34 +68,26 @@ def test_integrate_stationary():
 
 
 def test_integrate_constant_velocity():
-    total_time = 3600
     dt = 1e-1
-    n = int(total_time / dt)
+    total_time = 3600
 
     lla0 = [55.0, 37.0, 150.0]
-
-    V_n = np.empty((n, 3))
-    V_n[:, 0] = 5.0
-    V_n[:, 1] = -3.0
-    V_n[:, 2] = 0.2
-
-    rph = np.empty((n, 3))
-    rph[:, 0] = -5.0
-    rph[:, 1] = 10.0
-    rph[:, 2] = 110.0
+    velocity_n = [5.0, -3.0, 0.2]
 
     thresholds = pd.Series({
         'lat': 1, 'lon': 1, 'alt': 1,
         'VE': 1e-3, 'VN': 1e-3, 'VU': 1e-3,
-        'roll': 1e-5, 'pitch': 1e-5, 'heading': 1e-5
+        'roll': 1e-4, 'pitch': 1e-4, 'heading': 1e-4
     })
 
-    ref, gyro, accel = sim.from_velocity(dt, lla0, V_n, rph,
-                                         sensor_type='increment')
+    ref, gyro, accel = sim.constant_velocity_motion(dt, total_time,
+                                                    lla0, velocity_n,
+                                                    sensor_type='increment')
     run_integration_test(ref, gyro, accel, dt, 'increment', thresholds)
 
-    ref, gyro, accel = sim.from_velocity(dt, lla0, V_n, rph,
-                                         sensor_type='rate')
+    ref, gyro, accel = sim.constant_velocity_motion(dt, total_time,
+                                                    lla0, velocity_n,
+                                                    sensor_type='rate')
     run_integration_test(ref, gyro, accel, dt, 'rate', thresholds)
 
 
