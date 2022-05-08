@@ -235,6 +235,47 @@ def from_velocity(dt, lla0, velocity_n, rph, sensor_type='increment'):
     return from_position(dt, lla, rph, sensor_type)
 
 
+def constant_velocity_motion(dt, total_time, lla0, velocity_n,
+                             sensor_type='increment'):
+    """Generate trajectory with constant ENU velocity.
+
+    Roll is set to zero, pitch and heading angles are computed with zero
+    lateral and vertical velocity assumptions.
+
+    Parameters
+    ----------
+    dt : float
+        Time step.
+    total_time : float
+        Total motion time.
+    lla0 : array_like, shape (3,)
+        Initial latitude, longitude and altitude.
+    velocity_n : array_like, shape (3,)
+        Velocity resolved in ENU.
+    sensor_type: 'increment' or 'rate', optional
+        Type of sensor to generate. If 'increment' (default), then integrals
+        over sampling intervals are generated (in rad and m/s).
+        If 'rate', then instantaneous rate values are generated
+        (in rad/s and /m/s/s).
+
+    Returns
+    -------
+    traj : DataFrame
+        Trajectory. Contains n_points rows.
+    gyro : ndarray, shape (n_points - 1, 3)
+        Gyro readings.
+    accel : ndarray, shape (n_points - 1, 3)
+        Accelerometer readings.
+    """
+    n_points = int(total_time / dt)
+    velocity_n = np.tile(velocity_n, (n_points, 1))
+    rph = np.zeros_like(velocity_n)
+    rph[:, 1] = np.rad2deg(np.arctan2(
+        np.hypot(velocity_n[:, 0], velocity_n[:, 1]), velocity_n[:, 2]))
+    rph[:, 2] = np.rad2deg(np.arctan2(velocity_n[:, 0], velocity_n[:, 1]))
+    return from_velocity(dt, lla0, velocity_n, rph, sensor_type)
+
+
 def stationary_rotation(dt, lat, alt, Cnb, Cbs=None):
     """Simulate readings on a stationary bench.
 
