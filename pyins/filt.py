@@ -304,7 +304,7 @@ class EnuVelocityObs(Observation):
 
         z = trajectory_point[['VE', 'VN', 'VU']] - \
             self.data.loc[stamp,  ['VE', 'VN', 'VU']]
-        H = error_model.enu_velocity_jacobian(trajectory_point)
+        H = error_model.enu_velocity_error_jacobian(trajectory_point)
 
         return z, H, self.R
 
@@ -336,7 +336,7 @@ class BodyVelocityObs(Observation):
         Cnb = dcm.from_rph(trajectory_point[['roll', 'pitch', 'heading']])
         z = Cnb.transpose() @ trajectory_point[['VE', 'VN', 'VU']] - \
             self.data.loc[stamp, ['VX', 'VY', 'VZ']]
-        H = error_model.body_velocity_jacobian(trajectory_point)
+        H = error_model.body_velocity_error_jacobian(trajectory_point)
         return z, H, self.R
 
 
