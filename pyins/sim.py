@@ -172,7 +172,7 @@ class _QuadraticSpline(PPoly):
         super(_QuadraticSpline, self).__init__(c, x)
 
 
-def from_velocity(dt, lla0, V_n, rph, sensor_type='increment'):
+def from_velocity(dt, lla0, velocity_n, rph, sensor_type='increment'):
     """Generate inertial readings given velocity and attitude.
 
     Parameters
@@ -181,7 +181,7 @@ def from_velocity(dt, lla0, V_n, rph, sensor_type='increment'):
         Time step.
     lla0 : array_like, shape (3,)
         Initial values of latitude, longitude and altitude.
-    V_n : array_like, shape (n_points, 3)
+    velocity_n : array_like, shape (n_points, 3)
         Time series of East, North and vertical velocity components.
     rph : array_like, shape (n_points, 3)
         Time series of roll, pitch and heading.
@@ -203,19 +203,19 @@ def from_velocity(dt, lla0, V_n, rph, sensor_type='increment'):
     MAX_ITER = 3
     ACCURACY = 0.01
 
-    V_n = np.asarray(V_n, dtype=float)
+    velocity_n = np.asarray(velocity_n, dtype=float)
     rph = np.asarray(rph, dtype=float)
-    n_points = len(V_n)
+    n_points = len(velocity_n)
     time = np.arange(n_points) * dt
 
-    VU_spline = _QuadraticSpline(time, V_n[:, 2])
+    VU_spline = _QuadraticSpline(time, velocity_n[:, 2])
     alt_spline = VU_spline.antiderivative()
     alt = lla0[2] + alt_spline(time)
 
     lat = lat0 = np.deg2rad(lla0[0])
     for iteration in range(MAX_ITER):
         _, rn, _ = earth.principal_radii(np.rad2deg(lat), alt)
-        dlat_spline = _QuadraticSpline(time, V_n[:, 1] / rn)
+        dlat_spline = _QuadraticSpline(time, velocity_n[:, 1] / rn)
         lat_spline = dlat_spline.antiderivative()
         lat_new = lat_spline(time) + lat0
         delta = (lat - lat_new) * rn
@@ -224,7 +224,7 @@ def from_velocity(dt, lla0, V_n, rph, sensor_type='increment'):
             break
 
     _, _, rp = earth.principal_radii(np.rad2deg(lat), alt)
-    dlon_spline = _QuadraticSpline(time, V_n[:, 0] / rp)
+    dlon_spline = _QuadraticSpline(time, velocity_n[:, 0] / rp)
     lon_spline = dlon_spline.antiderivative()
 
     lla = np.empty((n_points, 3))
