@@ -1167,7 +1167,7 @@ class FeedbackFilter:
                                                       feedback_period)
 
         traj = integrator.traj.loc[record_stamps]
-        err, sd, accel_err, accel_sd, gyro_err, gyro_sd = \
+        err, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
             _compute_output_errors(traj, x, P, record_stamps, self.error_model,
                                    self.gyro_model, self.accel_model)
 
