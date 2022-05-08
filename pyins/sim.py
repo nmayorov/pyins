@@ -277,6 +277,33 @@ def constant_velocity_motion(dt, total_time, lla0, velocity_n,
     return from_velocity(dt, lla0, velocity_n, rph, sensor_type)
 
 
+def generate_position_observations(trajectory, error_sd, rng=None):
+    rng = check_random_state(rng)
+    error = error_sd * rng.randn(len(trajectory), 3)
+    lla = transform.perturb_lla(trajectory[['lat', 'lon', 'alt']],
+                                error)
+    return pd.DataFrame(data=lla, index=trajectory.index,
+                        columns=['lat', 'lon', 'alt'])
+
+
+def generate_enu_velocity_observations(trajectory, error_sd, rng=None):
+    rng = check_random_state(rng)
+    error = error_sd * rng.randn(len(trajectory), 3)
+    velocity_n = trajectory[['VE', 'VN', 'VU']] + error
+    return pd.DataFrame(data=velocity_n, index=trajectory.index,
+                        columns=['VE', 'VN', 'VU'])
+
+
+def generate_body_velocity_observations(trajectory, error_sd, rng=None):
+    rng = check_random_state(rng)
+    error = error_sd * rng.randn(len(trajectory), 3)
+    Cnb = dcm.from_rph(trajectory[['roll', 'pitch', 'heading']])
+    velocity_b = (util.mv_prod(Cnb, trajectory[['VE', 'VN', 'VU']], at=True)
+                  + error)
+    return pd.DataFrame(data=velocity_b, index=trajectory.index,
+                        columns=['VX', 'VY', 'VZ'])
+
+
 def stationary_rotation(dt, lat, alt, Cnb, Cbs=None):
     """Simulate readings on a stationary bench.
 
