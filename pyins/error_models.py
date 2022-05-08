@@ -18,7 +18,9 @@ class ErrorModel:
     DROLL = 6
     DPITCH = 7
     DHEADING = 8
+
     STATES = None
+    N_STATES = None
 
     def system_matrix(self, trajectory):
         """Compute error ODE system matrix.
