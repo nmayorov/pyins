@@ -5,7 +5,8 @@ from . import earth
 
 DEG_TO_RAD = np.pi / 180
 RAD_TO_DEG = 1 / DEG_TO_RAD
-DPH_TO_RPS = DEG_TO_RAD / 3600
+DH_TO_RS = DEG_TO_RAD / 3600
+DRH_TO_RRS = DEG_TO_RAD / 60
 
 
 def lla_to_ecef(lla):
