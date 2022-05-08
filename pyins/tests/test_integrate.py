@@ -55,7 +55,7 @@ def test_integrate_stationary():
     rph[:, 2] = 110.0
 
     thresholds = pd.Series({
-        'lat': 1e-3, 'lon': 1e-3, 'alt': 1e-2,
+        'east': 1e-3, 'north': 1e-3, 'up': 1e-2,
         'VE': 1e-6, 'VN': 1e-6, 'VU': 1e-5,
         'roll': 1e-8, 'pitch': 1e-8, 'heading': 1e-8
     })
@@ -75,7 +75,7 @@ def test_integrate_constant_velocity():
     velocity_n = [5.0, -3.0, 0.2]
 
     thresholds = pd.Series({
-        'lat': 1, 'lon': 1, 'alt': 1,
+        'east': 1, 'north': 1, 'up': 1,
         'VE': 1e-3, 'VN': 1e-3, 'VU': 1e-3,
         'roll': 1e-4, 'pitch': 1e-4, 'heading': 1e-4
     })

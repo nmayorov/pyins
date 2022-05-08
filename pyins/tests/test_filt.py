@@ -129,8 +129,8 @@ def test_FeedforwardFilter():
     x = errors.loc[3000:]
     y = res.err.loc[3000:]
 
-    assert_allclose(x.lat, y.lat, rtol=0, atol=10)
-    assert_allclose(x.lon, y.lon, rtol=0, atol=10)
+    assert_allclose(x.east, y.east, rtol=0, atol=10)
+    assert_allclose(x.north, y.north, rtol=0, atol=10)
     assert_allclose(x.VE, y.VE, rtol=0, atol=2e-2)
     assert_allclose(x.VN, y.VN, rtol=0, atol=2e-2)
     assert_allclose(x.roll, y.roll, rtol=0, atol=1e-4)
@@ -145,8 +145,8 @@ def test_FeedforwardFilter():
     x = errors
     y = res.err
 
-    assert_allclose(x.lat, y.lat, rtol=0, atol=10)
-    assert_allclose(x.lon, y.lon, rtol=0, atol=10)
+    assert_allclose(x.east, y.east, rtol=0, atol=10)
+    assert_allclose(x.north, y.north, rtol=0, atol=10)
     assert_allclose(x.VE, y.VE, rtol=0, atol=2e-2)
     assert_allclose(x.VN, y.VN, rtol=0, atol=2e-2)
     assert_allclose(x.roll, y.roll, rtol=0, atol=1e-4)
@@ -199,8 +199,8 @@ def test_FeedbackFilter():
     error = difference_trajectories(res.traj, traj)
     error = error.iloc[3000:]
 
-    assert_allclose(error.lat, 0, rtol=0, atol=10)
-    assert_allclose(error.lon, 0, rtol=0, atol=10)
+    assert_allclose(error.east, 0, rtol=0, atol=10)
+    assert_allclose(error.north, 0, rtol=0, atol=10)
     assert_allclose(error.VE, 0, rtol=0, atol=2e-2)
     assert_allclose(error.VN, 0, rtol=0, atol=2e-2)
     assert_allclose(error.heading, 0, rtol=0, atol=2e-3)
@@ -210,8 +210,8 @@ def test_FeedbackFilter():
 
     res = f.run_smoother(integrator, theta, dv, [position_obs])
     error = difference_trajectories(res.traj, traj)
-    assert_allclose(error.lat, 0, rtol=0, atol=10)
-    assert_allclose(error.lon, 0, rtol=0, atol=10)
+    assert_allclose(error.east, 0, rtol=0, atol=10)
+    assert_allclose(error.north, 0, rtol=0, atol=10)
     assert_allclose(error.VE, 0, rtol=0, atol=2e-2)
     assert_allclose(error.VN, 0, rtol=0, atol=2e-2)
     assert_allclose(error.roll, 0, rtol=0, atol=1e-4)

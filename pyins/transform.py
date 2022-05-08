@@ -111,6 +111,9 @@ def difference_trajectories(t1, t2):
         Trajectory difference. It can be interpreted as errors in `t1` relative
         to `t2`.
     """
+    OUTPUT_COLUMNS = ['east', 'north', 'up', 'VE', 'VN', 'VU',
+                      'roll', 'pitch', 'heading']
+
     diff = t1 - t2
     _, rn, rp = earth.principal_radii(0.5 * (t1.lat + t2.lat),
                                       0.5 * (t1.alt + t2.alt))
@@ -119,6 +122,9 @@ def difference_trajectories(t1, t2):
     diff.heading %= 360
     diff.heading[diff.heading < -180] += 360
     diff.heading[diff.heading > 180] -= 360
+
+    diff = diff.rename(columns={'lon': 'east', 'lat': 'north', 'alt': 'up'})
+    diff = diff[OUTPUT_COLUMNS]
 
     return diff.loc[t1.index.intersection(t2.index)]
 
@@ -141,10 +147,10 @@ def correct_traj(traj, error):
         Corrected trajectory.
     """
     traj_corr = traj.copy()
-    traj_corr['lat'] -= np.rad2deg(error.lat / earth.R0)
-    traj_corr['lon'] -= np.rad2deg(error.lon / (earth.R0 *
+    traj_corr['lat'] -= np.rad2deg(error.north / earth.R0)
+    traj_corr['lon'] -= np.rad2deg(error.east / (earth.R0 *
                                    np.cos(np.deg2rad(traj_corr['lat']))))
-    traj_corr['alt'] -= error.alt
+    traj_corr['alt'] -= error.up
     traj_corr['VE'] -= error.VE
     traj_corr['VN'] -= error.VN
     traj_corr['VU'] -= error.VU

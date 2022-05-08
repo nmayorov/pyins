@@ -366,9 +366,9 @@ def _compute_output_errors(traj, x, P, output_stamps,
     sd_y = np.diagonal(Py, axis1=1, axis2=2) ** 0.5
 
     err = pd.DataFrame(index=output_stamps)
-    err['lat'] = y[:, error_model.DRN]
-    err['lon'] = y[:, error_model.DRE]
-    err['alt'] = y[:, error_model.DRU]
+    err['east'] = y[:, error_model.DRE]
+    err['north'] = y[:, error_model.DRN]
+    err['up'] = y[:, error_model.DRU]
     err['VE'] = y[:, error_model.DVE]
     err['VN'] = y[:, error_model.DVN]
     err['VU'] = y[:, error_model.DVU]
@@ -377,9 +377,9 @@ def _compute_output_errors(traj, x, P, output_stamps,
     err['heading'] = np.rad2deg(y[:, error_model.DHEADING])
 
     sd = pd.DataFrame(index=output_stamps)
-    sd['lat'] = sd_y[:, error_model.DRN]
-    sd['lon'] = sd_y[:, error_model.DRE]
-    sd['alt'] = sd_y[:, error_model.DRU]
+    sd['east'] = sd_y[:, error_model.DRE]
+    sd['north'] = sd_y[:, error_model.DRN]
+    sd['up'] = sd_y[:, error_model.DRU]
     sd['VE'] = sd_y[:, error_model.DVE]
     sd['VN'] = sd_y[:, error_model.DVN]
     sd['VU'] = sd_y[:, error_model.DVU]

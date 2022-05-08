@@ -277,9 +277,9 @@ def propagate_errors(dt, traj,
 
     x = util.mv_prod(T, x)
     error = pd.DataFrame(index=traj.index)
-    error['lat'] = x[:, error_model.DRN]
-    error['lon'] = x[:, error_model.DRE]
-    error['alt'] = x[:, error_model.DRU]
+    error['east'] = x[:, error_model.DRE]
+    error['north'] = x[:, error_model.DRN]
+    error['up'] = x[:, error_model.DRU]
     error['VE'] = x[:, error_model.DVE]
     error['VN'] = x[:, error_model.DVN]
     error['VU'] = x[:, error_model.DVU]
