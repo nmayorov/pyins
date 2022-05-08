@@ -149,10 +149,11 @@ def correct_trajectory(trajectory, error):
     traj_corr : DataFrame
         Corrected trajectory.
     """
+    _, rn, rp = earth.principal_radii(trajectory.lat, trajectory.alt)
+
     result = trajectory.copy()
-    result['lat'] -= np.rad2deg(error.north / earth.R0)
-    result['lon'] -= np.rad2deg(error.east / (earth.R0 *
-                                   np.cos(np.deg2rad(result['lat']))))
+    result['lat'] -= np.rad2deg(error.north / rn)
+    result['lon'] -= np.rad2deg(error.east / rp)
     result['alt'] -= error.up
     result['VE'] -= error.VE
     result['VN'] -= error.VN
