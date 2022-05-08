@@ -304,6 +304,14 @@ def generate_body_velocity_observations(trajectory, error_sd, rng=None):
                         columns=['VX', 'VY', 'VZ'])
 
 
+def perturb_navigation_state(lla, velocity_n, rph, position_sd, velocity_sd,
+                             level_sd, azimuth_sd, rng=None):
+    rng = check_random_state(rng)
+    return (transform.perturb_lla(lla, position_sd * rng.randn(3)),
+            velocity_n + velocity_sd * rng.randn(3),
+            rph + [level_sd, level_sd, azimuth_sd] * rng.randn(3))
+
+
 def stationary_rotation(dt, lat, alt, Cnb, Cbs=None):
     """Simulate readings on a stationary bench.
 
