@@ -111,8 +111,8 @@ def difference_trajectories(t1, t2):
         Trajectory difference. It can be interpreted as errors in `t1` relative
         to `t2`.
     """
-    OUTPUT_COLUMNS = ['east', 'north', 'up', 'VE', 'VN', 'VU',
-                      'roll', 'pitch', 'heading']
+    TRAJECTORY_ERROR_COLUMNS = ['east', 'north', 'up', 'VE', 'VN', 'VU',
+                                'roll', 'pitch', 'heading']
 
     diff = t1 - t2
     _, rn, rp = earth.principal_radii(0.5 * (t1.lat + t2.lat),
@@ -124,7 +124,10 @@ def difference_trajectories(t1, t2):
     diff.heading[diff.heading > 180] -= 360
 
     diff = diff.rename(columns={'lon': 'east', 'lat': 'north', 'alt': 'up'})
-    diff = diff[OUTPUT_COLUMNS]
+
+    other_columns = [column for column in diff.columns
+                     if column not in TRAJECTORY_ERROR_COLUMNS]
+    diff = diff[TRAJECTORY_ERROR_COLUMNS + other_columns]
 
     return diff.loc[t1.index.intersection(t2.index)]
 
