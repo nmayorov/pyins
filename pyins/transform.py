@@ -112,9 +112,10 @@ def difference_trajectories(t1, t2):
         to `t2`.
     """
     diff = t1 - t2
-    diff['lat'] *= np.deg2rad(earth.R0)
-    diff['lon'] *= np.deg2rad(earth.R0) * np.cos(0.5 *
-                                                 np.deg2rad(t1.lat + t2.lat))
+    _, rn, rp = earth.principal_radii(0.5 * (t1.lat + t2.lat),
+                                      0.5 * (t1.alt + t2.alt))
+    diff.lat *= np.deg2rad(rn)
+    diff.lon *= np.deg2rad(rp)
     diff.heading %= 360
     diff.heading[diff.heading < -180] += 360
     diff.heading[diff.heading > 180] -= 360
