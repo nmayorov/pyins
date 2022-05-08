@@ -2,7 +2,7 @@
 from collections import OrderedDict
 import numpy as np
 import pandas as pd
-from . import error_models, kalman, util, transform
+from . import dcm, error_models, kalman, util, transform
 from .transform import correct_traj
 
 
@@ -306,6 +306,37 @@ class EnuVelocityObs(Observation):
             self.data.loc[stamp,  ['VE', 'VN', 'VU']]
         H = error_model.enu_velocity_jacobian(trajectory_point)
 
+        return z, H, self.R
+
+
+class BodyVelocityObs(Observation):
+    """Observation of velocity resolved in body frame.
+
+    Parameters
+    ----------
+    data : DataFrame
+        Must contain columns 'VX', 'VY' and 'VZ' columns.
+        Index must contain time stamps.
+    sd : float
+        Measurement accuracy in m/s.
+
+    Attributes
+    ----------
+    data : DataFrame
+        Data saved from the constructor.
+    """
+    def __init__(self, data, sd):
+        super(BodyVelocityObs, self).__init__(data)
+        self.R = sd**2 * np.eye(3)
+
+    def compute_obs(self, stamp, trajectory_point, error_model):
+        if stamp not in self.data.index:
+            return None
+
+        Cnb = dcm.from_rph(trajectory_point[['roll', 'pitch', 'heading']])
+        z = Cnb.transpose() @ trajectory_point[['VE', 'VN', 'VU']] - \
+            self.data.loc[stamp, ['VX', 'VY', 'VZ']]
+        H = error_model.body_velocity_jacobian(trajectory_point)
         return z, H, self.R
 
 
