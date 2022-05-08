@@ -205,7 +205,7 @@ class Integrator:
         traj[['VE', 'VN', 'VU']] = self.velocity_n[n_data:n_data + n_readings]
         traj[['roll', 'pitch', 'heading']] = rph
 
-        self.traj = self.traj.append(traj)
+        self.traj = pd.concat([self.traj, traj])
 
         return self.traj.iloc[-n_readings - 1:]
 
