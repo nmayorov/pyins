@@ -382,10 +382,17 @@ def _align_matrix(align_angles):
     ])
 
 
-def _apply_errors(dt, readings, scale_error, scale_asym, align, bias, noise):
+def _apply_errors(sensor_type, dt, readings, scale_error, scale_asym, align,
+                  bias, noise):
     out = util.mv_prod(align, readings)
-    out += bias * dt
-    out += noise * dt ** 0.5 * np.random.randn(*readings.shape)
+    if sensor_type == 'increment':
+        out += bias * dt
+        out += noise * dt ** 0.5 * np.random.randn(*readings.shape)
+    elif sensor_type == 'rate':
+        out += bias
+        out += noise * dt ** -0.5 * np.random.randn(*readings.shape)
+    else:
+        assert False
     scale = 1 + scale_error + scale_asym * np.sign(out)
     out *= scale
     return out
@@ -466,13 +473,15 @@ class ImuErrors:
         self.accel_align_mars = accel_align_mars
         self.Cmb = Cmb
 
-    def apply(self, dt, gyro, accel):
-        gyro_out = _apply_errors(dt, gyro, self.gyro_scale_error,
-                                 self.gyro_scale_asym, self.gyro_align,
-                                 self.gyro_bias, self.gyro_noise)
-        accel_out = _apply_errors(dt, accel, self.accel_scale_error,
-                                  self.accel_scale_asym, self.accel_align,
-                                  self.accel_bias, self.accel_noise)
+    def apply(self, dt, gyro, accel, sensor_type='increment'):
+        gyro_out = _apply_errors(sensor_type, dt, gyro,
+                                 self.gyro_scale_error, self.gyro_scale_asym,
+                                 self.gyro_align, self.gyro_bias,
+                                 self.gyro_noise)
+        accel_out = _apply_errors(sensor_type, dt, accel,
+                                  self.accel_scale_error, self.accel_scale_asym,
+                                  self.accel_align, self.accel_bias,
+                                  self.accel_noise)
 
         return gyro_out, accel_out
 
