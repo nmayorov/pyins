@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from pyins.filt import (InertialSensor, PositionObs, EnuVelocityObs,
                         FeedforwardFilter, FeedbackFilter,
-                        _refine_stamps, correct_traj)
+                        _refine_stamps, correct_trajectory)
 from pyins.error_models import propagate_errors
 from pyins import earth
 from pyins import sim
@@ -121,7 +121,7 @@ def test_FeedforwardFilter():
 
     errors = propagate_errors(dt, traj, delta_position_n, delta_velocity_n,
                               delta_rph)
-    traj_error = correct_traj(traj, -errors)
+    traj_error = correct_trajectory(traj, -errors)
 
     f = FeedforwardFilter(dt, traj, 5, 1, 0.2, 0.05)
     res = f.run(traj_error, [position_obs])

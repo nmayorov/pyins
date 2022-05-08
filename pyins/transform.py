@@ -129,14 +129,14 @@ def difference_trajectories(t1, t2):
     return diff.loc[t1.index.intersection(t2.index)]
 
 
-def correct_traj(traj, error):
+def correct_trajectory(trajectory, error):
     """Correct trajectory by estimated errors.
 
     Note that it means subtracting errors from the trajectory.
 
     Parameters
     ----------
-    traj : DataFrame
+    trajectory : DataFrame
         Trajectory.
     error : DataFrame
         Estimated errors.
@@ -146,16 +146,16 @@ def correct_traj(traj, error):
     traj_corr : DataFrame
         Corrected trajectory.
     """
-    traj_corr = traj.copy()
-    traj_corr['lat'] -= np.rad2deg(error.north / earth.R0)
-    traj_corr['lon'] -= np.rad2deg(error.east / (earth.R0 *
-                                   np.cos(np.deg2rad(traj_corr['lat']))))
-    traj_corr['alt'] -= error.up
-    traj_corr['VE'] -= error.VE
-    traj_corr['VN'] -= error.VN
-    traj_corr['VU'] -= error.VU
-    traj_corr['roll'] -= error.roll
-    traj_corr['pitch'] -= error.pitch
-    traj_corr['heading'] -= error.heading
+    result = trajectory.copy()
+    result['lat'] -= np.rad2deg(error.north / earth.R0)
+    result['lon'] -= np.rad2deg(error.east / (earth.R0 *
+                                   np.cos(np.deg2rad(result['lat']))))
+    result['alt'] -= error.up
+    result['VE'] -= error.VE
+    result['VN'] -= error.VN
+    result['VU'] -= error.VU
+    result['roll'] -= error.roll
+    result['pitch'] -= error.pitch
+    result['heading'] -= error.heading
 
-    return traj_corr.dropna()
+    return result.dropna()

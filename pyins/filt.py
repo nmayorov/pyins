@@ -3,7 +3,7 @@ from collections import OrderedDict
 import numpy as np
 import pandas as pd
 from . import dcm, error_models, kalman, util, transform
-from .transform import correct_traj
+from .transform import correct_trajectory
 
 
 class FiltResult:
@@ -711,7 +711,7 @@ class FeedforwardFilter:
                                    self.error_model, self.gyro_model,
                                    self.accel_model)
 
-        traj_corr = correct_traj(traj, err)
+        traj_corr = correct_trajectory(traj, err)
 
         return FiltResult(traj=traj_corr, err=err, sd=sd, gyro_err=gyro_err,
                           gyro_sd=gyro_sd, accel_err=accel_err,
@@ -787,7 +787,7 @@ class FeedforwardFilter:
                                    self.error_model, self.gyro_model,
                                    self.accel_model)
 
-        traj_corr = correct_traj(traj, err)
+        traj_corr = correct_trajectory(traj, err)
 
         return FiltResult(traj=traj_corr, err=err, sd=sd, gyro_err=gyro_err,
                           gyro_sd=gyro_sd, accel_err=accel_err,
@@ -1171,7 +1171,7 @@ class FeedbackFilter:
             _compute_output_errors(traj, x, P, record_stamps, self.error_model,
                                    self.gyro_model, self.accel_model)
 
-        traj_corr = correct_traj(integrator.traj, err)
+        traj_corr = correct_trajectory(integrator.traj, err)
 
         return FiltResult(traj=traj_corr, sd=sd, gyro_err=gyro_err,
                           gyro_sd=gyro_sd, accel_err=accel_err,
@@ -1246,7 +1246,7 @@ class FeedbackFilter:
             _compute_output_errors(traj, x, P, record_stamps, self.error_model,
                                    self.gyro_model, self.accel_model)
 
-        traj = correct_traj(traj, err)
+        traj = correct_trajectory(traj, err)
         xa[:, :self.error_model.N_STATES] -= x[:, :self.error_model.N_STATES]
         x[:, :self.error_model.N_STATES] = 0
 
@@ -1262,7 +1262,7 @@ class FeedbackFilter:
                                    self.error_model, self.gyro_model,
                                    self.accel_model)
 
-        traj = correct_traj(traj, err)
+        traj = correct_trajectory(traj, err)
 
         return FiltResult(traj=traj, sd=sd, gyro_err=gyro_err,
                           gyro_sd=gyro_sd, accel_err=accel_err,
