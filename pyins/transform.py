@@ -3,6 +3,11 @@ import numpy as np
 from . import earth
 
 
+DEG_TO_RAD = np.pi / 180
+RAD_TO_DEG = 1 / DEG_TO_RAD
+DPH_TO_RPS = DEG_TO_RAD / 3600
+
+
 def lla_to_ecef(lla):
     """Convert latitude, longitude, altitude to ECEF Cartesian coordinates.
 
