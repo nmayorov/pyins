@@ -180,11 +180,10 @@ class ModifiedPhiModel(ErrorModel):
 
         T = np.zeros((trajectory.shape[0], self.N_STATES, self.N_STATES))
         samples = np.arange(len(trajectory))
-        T[np.ix_(samples, self.DR, self.DR)] = np.eye(3)
-        T[np.ix_(samples, self.DV, self.DV)] = np.eye(3)
-        T[np.ix_(samples, self.DV, self.PHI)] = dcm.skew_matrix(
+        T[np.ix_(samples, self.DR_OUT, self.DR)] = np.eye(3)
+        T[np.ix_(samples, self.DV_OUT, self.DV)] = np.eye(3)
+        T[np.ix_(samples, self.DV_OUT, self.PHI)] = dcm.skew_matrix(
             trajectory[['VE', 'VN', 'VU']])
-
         T[np.ix_(samples, self.DRPH, self.PHI)] = transform.phi_to_delta_rph(
             trajectory[['roll', 'pitch', 'heading']])
 
