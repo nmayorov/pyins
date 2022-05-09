@@ -169,3 +169,44 @@ def correct_trajectory(trajectory, error):
     result['heading'] -= error.heading
 
     return result.dropna()
+
+
+def phi_to_delta_rph(rph):
+    """Compute transformation matrix relating small phi angle and rph error.
+
+    This function computes matrix `T` which relates perturbation of roll,
+    pitch and heading angles to the perturbation of the matrix
+    `exp(-phi) @ C` as::
+
+        delta_rph = T @ phi
+
+    Parameters
+    ----------
+    rph : array_like, shape (3,) or (n, 3)
+        Roll, pitch and heading.
+
+    Returns
+    -------
+    ndarray, shape (3, 3) or (n, 3, 3)
+        Transformation matrix.
+    """
+
+    rph = np.asarray(rph)
+    single = rph.ndim == 1
+    rph = np.atleast_2d(rph)
+    result = np.zeros((len(rph), 3, 3))
+
+    sin = np.sin(np.deg2rad(rph))
+    cos = np.cos(np.deg2rad(rph))
+
+    result[:, 0, 0] = -sin[:, 2] / cos[:, 1]
+    result[:, 0, 1] = -cos[:, 2] / cos[:, 1]
+
+    result[:, 1, 0] = -cos[:, 2]
+    result[:, 1, 1] = sin[:, 2]
+
+    result[:, 2, 0] = -sin[:, 2] * sin[:, 1] / cos[:, 1]
+    result[:, 2, 1] = -cos[:, 2] * sin[:, 1] / cos[:, 1]
+    result[:, 2, 2] = 1
+
+    return result[0] if single else result
