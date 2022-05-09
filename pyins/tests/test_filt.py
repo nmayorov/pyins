@@ -119,8 +119,8 @@ def test_FeedforwardFilter():
     delta_velocity_n = [1, -1, 0]
     delta_rph = [-0.02, 0.03, 0.1]
 
-    errors = propagate_errors(dt, traj, delta_position_n, delta_velocity_n,
-                              delta_rph)
+    errors, _ = propagate_errors(dt, traj, delta_position_n, delta_velocity_n,
+                                 delta_rph)
     traj_error = correct_trajectory(traj, -errors)
 
     f = FeedforwardFilter(dt, traj, 5, 1, 0.2, 0.05)
