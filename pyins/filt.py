@@ -482,8 +482,7 @@ class FeedforwardFilter:
         azimuth_sd = np.deg2rad(azimuth_sd)
 
         T = np.linalg.inv(error_model.transform_to_output(traj_ref.iloc[0]))
-        P_nav = np.zeros((error_model.N_OUTPUT_STATES,
-                          error_model.N_OUTPUT_STATES))
+        P_nav = np.zeros((error_model.N_STATES, error_model.N_STATES))
         P_nav[error_model.DRE, error_model.DRE] = pos_sd ** 2
         P_nav[error_model.DRN, error_model.DRN] = pos_sd ** 2
         P_nav[error_model.DRU, error_model.DRU] = pos_sd ** 2
@@ -850,8 +849,7 @@ class FeedbackFilter:
         level_sd = np.deg2rad(level_sd)
         azimuth_sd = np.deg2rad(azimuth_sd)
 
-        P_nav = np.zeros((error_model.N_OUTPUT_STATES,
-                          error_model.N_OUTPUT_STATES))
+        P_nav = np.zeros((error_model.N_STATES, error_model.N_STATES))
         P_nav[error_model.DRE, error_model.DRE] = pos_sd ** 2
         P_nav[error_model.DRN, error_model.DRN] = pos_sd ** 2
         P_nav[error_model.DRU, error_model.DRU] = pos_sd ** 2

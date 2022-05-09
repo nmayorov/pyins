@@ -8,7 +8,7 @@ from . import dcm, earth, util, transform
 class ErrorModel:
     """Error model interface."""
 
-    N_OUTPUT_STATES = 9
+    N_STATES = 9
     DRE = 0
     DRN = 1
     DRU = 2
@@ -20,7 +20,6 @@ class ErrorModel:
     DHEADING = 8
 
     STATES = None
-    N_STATES = None
 
     def system_matrix(self, trajectory):
         """Compute error ODE system matrix.
@@ -115,7 +114,6 @@ class ErrorModel:
 
 
 class ModifiedPhiModel(ErrorModel):
-    N_STATES = 9
     DR1 = 0
     DR2 = 1
     DR3 = 2
