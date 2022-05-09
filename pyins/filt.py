@@ -849,20 +849,20 @@ class FeedbackFilter:
         level_sd = np.deg2rad(level_sd)
         azimuth_sd = np.deg2rad(azimuth_sd)
 
-        P_nav = np.zeros((error_model.N_STATES, error_model.N_STATES))
-        P_nav[error_model.DRE, error_model.DRE] = pos_sd ** 2
-        P_nav[error_model.DRN, error_model.DRN] = pos_sd ** 2
-        P_nav[error_model.DRU, error_model.DRU] = pos_sd ** 2
-        P_nav[error_model.DVE, error_model.DVE] = vel_sd ** 2
-        P_nav[error_model.DVN, error_model.DVN] = vel_sd ** 2
-        P_nav[error_model.DVU, error_model.DVU] = vel_sd ** 2
-        P_nav[error_model.DROLL, error_model.DROLL] = level_sd ** 2
-        P_nav[error_model.DPITCH, error_model.DPITCH] = level_sd ** 2
-        P_nav[error_model.DHEADING, error_model.DHEADING] = azimuth_sd ** 2
+        P0_nav = np.zeros((error_model.N_STATES, error_model.N_STATES))
+        P0_nav[error_model.DRE, error_model.DRE] = pos_sd ** 2
+        P0_nav[error_model.DRN, error_model.DRN] = pos_sd ** 2
+        P0_nav[error_model.DRU, error_model.DRU] = pos_sd ** 2
+        P0_nav[error_model.DVE, error_model.DVE] = vel_sd ** 2
+        P0_nav[error_model.DVN, error_model.DVN] = vel_sd ** 2
+        P0_nav[error_model.DVU, error_model.DVU] = vel_sd ** 2
+        P0_nav[error_model.DROLL, error_model.DROLL] = level_sd ** 2
+        P0_nav[error_model.DPITCH, error_model.DPITCH] = level_sd ** 2
+        P0_nav[error_model.DHEADING, error_model.DHEADING] = azimuth_sd ** 2
 
         P0[n: n + n1, n: n + n1] = gyro_model.P
         P0[n + n1: n + n1 + n2, n + n1: n + n1 + n2] = accel_model.P
-        self.P_nav = P_nav
+        self.P0_nav = P0_nav
         self.P0 = P0
 
         s = 0
@@ -960,7 +960,7 @@ class FeedbackFilter:
         T = np.linalg.inv(
             self.error_model.transform_to_output(integrator.get_state()))
         Pc[:self.error_model.N_STATES, :self.error_model.N_STATES] = \
-            T @ self.P_nav @ T.transpose()
+            T @ self.P0_nav @ T.transpose()
 
         H_max = np.zeros((10, self.n_states))
 
