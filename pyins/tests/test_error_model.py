@@ -44,10 +44,10 @@ def test_propagate_errors(error_model):
     traj_c = integrator.integrate(theta, dv)
     error_true = difference_trajectories(traj_c, traj)
 
-    error_linear = error_models.propagate_errors(dt, traj, delta_position_n,
-                                                 delta_velocity_n, delta_rph,
-                                                 gyro_bias, accel_bias,
-                                                 error_model=error_model())
+    error_linear, _ = error_models.propagate_errors(dt, traj, delta_position_n,
+                                                    delta_velocity_n, delta_rph,
+                                                    gyro_bias, accel_bias,
+                                                    error_model=error_model())
 
     error_scale = np.mean(np.abs(error_true))
     rel_diff = (error_linear - error_true) / error_scale

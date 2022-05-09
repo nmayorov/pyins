@@ -378,16 +378,15 @@ def propagate_errors(dt, traj,
     for i in range(n_samples - 1):
         x[i + 1] = Phi[i].dot(x[i]) + delta_sensor[i] * dt
 
-    x = util.mv_prod(T, x)
-    error = pd.DataFrame(index=traj.index)
-    error['east'] = x[:, error_model.DRE]
-    error['north'] = x[:, error_model.DRN]
-    error['up'] = x[:, error_model.DRU]
-    error['VE'] = x[:, error_model.DVE]
-    error['VN'] = x[:, error_model.DVN]
-    error['VU'] = x[:, error_model.DVU]
-    error['roll'] = np.rad2deg(x[:, error_model.DROLL])
-    error['pitch'] = np.rad2deg(x[:, error_model.DPITCH])
-    error['heading'] = np.rad2deg(x[:, error_model.DHEADING])
+    state = pd.DataFrame(data=x, index=traj.index,
+                         columns=list(error_model.STATES.keys()))
 
-    return error
+    x_out = util.mv_prod(T, x)
+    x_out[:, error_model.DRPH] = np.rad2deg(x_out[:, error_model.DRPH])
+    error_out = pd.DataFrame(data=x_out,
+                             index=traj.index,
+                             columns=['east', 'north', 'up',
+                                      'VE', 'VN', 'VU',
+                                      'roll', 'pitch', 'heading'])
+
+    return error_out, state
