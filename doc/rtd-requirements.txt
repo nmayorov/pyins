@@ -1,5 +1,5 @@
 numpydoc==0.6
 Cython==0.23
-numpy==1.11
+numpy==1.21.0
 scipy==0.18
 pandas==0.18
