@@ -19,6 +19,10 @@ class ErrorModel:
     DPITCH = 7
     DHEADING = 8
 
+    DR_OUT = [DRE, DRN, DRU]
+    DV_OUT = [DVE, DVN, DVU]
+    DRPH = [DROLL, DPITCH, DHEADING]
+
     STATES = None
 
     def system_matrix(self, trajectory):
@@ -174,12 +178,6 @@ class ModifiedPhiModel(ErrorModel):
         if series:
             trajectory = trajectory.to_frame().transpose()
 
-        heading = np.deg2rad(trajectory.heading)
-        pitch = np.deg2rad(trajectory.pitch)
-
-        sh, ch = np.sin(heading), np.cos(heading)
-        cp, tp = np.cos(pitch), np.tan(pitch)
-
         T = np.zeros((trajectory.shape[0], self.N_STATES, self.N_STATES))
         samples = np.arange(len(trajectory))
         T[np.ix_(samples, self.DR, self.DR)] = np.eye(3)
@@ -187,13 +185,8 @@ class ModifiedPhiModel(ErrorModel):
         T[np.ix_(samples, self.DV, self.PHI)] = dcm.skew_matrix(
             trajectory[['VE', 'VN', 'VU']])
 
-        T[:, self.DHEADING, self.PHI1] = -sh * tp
-        T[:, self.DHEADING, self.PHI2] = -ch * tp
-        T[:, self.DHEADING, self.PHI3] = 1
-        T[:, self.DPITCH, self.PHI1] = -ch
-        T[:, self.DPITCH, self.PHI2] = sh
-        T[:, self.DROLL, self.PHI1] = -sh / cp
-        T[:, self.DROLL, self.PHI2] = -ch / cp
+        T[np.ix_(samples, self.DRPH, self.PHI)] = transform.phi_to_delta_rph(
+            trajectory[['roll', 'pitch', 'heading']])
 
         return T[0] if series else T
 
