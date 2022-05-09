@@ -1,12 +1,14 @@
 import numpy as np
+import pytest
 from numpy.testing import assert_allclose
-from pyins import sim
-from pyins.error_models import propagate_errors
+from pyins import error_models, sim
 from pyins.integrate import coning_sculling, Integrator
 from pyins.transform import perturb_lla, difference_trajectories
 
 
-def test_propagate_errors():
+@pytest.mark.parametrize("error_model", [error_models.ModifiedPhiModel,
+                                         error_models.ModifiedPsiModel])
+def test_propagate_errors(error_model):
     # This test is complex and hardly a unit test, but it is strong.
     # I believe it's better than a formal test.
     dt = 0.5
@@ -42,9 +44,10 @@ def test_propagate_errors():
     traj_c = integrator.integrate(theta, dv)
     error_true = difference_trajectories(traj_c, traj)
 
-    error_linear = propagate_errors(dt, traj, delta_position_n,
-                                    delta_velocity_n, delta_rph,
-                                    gyro_bias, accel_bias)
+    error_linear = error_models.propagate_errors(dt, traj, delta_position_n,
+                                                 delta_velocity_n, delta_rph,
+                                                 gyro_bias, accel_bias,
+                                                 error_model=error_model())
 
     error_scale = np.mean(np.abs(error_true))
     rel_diff = (error_linear - error_true) / error_scale
