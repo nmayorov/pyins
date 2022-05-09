@@ -1,0 +1,23 @@
+name: Build and test
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Install requirements
+      run: pip install -r requirements.txt
+
+    - name: Install package
+      run: pip install .
+
+    - name: Run tests
+      run: pytest .
