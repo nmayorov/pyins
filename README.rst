@@ -1,3 +1,5 @@
+![tests status](https://github.com/nmayorov/pyins/actions/workflows/build_and_test.yaml/badge.svg)
+
 pyins
 =====
 
