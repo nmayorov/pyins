@@ -172,6 +172,10 @@ class ModifiedPhiModel(ErrorModel):
         return F, B_gyro, B_accel
 
     def transform_to_output(self, trajectory):
+        series = isinstance(trajectory, pd.Series)
+        if series:
+            trajectory = trajectory.to_frame().transpose()
+
         heading = np.deg2rad(trajectory.heading)
         pitch = np.deg2rad(trajectory.pitch)
 
@@ -193,7 +197,7 @@ class ModifiedPhiModel(ErrorModel):
         T[:, self.DROLL, self.PHI1] = -sh / cp
         T[:, self.DROLL, self.PHI2] = -ch / cp
 
-        return T
+        return T[0] if series else T
 
     def correct_state(self, trajectory_point, error):
         Ctp = dcm.from_rv(error[self.PHI])
