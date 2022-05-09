@@ -1,4 +1,6 @@
 ![tests status](https://github.com/nmayorov/pyins/actions/workflows/build_and_test.yaml/badge.svg)
+![documentation status](https://readthedocs.org/projects/pyins/badge/?version=latest)
+
 
 pyins
 =====
