@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
-from pyins import error_models, sim
+from pyins import earth, error_models, sim, transform
 from pyins.integrate import coning_sculling, Integrator
 from pyins.transform import perturb_lla, difference_trajectories
 
@@ -9,32 +9,25 @@ from pyins.transform import perturb_lla, difference_trajectories
 @pytest.mark.parametrize("error_model", [error_models.ModifiedPhiModel,
                                          error_models.ModifiedPsiModel])
 def test_propagate_errors(error_model):
-    # This test is complex and hardly a unit test, but it is strong.
-    # I believe it's better than a formal test.
     dt = 0.5
     t = 0.5 * 3600
-    n_samples = int(t / dt)
-    lla = np.empty((n_samples, 3))
-    lla[:, 0] = 50.0
-    lla[:, 1] = 60.0
-    lla[:, 2] = 0
-    rph = np.empty((n_samples, 3))
-    rph[:, 0] = -5.0
-    rph[:, 1] = 3.0
-    rph[:, 2] = 10.0
 
-    traj, gyro, accel = sim.from_position(dt, lla, rph)
+    traj, gyro, accel = sim.sinusoid_velocity_motion(dt, t,
+                                                     [50, 60, 0],
+                                                     [-5, 10, 0.5],
+                                                     [1, 1, 0.5])
 
-    gyro_bias = np.array([1e-8, -2e-8, 3e-8])
-    accel_bias = np.array([3e-3, -4e-3, 2e-3])
+    b = 1e-2
+    gyro_bias = np.array([1, -2, 0.5]) * transform.DH_TO_RS
+    accel_bias = np.array([b, -b, 2 * b])
 
     gyro += gyro_bias * dt
     accel += accel_bias * dt
     theta, dv = coning_sculling(gyro, accel)
 
     delta_position_n = [-200, 100, 20]
-    delta_velocity_n = [1, -2, -0.5]
-    delta_rph = [0.03, -0.02, 0.01]
+    delta_velocity_n = [0.1, -0.2, -0.05]
+    delta_rph = [np.rad2deg(-2 * b / earth.G0), np.rad2deg(b / earth.G0), 0.5]
 
     lla0 = perturb_lla(traj.loc[0, ['lat', 'lon', 'alt']], delta_position_n)
     V0_n = traj.loc[0, ['VE', 'VN', 'VU']] + delta_velocity_n
