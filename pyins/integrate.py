@@ -210,9 +210,23 @@ class Integrator:
         return self.traj.iloc[-n_readings - 1:]
 
     def get_state(self):
+        """Get current integrator state.
+
+        Returns
+        -------
+        trajectory_point : pd.Series
+            Trajectory point.
+        """
         return self.traj.iloc[-1]
 
     def set_state(self, trajectory_point):
+        """Set (overwrite) the current integrator state.
+
+        Parameters
+        ----------
+        trajectory_point : pd.Series
+            Trajectory point.
+        """
         i = len(self.traj) - 1
         self.lla[i] = trajectory_point[['lat', 'lon', 'alt']]
         self.velocity_n[i] = trajectory_point[['VE', 'VN', 'VU']]
