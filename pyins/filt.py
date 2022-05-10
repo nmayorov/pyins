@@ -457,7 +457,7 @@ class FeedforwardFilter:
         n1 = gyro_model.n_states
         n2 = accel_model.n_states
 
-        states = error_model.STATES
+        states = error_model.STATES.copy()
         for name, state in gyro_model.states.items():
             states['GYRO_' + name] = n + state
         for name, state in accel_model.states.items():
@@ -869,7 +869,7 @@ class FeedbackFilter:
 
         self.q = q
 
-        states = error_model.STATES
+        states = error_model.STATES.copy()
         for name, state in gyro_model.states.items():
             states['GYRO_' + name] = n + state
         for name, state in accel_model.states.items():
