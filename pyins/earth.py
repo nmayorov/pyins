@@ -79,7 +79,7 @@ def gravity(lat, alt=0):
 
 
 def gravity_n(lat, alt):
-    """Compute gravity vector in ENU frame.
+    """Compute gravity vector in NED frame.
 
     Parameters
     ----------
@@ -139,9 +139,9 @@ def curvature_matrix(lat, alt):
     """Compute Earth curvature matrix.
 
     Curvature matrix `F` links linear displacement and angular rotation of
-    ENU frame as `rotation_n = F @ translation_n`, where `translation_n` is
-    linear translation in ENU and `rotation_n` is the corresponding small
-    rotation vector of ENU.
+    NED frame as `rotation_n = F @ translation_n`, where `translation_n` is
+    linear translation in NED and `rotation_n` is the corresponding small
+    rotation vector of NED.
 
     For example `transport_rate_n = F @ velocity_n`.
 

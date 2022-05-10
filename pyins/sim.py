@@ -241,9 +241,9 @@ def sinusoid_velocity_motion(dt, total_time, lla0, velocity_mean,
                              velocity_change_period=60,
                              velocity_change_phase_offset=[0, 90, 0],
                              sensor_type='increment'):
-    """Generate trajectory with ENU velocity changing as sinus.
+    """Generate trajectory with NED velocity changing as sinus.
 
-    The ENU velocity changes as::
+    The NED velocity changes as::
 
         V = V_mean + V_ampl * sin(2 * pi * t / period + phase_offset)
 
@@ -259,7 +259,7 @@ def sinusoid_velocity_motion(dt, total_time, lla0, velocity_mean,
     lla0 : array_like, shape (3,)
         Initial latitude, longitude and altitude.
     velocity_mean : array_like, shape (3,)
-        Mean velocity resolved in ENU.
+        Mean velocity resolved in NED.
     velocity_change_amplitude : array_like, optional
         Velocity change amplitude. Default is 0.
     velocity_change_period : float, optional
@@ -304,7 +304,7 @@ def generate_position_observations(trajectory, error_sd, rng=None):
                         columns=['lat', 'lon', 'alt'])
 
 
-def generate_enu_velocity_observations(trajectory, error_sd, rng=None):
+def generate_ned_velocity_observations(trajectory, error_sd, rng=None):
     rng = check_random_state(rng)
     error = error_sd * rng.randn(len(trajectory), 3)
     velocity_n = trajectory[['VN', 'VE', 'VD']] + error

@@ -2,11 +2,10 @@ from numpy.testing import (assert_, assert_allclose, run_module_suite,
                            assert_equal)
 import numpy as np
 import pandas as pd
-from pyins.filt import (InertialSensor, PositionObs, EnuVelocityObs,
+from pyins.filt import (InertialSensor, PositionObs,
                         FeedforwardFilter, FeedbackFilter,
                         _refine_stamps, correct_trajectory)
 from pyins.error_models import propagate_errors
-from pyins import earth
 from pyins import sim
 from pyins.strapdown import compute_theta_and_dv, StrapdownIntegrator
 from pyins.transform import perturb_lla, difference_trajectories

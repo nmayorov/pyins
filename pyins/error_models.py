@@ -82,7 +82,7 @@ class ErrorModel:
     def position_error_jacobian(self, trajectory_point):
         """Compute position error Jacobian matrix.
 
-        The position error is assumed to be resolved in ENU frame.
+        The position error is assumed to be resolved in NED frame.
 
         Parameters
         ----------
@@ -95,8 +95,8 @@ class ErrorModel:
         """
         raise NotImplementedError
 
-    def enu_velocity_error_jacobian(self, trajectory_point):
-        """Compute ENU velocity error Jacobian matrix.
+    def ned_velocity_error_jacobian(self, trajectory_point):
+        """Compute NED velocity error Jacobian matrix.
 
         Parameters
         ----------
@@ -227,7 +227,7 @@ class ModifiedPhiModel(ErrorModel):
         result[:, self.DR] = np.eye(3)
         return result
 
-    def enu_velocity_error_jacobian(self, trajectory_point):
+    def ned_velocity_error_jacobian(self, trajectory_point):
         result = np.zeros((3, self.N_STATES))
         result[:, self.DV] = np.eye(3)
         result[:, self.PHI] = dcm.skew_matrix(
@@ -347,7 +347,7 @@ class ModifiedPsiModel(ErrorModel):
         result[:, self.DR] = np.eye(3)
         return result
 
-    def enu_velocity_error_jacobian(self, trajectory_point):
+    def ned_velocity_error_jacobian(self, trajectory_point):
         result = np.zeros((3, self.N_STATES))
         result[:, self.DV] = np.eye(3)
         result[:, self.PSI] = dcm.skew_matrix(
@@ -377,9 +377,9 @@ def propagate_errors(dt, traj,
     traj : DataFrame
         Trajectory.
     delta_position_n : array_like, shape (3,)
-        Initial position errors in meters resolved in ENU.
+        Initial position errors in meters resolved in NED.
     delta_velocity_n : array_like, shape (3,)
-        Initial velocity errors resolved in ENU.
+        Initial velocity errors resolved in NED.
     delta_rph : array_like, shape (3,)
         Initial heading, pitch and roll errors.
     delta_gyro, delta_accel : float or array_like

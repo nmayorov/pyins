@@ -79,7 +79,7 @@ class StrapdownIntegrator:
     lla : array_like, shape (3,)
         Initial latitude, longitude and altitude.
     velocity_n: array_like, shape (3,)
-        Initial velocity in ENU frame.
+        Initial velocity in NED frame.
     rph : array_like, shape (3,)
         Initial heading, pitch and roll.
     stamp : int, optional

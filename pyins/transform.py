@@ -38,7 +38,7 @@ def lla_to_ecef(lla):
     return r_e.transpose()
 
 
-def perturb_lla(lla, delta_enu):
+def perturb_lla(lla, delta_ned):
     """Perturb latitude, longitude and altitude.
 
     This function recomputes linear displacements in meters to changes in a
@@ -51,8 +51,8 @@ def perturb_lla(lla, delta_enu):
     ----------
     lla : array_like, shape (3,) or (n, 3)
         Latitude, longitude and altitude.
-    delta_enu : array_like, shape (3,) or (n, 3)
-        Perturbation values in meters resolved in ENU frame.
+    delta_ned : array_like, shape (3,) or (n, 3)
+        Perturbation values in meters resolved in NED frame.
 
     Returns
     -------
@@ -60,23 +60,23 @@ def perturb_lla(lla, delta_enu):
         Perturbed values of latitude, longitude and altitude.
     """
     lla = np.asarray(lla, dtype=float)
-    delta_enu = np.asarray(delta_enu)
-    return_single = lla.ndim == 1 and delta_enu.ndim == 1
+    delta_ned = np.asarray(delta_ned)
+    return_single = lla.ndim == 1 and delta_ned.ndim == 1
 
     lla = np.atleast_2d(lla).copy()
-    delta_enu = np.atleast_2d(delta_enu)
+    delta_ned = np.atleast_2d(delta_ned)
 
     _, rn, rp = earth.principal_radii(lla[:, 0], lla[:, 2])
 
-    lla[:, 0] += np.rad2deg(delta_enu[:, 0] / rn)
-    lla[:, 1] += np.rad2deg(delta_enu[:, 1] / rp)
-    lla[:, 2] -= delta_enu[:, 2]
+    lla[:, 0] += np.rad2deg(delta_ned[:, 0] / rn)
+    lla[:, 1] += np.rad2deg(delta_ned[:, 1] / rp)
+    lla[:, 2] -= delta_ned[:, 2]
 
     return lla[0] if return_single else lla
 
 
 def difference_lla(lla1, lla2):
-    """Compute difference between lla points resolved in ENU in meters.
+    """Compute difference between lla points resolved in NED in meters.
 
     Parameters
     ----------
@@ -85,8 +85,8 @@ def difference_lla(lla1, lla2):
 
     Returns
     -------
-    difference_enu : ndarray
-        Difference in meters resolved in ENU.
+    difference_ned : ndarray
+        Difference in meters resolved in NED.
     """
     lla1 = np.asarray(lla1)
     lla2 = np.asarray(lla2)

@@ -278,8 +278,8 @@ class PositionObs(Observation):
         return z, H, self.R
 
 
-class EnuVelocityObs(Observation):
-    """Observation of velocity resolved in ENU frame.
+class NedVelocityObs(Observation):
+    """Observation of velocity resolved in NED frame.
 
     Parameters
     ----------
@@ -295,7 +295,7 @@ class EnuVelocityObs(Observation):
         Data saved from the constructor.
     """
     def __init__(self, data, sd):
-        super(EnuVelocityObs, self).__init__(data)
+        super(NedVelocityObs, self).__init__(data)
         self.R = sd**2 * np.eye(3)
 
     def compute_obs(self, stamp, trajectory_point, error_model):
@@ -304,7 +304,7 @@ class EnuVelocityObs(Observation):
 
         z = trajectory_point[['VN', 'VE', 'VD']] - \
             self.data.loc[stamp,  ['VN', 'VE', 'VD']]
-        H = error_model.enu_velocity_error_jacobian(trajectory_point)
+        H = error_model.ned_velocity_error_jacobian(trajectory_point)
 
         return z, H, self.R
 
