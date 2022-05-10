@@ -6,8 +6,16 @@ from . import dcm, earth, util, transform
 
 
 class ErrorModel:
-    """Error model interface."""
+    """Error model interface.
 
+    Attributes
+    ----------
+    N_STATES : int
+        Number of states used in error models. This value is always equal to 9.
+    STATES : OrderedDict
+        Mapping from internal error states names to their indices in the state
+        vector.
+    """
     N_STATES = 9
     DRE = 0
     DRN = 1
