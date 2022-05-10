@@ -22,8 +22,8 @@ class InsErrorModel:
     For education purposes two models implementing this interface are
     provided:
 
-        - `pyins.error_models.ModifiedPhiModel`
-        - `pyins.error_models.ModifiedPsiModel`
+        - `ModifiedPhiModel`
+        - `ModifiedPsiModel`
 
     Attributes
     ----------
