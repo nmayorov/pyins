@@ -105,6 +105,11 @@ def skew_matrix(vec):
     return result[0] if single else result
 
 
+def compute_rms(data):
+    """Compute root mean square of data along 0 axis."""
+    return np.mean(np.square(data), axis=0) ** 0.5
+
+
 class Bunch(OrderedDict):
     def __getattr__(self, name):
         try:
