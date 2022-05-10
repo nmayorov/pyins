@@ -1242,6 +1242,12 @@ class FeedbackFilter:
         Estimated trajectory errors and a history of the filter states are not
         returned because they are computed relative to partially corrected
         trajectory and are not useful for interpretation.
+
+        References
+        ----------
+        .. [1] H. E. Rauch, F. Tung and C.T. Striebel, "Maximum Likelihood
+               Estimates of Linear Dynamic Systems", AIAA Journal, Vol. 3,
+               No. 8, August 1965.
         """
         theta, dv, observations, stamps, record_stamps, feedback_period = \
             self._validate_parameters(integrator, theta, dv, observations,
