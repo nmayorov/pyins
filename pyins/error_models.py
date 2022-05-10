@@ -160,10 +160,10 @@ class ModifiedPhiModel(ErrorModel):
     def system_matrix(self, trajectory):
         n_samples = trajectory.shape[0]
 
-        V_skew = dcm.skew_matrix(trajectory[['VE', 'VN', 'VU']])
+        V_skew = dcm.skew_matrix(trajectory[['VN', 'VE', 'VD']])
         R = earth.curvature_matrix(trajectory.lat, trajectory.alt)
         Omega_n = earth.rate_n(trajectory.lat)
-        rho_n = util.mv_prod(R, trajectory[['VE', 'VN', 'VU']])
+        rho_n = util.mv_prod(R, trajectory[['VN', 'VE', 'VD']])
         g_n = earth.gravity_n(trajectory.lat, trajectory.alt)
         Cnb = dcm.from_rph(trajectory[['roll', 'pitch', 'heading']])
 
@@ -204,7 +204,7 @@ class ModifiedPhiModel(ErrorModel):
         T[np.ix_(samples, self.DR_OUT, self.DR)] = np.eye(3)
         T[np.ix_(samples, self.DV_OUT, self.DV)] = np.eye(3)
         T[np.ix_(samples, self.DV_OUT, self.PHI)] = dcm.skew_matrix(
-            trajectory[['VE', 'VN', 'VU']])
+            trajectory[['VN', 'VE', 'VD']])
         T[np.ix_(samples, self.DRPH, self.PHI)] = transform.phi_to_delta_rph(
             trajectory[['roll', 'pitch', 'heading']])
 
@@ -214,7 +214,7 @@ class ModifiedPhiModel(ErrorModel):
         Ctp = dcm.from_rv(error[self.PHI])
         lla = transform.perturb_lla(trajectory_point[['lat', 'lon', 'alt']],
                                     -error[self.DR])
-        velocity_n = Ctp @ (trajectory_point[['VE', 'VN', 'VU']]
+        velocity_n = Ctp @ (trajectory_point[['VN', 'VE', 'VD']]
                             - error[self.DV])
         rph = dcm.to_rph(
             Ctp @ dcm.from_rph(trajectory_point[['roll', 'pitch', 'heading']]))
@@ -276,10 +276,10 @@ class ModifiedPsiModel(ErrorModel):
     def system_matrix(self, trajectory):
         n_samples = trajectory.shape[0]
 
-        V_skew = dcm.skew_matrix(trajectory[['VE', 'VN', 'VU']])
+        V_skew = dcm.skew_matrix(trajectory[['VN', 'VE', 'VD']])
         R = earth.curvature_matrix(trajectory.lat, trajectory.alt)
         Omega_n = earth.rate_n(trajectory.lat)
-        rho_n = util.mv_prod(R, trajectory[['VE', 'VN', 'VU']])
+        rho_n = util.mv_prod(R, trajectory[['VN', 'VE', 'VD']])
         g_n_skew = dcm.skew_matrix(earth.gravity_n(trajectory.lat,
                                                    trajectory.alt))
         Cnb = dcm.from_rph(trajectory[['roll', 'pitch', 'heading']])
@@ -319,7 +319,7 @@ class ModifiedPsiModel(ErrorModel):
         T[np.ix_(samples, self.DR_OUT, self.DR)] = np.eye(3)
         T[np.ix_(samples, self.DV_OUT, self.DV)] = np.eye(3)
         T[np.ix_(samples, self.DV_OUT, self.PSI)] = dcm.skew_matrix(
-            trajectory[['VE', 'VN', 'VU']])
+            trajectory[['VN', 'VE', 'VD']])
 
         T_rph_phi = transform.phi_to_delta_rph(
             trajectory[['roll', 'pitch', 'heading']])
@@ -334,7 +334,7 @@ class ModifiedPsiModel(ErrorModel):
         Ctp = dcm.from_rv(error[self.PSI] + R @ error[self.DR])
         lla = transform.perturb_lla(trajectory_point[['lat', 'lon', 'alt']],
                                     -error[self.DR])
-        velocity_n = Ctp @ (trajectory_point[['VE', 'VN', 'VU']]
+        velocity_n = Ctp @ (trajectory_point[['VN', 'VE', 'VD']]
                             - error[self.DV])
         rph = dcm.to_rph(
             Ctp @ dcm.from_rph(trajectory_point[['roll', 'pitch', 'heading']]))
@@ -351,7 +351,7 @@ class ModifiedPsiModel(ErrorModel):
         result = np.zeros((3, self.N_STATES))
         result[:, self.DV] = np.eye(3)
         result[:, self.PSI] = dcm.skew_matrix(
-            trajectory_point[['VE', 'VN', 'VU']])
+            trajectory_point[['VN', 'VE', 'VD']])
         return result
 
     def body_velocity_error_jacobian(self, trajectory_point):
@@ -420,7 +420,7 @@ def propagate_errors(dt, traj,
     error_out = pd.DataFrame(data=x_out,
                              index=traj.index,
                              columns=['north', 'east', 'down',
-                                      'VE', 'VN', 'VU',
+                                      'VN', 'VE', 'VD',
                                       'roll', 'pitch', 'heading'])
 
     return error_out, state

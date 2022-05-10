@@ -103,7 +103,7 @@ class StrapdownIntegrator:
            Design Part 2: Velocity and Position Algorithms", Journal of
            Guidance, Control, and Dynamics 1998, Vol. 21, no. 2.
     """
-    TRAJECTORY_COLUMNS = ['lat', 'lon', 'alt', 'VE', 'VN', 'VU',
+    TRAJECTORY_COLUMNS = ['lat', 'lon', 'alt', 'VN', 'VE', 'VD',
                           'roll', 'pitch', 'heading']
     INITIAL_SIZE = 10000
 
@@ -169,7 +169,7 @@ class StrapdownIntegrator:
                          name='stamp')
         traj = pd.DataFrame(index=index)
         traj[['lat', 'lon', 'alt']] = self.lla[n_data:n_data + n_readings]
-        traj[['VE', 'VN', 'VU']] = self.velocity_n[n_data:n_data + n_readings]
+        traj[['VN', 'VE', 'VD']] = self.velocity_n[n_data:n_data + n_readings]
         traj[['roll', 'pitch', 'heading']] = rph
 
         self.traj = pd.concat([self.traj, traj])
@@ -196,7 +196,7 @@ class StrapdownIntegrator:
         """
         i = len(self.traj) - 1
         self.lla[i] = trajectory_point[['lat', 'lon', 'alt']]
-        self.velocity_n[i] = trajectory_point[['VE', 'VN', 'VU']]
+        self.velocity_n[i] = trajectory_point[['VN', 'VE', 'VD']]
         self.Cnb[i] = dcm.from_rph(
             trajectory_point[['roll', 'pitch', 'heading']])
         self.traj.iloc[-1] = trajectory_point

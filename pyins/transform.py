@@ -117,7 +117,7 @@ def difference_trajectories(t1, t2):
         Trajectory difference. It can be interpreted as errors in `t1` relative
         to `t2`.
     """
-    TRAJECTORY_ERROR_COLUMNS = ['north', 'east', 'down', 'VE', 'VN', 'VU',
+    TRAJECTORY_ERROR_COLUMNS = ['north', 'east', 'down', 'VN', 'VE', 'VD',
                                 'roll', 'pitch', 'heading']
 
     diff = t1 - t2
@@ -162,13 +162,8 @@ def correct_trajectory(trajectory, error):
     result['lat'] -= np.rad2deg(error.north / rn)
     result['lon'] -= np.rad2deg(error.east / rp)
     result['alt'] += error.down
-    result['VE'] -= error.VE
-    result['VN'] -= error.VN
-    result['VU'] -= error.VU
-    result['roll'] -= error.roll
-    result['pitch'] -= error.pitch
-    result['heading'] -= error.heading
-
+    result[['VN', 'VE', 'VD']] -= error[['VN', 'VE', 'VD']]
+    result[['roll', 'pitch', 'heading']] -= error[['roll', 'pitch', 'heading']]
     return result.dropna()
 
 

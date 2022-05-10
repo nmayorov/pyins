@@ -30,7 +30,7 @@ def test_propagate_errors(error_model):
     delta_rph = [np.rad2deg(-2 * b / earth.G0), np.rad2deg(b / earth.G0), 0.5]
 
     lla0 = perturb_lla(traj.loc[0, ['lat', 'lon', 'alt']], delta_position_n)
-    V0_n = traj.loc[0, ['VE', 'VN', 'VU']] + delta_velocity_n
+    V0_n = traj.loc[0, ['VN', 'VE', 'VD']] + delta_velocity_n
     rph0 = traj.loc[0, ['roll', 'pitch', 'heading']] + delta_rph
 
     integrator = StrapdownIntegrator(dt, lla0, V0_n, rph0)

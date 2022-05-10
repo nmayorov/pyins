@@ -31,7 +31,7 @@ def run_integration_test(reference_trajectory, gyro, accel, dt, sensor_type,
     init = reference_trajectory.iloc[0]
     integrator = StrapdownIntegrator(dt,
                                      init[['lat', 'lon', 'alt']],
-                                     init[['VE', 'VN', 'VU']],
+                                     init[['VN', 'VE', 'VD']],
                                      init[['roll', 'pitch', 'heading']])
     result = integrator.integrate(theta, dv)
     diff = difference_trajectories(
@@ -56,7 +56,7 @@ def test_integrate_stationary():
 
     thresholds = pd.Series({
         'north': 1e-3, 'east': 1e-3, 'down': 1e-2,
-        'VE': 1e-6, 'VN': 1e-6, 'VU': 1e-5,
+        'VN': 1e-6, 'VE': 1e-6, 'VD': 1e-5,
         'roll': 1e-8, 'pitch': 1e-8, 'heading': 1e-8
     })
 
@@ -76,7 +76,7 @@ def test_integrate_constant_velocity():
 
     thresholds = pd.Series({
         'north': 1, 'east':1, 'down': 1,
-        'VE': 1e-3, 'VN': 1e-3, 'VU': 1e-3,
+        'VN': 1e-3, 'VE': 1e-3, 'VD': 1e-3,
         'roll': 1e-4, 'pitch': 1e-4, 'heading': 1e-4
     })
 

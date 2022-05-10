@@ -101,9 +101,9 @@ def test_FeedforwardFilter():
     traj['lat'] = 50
     traj['lon'] = 60
     traj['alt'] = 100
-    traj['VE'] = 0
     traj['VN'] = 0
-    traj['VU'] = 0
+    traj['VE'] = 0
+    traj['VD'] = 0
     traj['roll'] = 0
     traj['pitch'] = 0
     traj['heading'] = 0

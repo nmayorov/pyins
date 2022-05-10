@@ -302,8 +302,8 @@ class EnuVelocityObs(Observation):
         if stamp not in self.data.index:
             return None
 
-        z = trajectory_point[['VE', 'VN', 'VU']] - \
-            self.data.loc[stamp,  ['VE', 'VN', 'VU']]
+        z = trajectory_point[['VN', 'VE', 'VD']] - \
+            self.data.loc[stamp,  ['VN', 'VE', 'VD']]
         H = error_model.enu_velocity_error_jacobian(trajectory_point)
 
         return z, H, self.R
@@ -334,7 +334,7 @@ class BodyVelocityObs(Observation):
             return None
 
         Cnb = dcm.from_rph(trajectory_point[['roll', 'pitch', 'heading']])
-        z = Cnb.transpose() @ trajectory_point[['VE', 'VN', 'VU']] - \
+        z = Cnb.transpose() @ trajectory_point[['VN', 'VE', 'VD']] - \
             self.data.loc[stamp, ['VX', 'VY', 'VZ']]
         H = error_model.body_velocity_error_jacobian(trajectory_point)
         return z, H, self.R
@@ -369,9 +369,9 @@ def _compute_output_errors(traj, x, P, output_stamps,
     err['north'] = y[:, error_model.DRN]
     err['east'] = y[:, error_model.DRE]
     err['down'] = y[:, error_model.DRD]
-    err['VE'] = y[:, error_model.DVN]
-    err['VN'] = y[:, error_model.DVE]
-    err['VU'] = y[:, error_model.DVD]
+    err['VN'] = y[:, error_model.DVN]
+    err['VE'] = y[:, error_model.DVE]
+    err['VD'] = y[:, error_model.DVD]
     err['roll'] = np.rad2deg(y[:, error_model.DROLL])
     err['pitch'] = np.rad2deg(y[:, error_model.DPITCH])
     err['heading'] = np.rad2deg(y[:, error_model.DHEADING])
@@ -380,9 +380,9 @@ def _compute_output_errors(traj, x, P, output_stamps,
     sd['north'] = sd_y[:, error_model.DRN]
     sd['east'] = sd_y[:, error_model.DRE]
     sd['down'] = sd_y[:, error_model.DRD]
-    sd['VE'] = sd_y[:, error_model.DVN]
-    sd['VN'] = sd_y[:, error_model.DVE]
-    sd['VU'] = sd_y[:, error_model.DVD]
+    sd['VN'] = sd_y[:, error_model.DVN]
+    sd['VE'] = sd_y[:, error_model.DVE]
+    sd['VD'] = sd_y[:, error_model.DVD]
     sd['roll'] = np.rad2deg(sd_y[:, error_model.DROLL])
     sd['pitch'] = np.rad2deg(sd_y[:, error_model.DPITCH])
     sd['heading'] = np.rad2deg(sd_y[:, error_model.DHEADING])

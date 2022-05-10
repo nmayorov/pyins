@@ -139,7 +139,7 @@ def from_position(dt, lla, rph, sensor_type='increment'):
 
     traj = pd.DataFrame(index=np.arange(time.shape[0]))
     traj[['lat', 'lon', 'alt']] = lla
-    traj[['VE', 'VN', 'VU']] = V
+    traj[['VN', 'VE', 'VD']] = V
     traj[['roll', 'pitch', 'heading']] = rph
     return traj, gyros, accels
 
@@ -307,16 +307,16 @@ def generate_position_observations(trajectory, error_sd, rng=None):
 def generate_enu_velocity_observations(trajectory, error_sd, rng=None):
     rng = check_random_state(rng)
     error = error_sd * rng.randn(len(trajectory), 3)
-    velocity_n = trajectory[['VE', 'VN', 'VU']] + error
+    velocity_n = trajectory[['VN', 'VE', 'VD']] + error
     return pd.DataFrame(data=velocity_n, index=trajectory.index,
-                        columns=['VE', 'VN', 'VU'])
+                        columns=['VN', 'VE', 'VD'])
 
 
 def generate_body_velocity_observations(trajectory, error_sd, rng=None):
     rng = check_random_state(rng)
     error = error_sd * rng.randn(len(trajectory), 3)
     Cnb = dcm.from_rph(trajectory[['roll', 'pitch', 'heading']])
-    velocity_b = (util.mv_prod(Cnb, trajectory[['VE', 'VN', 'VU']], at=True)
+    velocity_b = (util.mv_prod(Cnb, trajectory[['VN', 'VE', 'VD']], at=True)
                   + error)
     return pd.DataFrame(data=velocity_b, index=trajectory.index,
                         columns=['VX', 'VY', 'VZ'])
