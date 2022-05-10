@@ -3,13 +3,10 @@ from numpy.testing import (assert_, assert_allclose, run_module_suite,
 import numpy as np
 import pandas as pd
 from pyins.filt import (InertialSensor, PositionObs,
-                        FeedforwardFilter, FeedbackFilter,
-                        _refine_stamps)
+                        FeedforwardFilter, _refine_stamps)
 from pyins.error_models import propagate_errors
-from pyins import sim
-from pyins.strapdown import compute_theta_and_dv, StrapdownIntegrator
-from pyins.transform import (perturb_lla, difference_trajectories,
-                             correct_trajectory)
+from pyins import filt, sim, strapdown, transform, util
+from pyins.transform import perturb_lla, correct_trajectory
 
 
 def test_InertialSensor():
@@ -94,6 +91,92 @@ def test_refine_stamps():
     assert_equal(stamps, stamps_true)
 
 
+def test_FeedbackFilter():
+    dt = 0.1
+    rng = np.random.RandomState(0)
+
+    trajectory, gyro_true, accel_true = sim.sinusoid_velocity_motion(
+        dt, 300, [50, 60, 100], [1, -1, 0.5], [3, 3, 0.5])
+
+    position_obs = filt.PositionObs(
+        sim.generate_position_observations(trajectory.iloc[::10], 1, rng), 1)
+    ned_velocity_obs = filt.NedVelocityObs(
+        sim.generate_ned_velocity_observations(trajectory.iloc[3::10], 0.5,
+                                               rng), 0.5)
+    body_velocity_obs = filt.BodyVelocityObs(
+        sim.generate_body_velocity_observations(trajectory.iloc[6::10], 0.2,
+                                                rng), 0.2)
+
+    imu_errors = sim.ImuErrors(
+        gyro_bias=np.array([-100, 50, 40]) * transform.DH_TO_RS,
+        gyro_noise=1 * transform.DRH_TO_RRS,
+        accel_bias=[0.1, -0.1, 0.2],
+        accel_noise=1.0 / 60,
+        rng=rng)
+
+    gyro_model = filt.InertialSensor(bias=100 * transform.DH_TO_RS,
+                                     noise=1 * transform.DRH_TO_RRS)
+    accel_model = filt.InertialSensor(bias=0.1, noise=1.0 / 60)
+
+    gyro, accel = imu_errors.apply(dt, gyro_true, accel_true)
+    theta, dv = strapdown.compute_theta_and_dv(gyro, accel)
+
+    pos_sd = 10
+    vel_sd = 2
+    level_sd = 1.0
+    azimuth_sd = 5.0
+
+    lla, velocity_n, rph = sim.perturb_navigation_state(
+        trajectory.loc[0, ['lat', 'lon', 'alt']],
+        trajectory.loc[0, ['VN', 'VE', 'VD']],
+        trajectory.loc[0, ['roll', 'pitch', 'heading']],
+        pos_sd, vel_sd, level_sd, azimuth_sd,
+        rng=rng)
+
+    f = filt.FeedbackFilter(dt, pos_sd=pos_sd, vel_sd=vel_sd,
+                            azimuth_sd=azimuth_sd, level_sd=level_sd,
+                            gyro_model=gyro_model, accel_model=accel_model)
+    integrator = strapdown.StrapdownIntegrator(dt, lla, velocity_n, rph)
+
+    result = f.run(integrator, theta, dv,
+                   observations=[position_obs, ned_velocity_obs,
+                                 body_velocity_obs],
+                   feedback_period=5)
+
+    error = transform.difference_trajectories(result.trajectory, trajectory)
+
+    relative_error = error / result.sd
+    assert (util.compute_rms(relative_error) < 1.5).all()
+
+    gyro_bias_relative_error = (np.abs(result.gyro_estimates.iloc[-1] -
+                                       imu_errors.gyro_bias)
+                                / result.gyro_sd.iloc[-1])
+    assert (gyro_bias_relative_error < 2.0).all()
+
+    accel_bias_relative_error = (np.abs(result.accel_estimates.iloc[-1] -
+                                        imu_errors.accel_bias)
+                                 / result.accel_sd.iloc[-1])
+    assert (accel_bias_relative_error < 2.0).all()
+
+    result = f.run_smoother(integrator, theta, dv,
+                            observations=[position_obs, ned_velocity_obs,
+                                          body_velocity_obs],
+                            feedback_period=5)
+
+    error = transform.difference_trajectories(result.trajectory, trajectory)
+
+    relative_error = error / result.sd
+    assert (util.compute_rms(relative_error) < 1.6).all()
+
+    gyro_bias_relative_error = np.abs(result.gyro_estimates -
+                                      imu_errors.gyro_bias) / result.gyro_sd
+    assert (gyro_bias_relative_error < 2.0).all(axis=None)
+
+    accel_bias_relative_error = np.abs(result.accel_estimates -
+                                       imu_errors.accel_bias) / result.accel_sd
+    assert (accel_bias_relative_error < 2.0).all(axis=None)
+
+
 def test_FeedforwardFilter():
     # Test that the results are reasonable on a static bench.
     dt = 1
@@ -154,70 +237,6 @@ def test_FeedforwardFilter():
     assert_allclose(x.heading, y.heading, rtol=0, atol=1.5e-3)
     assert_(np.all(np.abs(res.residuals[0] < 4)))
 
-
-def test_FeedbackFilter():
-    dt = 0.9
-    trajectory = pd.DataFrame(index=np.arange(1 * 3600))
-    trajectory['lat'] = 50
-    trajectory['lon'] = 60
-    trajectory['alt'] = 100
-    trajectory['VE'] = 0
-    trajectory['VN'] = 0
-    trajectory['VU'] = 0
-    trajectory['roll'] = 0
-    trajectory['pitch'] = 0
-    trajectory['heading'] = 0
-
-    _, gyro, accel = sim.from_position(dt, trajectory[['lat', 'lon', 'alt']],
-                                       trajectory[['roll', 'pitch', 'heading']])
-    theta, dv = compute_theta_and_dv(gyro, accel)
-
-    np.random.seed(0)
-    obs_data = pd.DataFrame(index=trajectory.index[::10])
-    obs_data[['lat', 'lon', 'alt']] = perturb_lla(
-        trajectory.loc[::10, ['lat', 'lon', 'alt']],
-        10 * np.random.randn(len(obs_data), 3))
-    position_obs = PositionObs(obs_data, 10)
-
-    f = FeedbackFilter(dt, 5, 1, 0.2, 0.05)
-
-    d_lat = 5
-    d_lon = -3
-    d_alt = 0
-    d_VE = 1
-    d_VN = -1
-    d_VU = 0
-    d_r = -0.02
-    d_p = 0.03
-    d_h = 0.1
-
-    lla0 = perturb_lla(trajectory.loc[0, ['lat', 'lon', 'alt']],
-                       [d_lon, d_lat, d_alt])
-    integrator = StrapdownIntegrator(dt, lla0, [d_VE, d_VN, d_VU],
-                                     [d_r, d_p, d_h])
-    res = f.run(integrator, theta, dv, observations=[position_obs])
-    error = difference_trajectories(res.trajectory, trajectory)
-    error = error.iloc[3000:]
-
-    assert_allclose(error.east, 0, rtol=0, atol=10)
-    assert_allclose(error.north, 0, rtol=0, atol=10)
-    assert_allclose(error.VE, 0, rtol=0, atol=2e-2)
-    assert_allclose(error.VN, 0, rtol=0, atol=2e-2)
-    assert_allclose(error.heading, 0, rtol=0, atol=2e-3)
-    assert_allclose(error.pitch, 0, rtol=0, atol=1e-4)
-    assert_allclose(error.roll, 0, rtol=0, atol=1e-4)
-    assert_(np.all(np.abs(res.residuals[0] < 4)))
-
-    res = f.run_smoother(integrator, theta, dv, [position_obs])
-    error = difference_trajectories(res.trajectory, trajectory)
-    assert_allclose(error.east, 0, rtol=0, atol=10)
-    assert_allclose(error.north, 0, rtol=0, atol=10)
-    assert_allclose(error.VE, 0, rtol=0, atol=2e-2)
-    assert_allclose(error.VN, 0, rtol=0, atol=2e-2)
-    assert_allclose(error.roll, 0, rtol=0, atol=1e-4)
-    assert_allclose(error.pitch, 0, rtol=0, atol=1e-4)
-    assert_allclose(error.heading, 0, rtol=0, atol=1.5e-3)
-    assert_(np.all(np.abs(res.residuals[0] < 4)))
 
 
 if __name__ == '__main__':
