@@ -118,6 +118,19 @@ class ErrorModel:
 
 
 class ModifiedPhiModel(ErrorModel):
+    """Error model with phi-angle error and modified velocity errors.
+
+    The phi-angle is used to describe attitude errors and velocity error is
+    measured relative to the true velocity resolved in platform frame.
+    The latter trick eliminates specific force from the equations which makes
+    implementation much more convenient. See [1]_ for a detailed discussion
+    and derivation.
+
+    References
+    ----------
+    .. [1] Bruno M. Scherzinger and D.Blake Reid
+           "Modified Strapdown Inertial Navigator Error Models".
+    """
     DR1 = 0
     DR2 = 1
     DR3 = 2
@@ -221,6 +234,19 @@ class ModifiedPhiModel(ErrorModel):
 
 
 class ModifiedPsiModel(ErrorModel):
+    """Error model with psi-angle error and modified velocity errors.
+
+    The psi-angle is used to describe attitude errors and velocity error is
+    measured relative to the true velocity resolved in platform frame.
+    The latter trick eliminates specific force from the equations which makes
+    implementation much more convenient. See [1]_ for a detailed discussion
+    and derivation.
+
+    References
+    ----------
+    .. [1] Bruno M. Scherzinger and D.Blake Reid
+           "Modified Strapdown Inertial Navigator Error Models".
+    """
     DR1 = 0
     DR2 = 1
     DR3 = 2
