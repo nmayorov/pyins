@@ -372,21 +372,21 @@ def _compute_output_errors(trajectory, x, P, output_stamps,
     sd['pitch'] = np.rad2deg(sd_y[:, error_model.DPITCH])
     sd['heading'] = np.rad2deg(sd_y[:, error_model.DHEADING])
 
-    gyro_err = pd.DataFrame(index=output_stamps)
+    gyro_estimates = pd.DataFrame(index=output_stamps)
     gyro_sd = pd.DataFrame(index=output_stamps)
     n = error_model.N_STATES
     for i, name in enumerate(gyro_model.states):
-        gyro_err[name] = x[:, n + i]
+        gyro_estimates[name] = x[:, n + i]
         gyro_sd[name] = P[:, n + i, n + i] ** 0.5
 
-    accel_err = pd.DataFrame(index=output_stamps)
+    accel_estimates = pd.DataFrame(index=output_stamps)
     accel_sd = pd.DataFrame(index=output_stamps)
     ng = gyro_model.n_states
     for i, name in enumerate(accel_model.states):
-        accel_err[name] = x[:, n + ng + i]
+        accel_estimates[name] = x[:, n + ng + i]
         accel_sd[name] = P[:, n + ng + i, n + ng + i] ** 0.5
 
-    return error, sd, gyro_err, gyro_sd, accel_err, accel_sd
+    return error, sd, gyro_estimates, gyro_sd, accel_estimates, accel_sd
 
 
 class FeedforwardFilter:
@@ -675,9 +675,9 @@ class FeedforwardFilter:
             Trajectory corrected by estimated errors.
         error, sd : DataFrame
             Estimated trajectory errors and their standard deviations.
-        gyro_err, gyro_sd : DataFrame
+        gyro_estimates, gyro_sd : DataFrame
             Estimated gyro error states and their standard deviations.
-        accel_err, accel_sd : DataFrame
+        accel_estimates, accel_sd : DataFrame
             Estimated accelerometer error states and their standard deviations.
         x : ndarray, shape (n_points, n_states)
             History of the filter states.
@@ -696,7 +696,7 @@ class FeedforwardFilter:
         x, P, _, _, _, residuals = self._forward_pass(trajectory, observations,
                                                       stamps, record_stamps)
 
-        error, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
+        error, sd, gyro_estimates, gyro_sd, accel_estimates, accel_sd = \
             _compute_output_errors(self.traj_ref, x, P, record_stamps,
                                    self.error_model, self.gyro_model,
                                    self.accel_model)
@@ -704,9 +704,9 @@ class FeedforwardFilter:
         trajectory = transform.correct_trajectory(trajectory, error)
 
         return util.Bunch(trajectory=trajectory, error=error, sd=sd,
-                          gyro_err=gyro_err, gyro_sd=gyro_sd,
-                          accel_err=accel_err,
-                          accel_sd=accel_sd, x=x, P=P, residuals=residuals)
+                          gyro_estimates=gyro_estimates, gyro_sd=gyro_sd,
+                          accel_estimates=accel_estimates, accel_sd=accel_sd,
+                          x=x, P=P, residuals=residuals)
 
     def run_smoother(self, trajectory=None, observations=[], max_step=1,
                      record_stamps=None):
@@ -740,9 +740,9 @@ class FeedforwardFilter:
             stamps presented in `record_stamps`.
         error, sd : DataFrame
             Estimated trajectory errors and their standard deviations.
-        gyro_err, gyro_sd : DataFrame
+        gyro_estimates, gyro_sd : DataFrame
             Estimated gyro error states and their standard deviations.
-        accel_err, accel_sd : DataFrame
+        accel_estimates, accel_sd : DataFrame
             Estimated accelerometer error states and their standard deviations.
         x : ndarray, shape (n_points, n_states)
             History of the filter states.
@@ -774,7 +774,7 @@ class FeedforwardFilter:
         x = x[ind]
         P = P[ind]
 
-        error, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
+        error, sd, gyro_estimates, gyro_sd, accel_estimates, accel_sd = \
             _compute_output_errors(self.traj_ref, x, P, record_stamps,
                                    self.error_model, self.gyro_model,
                                    self.accel_model)
@@ -782,8 +782,8 @@ class FeedforwardFilter:
         trajectory = transform.correct_trajectory(trajectory, error)
 
         return util.Bunch(trajectory=trajectory, error=error, sd=sd,
-                          gyro_err=gyro_err, gyro_sd=gyro_sd,
-                          accel_err=accel_err, accel_sd=accel_sd,
+                          gyro_estimates=gyro_estimates, gyro_sd=gyro_sd,
+                          accel_estimates=accel_estimates, accel_sd=accel_sd,
                           x=x, P=P, residuals=residuals)
 
 
@@ -1138,9 +1138,9 @@ class FeedbackFilter:
             stamps presented in `record_stamps`.
         sd : DataFrame
             Estimated standard deviations of trajectory errors.
-        gyro_err, gyro_sd : DataFrame
+        gyro_estimates, gyro_sd : DataFrame
             Estimated gyro error states and their standard deviations.
-        accel_err, accel_sd : DataFrame
+        accel_estimates, accel_sd : DataFrame
             Estimated accelerometer error states and their standard deviations.
         P : ndarray, shape (n_points, n_states, n_states)
             History of the filter covariance.
@@ -1166,16 +1166,17 @@ class FeedbackFilter:
                                                       feedback_period)
 
         trajectory = integrator.trajectory.loc[record_stamps]
-        error, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
+        error, sd, gyro_estimates, gyro_sd, accel_estimates, accel_sd = \
             _compute_output_errors(trajectory, x, P, record_stamps,
                                    self.error_model, self.gyro_model,
                                    self.accel_model)
 
         trajectory = transform.correct_trajectory(integrator.trajectory, error)
 
-        return util.Bunch(trajectory=trajectory, sd=sd, gyro_err=gyro_err,
-                          gyro_sd=gyro_sd, accel_err=accel_err,
-                          accel_sd=accel_sd, P=P, residuals=residuals)
+        return util.Bunch(trajectory=trajectory, sd=sd,
+                          gyro_estimates=gyro_estimates, gyro_sd=gyro_sd,
+                          accel_estimates=accel_estimates, accel_sd=accel_sd,
+                          P=P, residuals=residuals)
 
     def run_smoother(self, integrator, theta, dv, observations=[], max_step=1,
                      feedback_period=500, record_stamps=None):
@@ -1215,9 +1216,9 @@ class FeedbackFilter:
             stamps presented in `record_stamps`.
         sd : DataFrame
             Estimated trajectory errors and their standard deviations.
-        gyro_err, gyro_sd : DataFrame
+        gyro_estimates, gyro_sd : DataFrame
             Estimated gyro error states and their standard deviations.
-        accel_err, accel_sd : DataFrame
+        accel_estimates, accel_sd : DataFrame
             Estimated accelerometer error states and their standard deviations.
         P : ndarray, shape (n_points, n_states, n_states)
             History of the filter covariance.
@@ -1248,7 +1249,7 @@ class FeedbackFilter:
             feedback_period, data_for_backward=True)
 
         trajectory = integrator.trajectory.loc[record_stamps]
-        error, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
+        error, sd, gyro_estimates, gyro_sd, accel_estimates, accel_sd = \
             _compute_output_errors(trajectory, x, P, record_stamps,
                                    self.error_model, self.gyro_model,
                                    self.accel_model)
@@ -1264,13 +1265,14 @@ class FeedbackFilter:
         P = P[ind]
         trajectory = trajectory.iloc[ind]
 
-        error, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
+        error, sd, gyro_estimates, gyro_sd, accel_estimates, accel_sd = \
             _compute_output_errors(trajectory, x, P, record_stamps[ind],
                                    self.error_model, self.gyro_model,
                                    self.accel_model)
 
         trajectory = transform.correct_trajectory(trajectory, error)
 
-        return util.Bunch(trajectory=trajectory, sd=sd, gyro_err=gyro_err,
-                          gyro_sd=gyro_sd, accel_err=accel_err,
-                          accel_sd=accel_sd, P=P, residuals=residuals)
+        return util.Bunch(trajectory=trajectory, sd=sd,
+                          gyro_estimates=gyro_estimates, gyro_sd=gyro_sd,
+                          accel_estimates=accel_estimates, accel_sd=accel_sd,
+                          P=P, residuals=residuals)
