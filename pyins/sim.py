@@ -215,7 +215,7 @@ def from_velocity(dt, lla0, velocity_n, rph, sensor_type='increment'):
 
     lat = lat0 = np.deg2rad(lla0[0])
     for iteration in range(MAX_ITER):
-        _, rn, _ = earth.principal_radii(np.rad2deg(lat), alt)
+        rn, _, _ = earth.principal_radii(np.rad2deg(lat), alt)
         dlat_spline = _QuadraticSpline(time, velocity_n[:, 0] / rn)
         lat_spline = dlat_spline.antiderivative()
         lat_new = lat_spline(time) + lat0

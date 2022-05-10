@@ -30,7 +30,7 @@ def lla_to_ecef(lla):
     sin_lon = np.sin(np.deg2rad(lon))
     cos_lon = np.cos(np.deg2rad(lon))
 
-    re, _, _ = earth.principal_radii(lat, 0)
+    _, re, _ = earth.principal_radii(lat, 0)
     r_e = np.empty((3,) + lat.shape)
     r_e[0] = (re + alt) * cos_lat * cos_lon
     r_e[1] = (re + alt) * cos_lat * sin_lon
@@ -67,7 +67,7 @@ def perturb_lla(lla, delta_ned):
     lla = np.atleast_2d(lla).copy()
     delta_ned = np.atleast_2d(delta_ned)
 
-    _, rn, rp = earth.principal_radii(lla[:, 0], lla[:, 2])
+    rn, _, rp = earth.principal_radii(lla[:, 0], lla[:, 2])
 
     lla[:, 0] += np.rad2deg(delta_ned[:, 0] / rn)
     lla[:, 1] += np.rad2deg(delta_ned[:, 1] / rp)
@@ -94,7 +94,7 @@ def difference_lla(lla1, lla2):
     single = lla1.ndim == 1 and lla2.ndim == 1
     lla1 = np.atleast_2d(lla1)
     lla2 = np.atleast_2d(lla2)
-    _, rn, rp = earth.principal_radii(0.5 * (lla1[:, 0] + lla2[:, 0]),
+    rn, _, rp = earth.principal_radii(0.5 * (lla1[:, 0] + lla2[:, 0]),
                                       0.5 * (lla1[:, 2] + lla2[:, 2]))
     diff = lla1 - lla2
     result = np.empty_like(diff)
@@ -122,7 +122,7 @@ def difference_trajectories(t1, t2):
                                 'roll', 'pitch', 'heading']
 
     diff = t1 - t2
-    _, rn, rp = earth.principal_radii(0.5 * (t1.lat + t2.lat),
+    rn, _, rp = earth.principal_radii(0.5 * (t1.lat + t2.lat),
                                       0.5 * (t1.alt + t2.alt))
     diff.lat *= np.deg2rad(rn)
     diff.lon *= np.deg2rad(rp)
@@ -157,7 +157,7 @@ def correct_trajectory(trajectory, error):
     traj_corr : DataFrame
         Corrected trajectory.
     """
-    _, rn, rp = earth.principal_radii(trajectory.lat, trajectory.alt)
+    rn, _, rp = earth.principal_radii(trajectory.lat, trajectory.alt)
 
     result = trajectory.copy()
     result['lat'] -= np.rad2deg(error.north / rn)

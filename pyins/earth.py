@@ -32,10 +32,10 @@ def principal_radii(lat, alt):
 
     Returns
     -------
-    re : ndarray
-        Principle radius in East direction.
     rn : ndarray
         Principle radius in North direction.
+    re : ndarray
+        Principle radius in East direction.
     rp : ndarray
         Radius of cross-section along the parallel.
 
@@ -51,7 +51,7 @@ def principal_radii(lat, alt):
     re = R0 / np.sqrt(x)
     rn = re * (1 - E2) / x
 
-    return re + alt, rn + alt, (re + alt) * cos_lat
+    return rn + alt, re + alt, (re + alt) * cos_lat
 
 
 def gravity(lat, alt=0):
@@ -157,7 +157,7 @@ def curvature_matrix(lat, alt):
     F: ndarray, shape (n, 3, 3)
         Curvature matrix.
     """
-    re, rn, _ = principal_radii(lat, alt)
+    rn, re, _ = principal_radii(lat, alt)
     n = 1 if re.ndim == 0 else len(re)
 
     result = np.zeros((n, 3, 3))
