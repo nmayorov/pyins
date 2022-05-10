@@ -43,7 +43,7 @@ class ErrorModel:
 
         Returns
         -------
-        system_matrix : ndarray, shape (n_points, n_states, n_states)
+        system_matrix : ndarray, shape (n_points, N_STATES, N_STATES)
         """
         raise NotImplementedError
 
@@ -57,7 +57,7 @@ class ErrorModel:
 
         Returns
         -------
-        transform_matrix : ndarray, shape (n_points, n_states, n_states)
+        transform_matrix : ndarray, shape (n_points, N_STATES, N_STATES)
         """
         raise NotImplementedError
 
@@ -70,7 +70,7 @@ class ErrorModel:
             Point of trajectory.
 
         error : ndarray
-            Estimates errors. First n_states components are assumed to
+            Estimates errors. First N_STATES components are assumed to
             contain error states.
 
         Returns
@@ -91,7 +91,7 @@ class ErrorModel:
 
         Returns
         -------
-        jacobian : ndarray, shape (3, n_states)
+        jacobian : ndarray, shape (3, N_STATES)
         """
         raise NotImplementedError
 
@@ -105,7 +105,7 @@ class ErrorModel:
 
         Returns
         -------
-        jacobian : ndarray, shape (3, n_states)
+        jacobian : ndarray, shape (3, N_STATES)
         """
 
         raise NotImplementedError
@@ -120,7 +120,7 @@ class ErrorModel:
 
         Returns
         -------
-        jacobian : ndarray, shape (3, n_states)
+        jacobian : ndarray, shape (3, N_STATES)
         """
         raise NotImplementedError
 
