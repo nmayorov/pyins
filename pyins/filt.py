@@ -229,7 +229,7 @@ class Observation:
             Time stamp.
         trajectory_point : Series
             Point of INS trajectory at `stamp`.
-        error_model : ErrorModel
+        error_model : InsErrorModel
             Error model object.
 
         Returns

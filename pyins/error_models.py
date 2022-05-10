@@ -1,4 +1,4 @@
-"""Navigation error models to use in EKF-like estimation filters."""
+"""INS error models to use in EKF-like estimation filters."""
 from collections import OrderedDict
 import numpy as np
 import pandas as pd
@@ -6,16 +6,32 @@ from scipy.spatial.transform import Rotation
 from . import earth, util, transform
 
 
-class ErrorModel:
-    """Error model interface.
+class InsErrorModel:
+    """INS error model interface.
+
+    INS error model is a system of non-stationary linear differential equations
+    which describe time evolution on INS errors. The system matrix depends
+    on the navigation state (trajectory).
+
+    We consider error models consisting of 9 total states: 3 for position,
+    velocity and attitude errors.
+
+    The states can be selected in different  manners and several error models
+    were proposed in the literature.
+
+    For education purposes two models implementing this interface are
+    provided:
+
+        - `pyins.error_models.ModifiedPhiModel`
+        - `pyins.error_models.ModifiedPsiModel`
 
     Attributes
     ----------
     N_STATES : int
         Number of states used in error models. This value is always equal to 9.
     STATES : OrderedDict
-        Mapping from internal error states names to their indices in the state
-        vector.
+        Mapping from the internal error states names to their indices in the
+        state vector.
     """
     N_STATES = 9
     DRN = 0
@@ -35,7 +51,7 @@ class ErrorModel:
     STATES = None
 
     def system_matrix(self, trajectory):
-        """Compute error ODE system matrix.
+        """Compute the system matrix.
 
         Parameters
         ----------
@@ -49,16 +65,16 @@ class ErrorModel:
         raise NotImplementedError
 
     def transform_to_output(self, trajectory):
-        """Compute matrix which transform internal states into output states.
+        """Compute matrix transforming the internal states into output states.
 
         Parameters
         ----------
-        trajectory : pd.DataFrame
-            Trajectory.
+        trajectory : pd.DataFrame or pd.Series
+            Trajectory or a single trajectory point.
 
         Returns
         -------
-        transform_matrix : ndarray, shape (n_points, N_STATES, N_STATES)
+        transform_matrix : ndarray, shape (N_STATES, N_STATES) or (n_points, N_STATES, N_STATES)
         """
         raise NotImplementedError
 
@@ -69,7 +85,6 @@ class ErrorModel:
         ----------
         trajectory_point : pd.Series
             Point of trajectory.
-
         error : ndarray
             Estimates errors. First N_STATES components are assumed to
             contain error states.
@@ -83,7 +98,8 @@ class ErrorModel:
     def position_error_jacobian(self, trajectory_point):
         """Compute position error Jacobian matrix.
 
-        The position error is assumed to be resolved in NED frame.
+        This is the matrix which linearly relates the position error in
+        NED frame and the internal error state vector.
 
         Parameters
         ----------
@@ -98,6 +114,9 @@ class ErrorModel:
 
     def ned_velocity_error_jacobian(self, trajectory_point):
         """Compute NED velocity error Jacobian matrix.
+
+        This is the matrix which linearly relates the velocity error in
+        NED frame and the internal error state vector.
 
         Parameters
         ----------
@@ -114,6 +133,9 @@ class ErrorModel:
     def body_velocity_error_jacobian(self, trajectory_point):
         """Compute body velocity error Jacobian matrix.
 
+        This is the matrix which linearly relates the velocity error in
+        body frame and the internal error state vector.
+
         Parameters
         ----------
         trajectory_point : pd.Series
@@ -126,13 +148,13 @@ class ErrorModel:
         raise NotImplementedError
 
 
-class ModifiedPhiModel(ErrorModel):
+class ModifiedPhiModel(InsErrorModel):
     """Error model with phi-angle error and modified velocity errors.
 
     The phi-angle is used to describe attitude errors and velocity error is
-    measured relative to the true velocity resolved in platform frame.
+    measured relative to the true velocity resolved in the platform frame.
     The latter trick eliminates specific force from the equations which makes
-    implementation much more convenient. See [1]_ for a detailed discussion
+    the implementation much more convenient. See [1]_ for a detailed discussion
     and derivation.
 
     References
@@ -243,13 +265,13 @@ class ModifiedPhiModel(ErrorModel):
         return result
 
 
-class ModifiedPsiModel(ErrorModel):
+class ModifiedPsiModel(InsErrorModel):
     """Error model with psi-angle error and modified velocity errors.
 
     The psi-angle is used to describe attitude errors and velocity error is
-    measured relative to the true velocity resolved in platform frame.
+    measured relative to the true velocity resolved in the platform frame.
     The latter trick eliminates specific force from the equations which makes
-    implementation much more convenient. See [1]_ for a detailed discussion
+    the implementation much more convenient. See [1]_ for a detailed discussion
     and derivation.
 
     References
@@ -389,7 +411,7 @@ def propagate_errors(dt, traj,
     delta_gyro, delta_accel : float or array_like
         Gyro and accelerometer errors (in SI units). Can be constant or
         specified for each time stamp in `traj`.
-    error_model : ErrorModel
+    error_model : InsErrorModel
         Error model object to use for the propagation.
 
     Returns
