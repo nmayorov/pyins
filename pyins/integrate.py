@@ -5,17 +5,15 @@ from . import dcm
 from ._integrate import integrate_fast
 
 
-def compute_theta_and_dv(gyro, accel, order=1, dt=None):
+def compute_theta_and_dv(gyro, accel, dt=None):
     """Compute attitude and velocity increments from IMU readings.
 
     This function transforms raw gyro and accelerometer readings into
     rotation vectors and velocity increments by applying coning and sculling
     corrections and accounting for IMU rotation during a sampling period.
 
-    The algorithm assumes a polynomial model for the angular velocity and the
-    specific force, fitting coefficients by considering previous time
-    intervals. The algorithm for a linear approximation is well known and
-    described in [1]_ and [2]_.
+    The algorithm assumes a linear model for the angular velocity and the
+    specific force described in [1]_ and [2]_.
 
     Parameters
     ----------
@@ -23,10 +21,6 @@ def compute_theta_and_dv(gyro, accel, order=1, dt=None):
         Gyro readings.
     accel : array_like, shape (n_readings, 3)
         Accelerometer readings.
-    order : {0, 1, 2}, optional
-        Angular velocity and specific force polynomial model order.
-        Note that 0 means not applying non-commutative corrections at all.
-        Default is 1.
     dt : float or None, optional
         If None (default), `gyro` and `accel` are assumed to contain integral
         increments. Float is interpreted as the sampling rate of rate sensors.
@@ -47,9 +41,6 @@ def compute_theta_and_dv(gyro, accel, order=1, dt=None):
            Design Part 2: Velocity and Position Algorithms", Journal of
            Guidance, Control, and Dynamics 1998, Vol. 21, no. 2.
     """
-    if order not in [0, 1, 2]:
-        raise ValueError("`order` must be 1, 2 or 3.")
-
     gyro = np.asarray(gyro)
     accel = np.asarray(accel)
 
@@ -61,42 +52,18 @@ def compute_theta_and_dv(gyro, accel, order=1, dt=None):
         alpha = (a_gyro + 0.5 * b_gyro) * dt
         dv = (a_accel + 0.5 * b_accel) * dt
 
-        if order == 0:
-            coning = 0
-            sculling = 0
-        else:
-            coning = np.cross(a_gyro, b_gyro) * dt**2 / 12
-            sculling = (np.cross(a_gyro, b_accel) +
-                        np.cross(a_accel, b_gyro)) * dt**2/12
+        coning = np.cross(a_gyro, b_gyro) * dt**2 / 12
+        sculling = (np.cross(a_gyro, b_accel) +
+                    np.cross(a_accel, b_gyro)) * dt**2/12
 
         return alpha + coning, dv + sculling + 0.5 * np.cross(alpha, dv)
 
-    if order == 0:
-        coning = 0
-        sculling = 0
-    elif order == 1:
-        coning = np.vstack((np.zeros(3), np.cross(gyro[:-1], gyro[1:]) / 12))
-        sculling = np.vstack((np.zeros(3),
-                             (np.cross(gyro[:-1], accel[1:]) +
-                              np.cross(accel[:-1], gyro[1:])) / 12))
-    elif order == 2:
-        coning = (-121 * np.cross(gyro[2:], gyro[1:-1]) +
-                  31 * np.cross(gyro[2:], gyro[:-2]) -
-                  np.cross(gyro[1:-1], gyro[:-2])) / 720
-        sculling = (-121 * np.cross(gyro[2:], accel[1:-1]) +
-                    31 * np.cross(gyro[2:], accel[:-2]) -
-                    np.cross(gyro[1:-1], accel[:-2]) -
-                    121 * np.cross(accel[2:], gyro[1:-1]) +
-                    31 * np.cross(accel[2:], gyro[:-2]) -
-                    np.cross(accel[1:-1], gyro[:-2])) / 720
-        coning = np.vstack((np.zeros((2, 3)), coning))
-        sculling = np.vstack((np.zeros((2, 3)), sculling))
-    else:
-        assert False
+    coning = np.vstack((np.zeros(3), np.cross(gyro[:-1], gyro[1:]) / 12))
+    sculling = np.vstack((np.zeros(3),
+                          (np.cross(gyro[:-1], accel[1:]) +
+                           np.cross(accel[:-1], gyro[1:])) / 12))
 
-    rc = 0.5 * np.cross(gyro, accel)
-
-    return gyro + coning, accel + sculling + rc
+    return gyro + coning, accel + sculling + 0.5 * np.cross(gyro, accel)
 
 
 class Integrator:
