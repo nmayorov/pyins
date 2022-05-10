@@ -1,7 +1,5 @@
 build
 .idea
-doc/_build
-doc/generated
 examples/.ipynb_checkpoints
 
 *.c
