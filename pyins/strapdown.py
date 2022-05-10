@@ -82,8 +82,6 @@ class StrapdownIntegrator:
         Initial velocity in NED frame.
     rph : array_like, shape (3,)
         Initial heading, pitch and roll.
-    stamp : int, optional
-        Time stamp of the initial point. Default is 0.
 
     Attributes
     ----------
@@ -107,7 +105,7 @@ class StrapdownIntegrator:
                           'roll', 'pitch', 'heading']
     INITIAL_SIZE = 10000
 
-    def __init__(self, dt, lla, velocity_n, rph, stamp=0):
+    def __init__(self, dt, lla, velocity_n, rph):
         self.dt = dt
 
         self.lla = np.empty((self.INITIAL_SIZE, 3))
@@ -116,19 +114,19 @@ class StrapdownIntegrator:
 
         self.trajectory = None
 
-        self._init_values = [lla, velocity_n, rph, stamp]
+        self._init_values = [lla, velocity_n, rph]
         self.reset()
 
     def reset(self):
         """Clear computed trajectory except the initial point."""
-        lla, velocity_n, rph, stamp = self._init_values
+        lla, velocity_n, rph = self._init_values
         self.lla[0] = lla
         self.velocity_n[0] = velocity_n
         self.Cnb[0] = transform.mat_from_rph(rph)
         self.trajectory = pd.DataFrame(
             data=np.atleast_2d(np.hstack((lla, velocity_n, rph))),
             columns=self.TRAJECTORY_COLUMNS,
-            index=pd.Index([stamp], name='stamp'))
+            index=pd.Index([0], name='stamp'))
 
     def integrate(self, theta, dv):
         """Integrate inertial readings.
