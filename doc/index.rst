@@ -29,8 +29,7 @@ It is highly recommended to start with reading :ref:`design`.
 .. toctree::
    :caption: Context
    :maxdepth: 1
-   
-   install   
+
    design
    tutorial
    examples
