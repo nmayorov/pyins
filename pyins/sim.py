@@ -8,16 +8,6 @@ from scipy._lib._util import check_random_state
 from . import earth, transform, util
 
 
-#: Degrees per hour to radians per second (SI units)
-DH2SI = np.pi / (180 * 3600)
-#: Radians per second (SI units) to degrees per hour.
-SI2DH = 1 / DH2SI
-#: Degrees per root hour to radians per root second (SI units).
-DRH2SI = np.pi / (180 * 60)
-#: Radians per root second (SI units) to degrees per root hour.
-SI2DRH = 1 / DRH2SI
-
-
 def _compute_increment_readings(dt, a, b, c, d, e):
     ab = np.cross(a, b)
     ac = np.cross(a, c)
