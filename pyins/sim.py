@@ -74,7 +74,7 @@ def from_position(dt, lla, rph, sensor_type='increment'):
 
     Returns
     -------
-    traj : DataFrame
+    trajectory : DataFrame
         Trajectory. Contains n_points rows.
     gyro : ndarray, shape (n_points - 1, 3) or (n_points, 3)
         Gyro readings.
@@ -127,11 +127,11 @@ def from_position(dt, lla, rph, sensor_type='increment'):
     else:
         assert False
 
-    traj = pd.DataFrame(index=np.arange(time.shape[0]))
-    traj[['lat', 'lon', 'alt']] = lla
-    traj[['VN', 'VE', 'VD']] = V
-    traj[['roll', 'pitch', 'heading']] = rph
-    return traj, gyros, accels
+    trajectory = pd.DataFrame(index=np.arange(time.shape[0]))
+    trajectory[['lat', 'lon', 'alt']] = lla
+    trajectory[['VN', 'VE', 'VD']] = V
+    trajectory[['roll', 'pitch', 'heading']] = rph
+    return trajectory, gyros, accels
 
 
 class _QuadraticSpline(PPoly):
@@ -184,7 +184,7 @@ def from_velocity(dt, lla0, velocity_n, rph, sensor_type='increment'):
 
     Returns
     -------
-    traj : DataFrame
+    trajectory : DataFrame
         Trajectory. Contains n_points rows.
     gyro : ndarray, shape (n_points - 1, 3)
         Gyro readings.
@@ -266,7 +266,7 @@ def sinusoid_velocity_motion(dt, total_time, lla0, velocity_mean,
 
     Returns
     -------
-    traj : DataFrame
+    trajectory : DataFrame
         Trajectory. Contains n_points rows.
     gyro : ndarray, shape (n_points - 1, 3)
         Gyro readings.

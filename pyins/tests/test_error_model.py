@@ -12,10 +12,8 @@ def test_propagate_errors(error_model):
     dt = 0.5
     t = 0.5 * 3600
 
-    traj, gyro, accel = sim.sinusoid_velocity_motion(dt, t,
-                                                     [50, 60, 0],
-                                                     [-5, 10, 0.5],
-                                                     [1, 1, 0.5])
+    trajectory, gyro, accel = sim.sinusoid_velocity_motion(
+        dt, t, [50, 60, 0], [-5, 10, 0.5], [1, 1, 0.5])
 
     b = 1e-2
     gyro_bias = np.array([1, -2, 0.5]) * transform.DH_TO_RS
@@ -29,15 +27,17 @@ def test_propagate_errors(error_model):
     delta_velocity_n = [0.1, -0.2, -0.05]
     delta_rph = [np.rad2deg(-2 * b / earth.G0), np.rad2deg(b / earth.G0), 0.5]
 
-    lla0 = perturb_lla(traj.loc[0, ['lat', 'lon', 'alt']], delta_position_n)
-    V0_n = traj.loc[0, ['VN', 'VE', 'VD']] + delta_velocity_n
-    rph0 = traj.loc[0, ['roll', 'pitch', 'heading']] + delta_rph
+    lla0 = perturb_lla(trajectory.loc[0, ['lat', 'lon', 'alt']],
+                       delta_position_n)
+    V0_n = trajectory.loc[0, ['VN', 'VE', 'VD']] + delta_velocity_n
+    rph0 = trajectory.loc[0, ['roll', 'pitch', 'heading']] + delta_rph
 
     integrator = StrapdownIntegrator(dt, lla0, V0_n, rph0)
     traj_c = integrator.integrate(theta, dv)
-    error_true = difference_trajectories(traj_c, traj)
+    error_true = difference_trajectories(traj_c, trajectory)
 
-    error_linear, _ = error_models.propagate_errors(dt, traj, delta_position_n,
+    error_linear, _ = error_models.propagate_errors(dt, trajectory,
+                                                    delta_position_n,
                                                     delta_velocity_n, delta_rph,
                                                     gyro_bias, accel_bias,
                                                     error_model=error_model())

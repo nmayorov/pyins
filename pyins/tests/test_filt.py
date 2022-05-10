@@ -96,21 +96,21 @@ def test_refine_stamps():
 def test_FeedforwardFilter():
     # Test that the results are reasonable on a static bench.
     dt = 1
-    traj = pd.DataFrame(index=np.arange(1 * 3600))
-    traj['lat'] = 50
-    traj['lon'] = 60
-    traj['alt'] = 100
-    traj['VN'] = 0
-    traj['VE'] = 0
-    traj['VD'] = 0
-    traj['roll'] = 0
-    traj['pitch'] = 0
-    traj['heading'] = 0
+    trajectory = pd.DataFrame(index=np.arange(1 * 3600))
+    trajectory['lat'] = 50
+    trajectory['lon'] = 60
+    trajectory['alt'] = 100
+    trajectory['VN'] = 0
+    trajectory['VE'] = 0
+    trajectory['VD'] = 0
+    trajectory['roll'] = 0
+    trajectory['pitch'] = 0
+    trajectory['heading'] = 0
 
     np.random.seed(1)
-    obs_data = pd.DataFrame(index=traj.index[::10])
+    obs_data = pd.DataFrame(index=trajectory.index[::10])
     obs_data[['lat', 'lon', 'alt']] = perturb_lla(
-        traj.loc[::10, ['lat', 'lon', 'alt']],
+        trajectory.loc[::10, ['lat', 'lon', 'alt']],
         10 * np.random.randn(len(obs_data), 3))
     position_obs = PositionObs(obs_data, 10)
 
@@ -118,11 +118,11 @@ def test_FeedforwardFilter():
     delta_velocity_n = [1, -1, 0]
     delta_rph = [-0.02, 0.03, 0.1]
 
-    errors, _ = propagate_errors(dt, traj, delta_position_n, delta_velocity_n,
-                                 delta_rph)
-    traj_error = correct_trajectory(traj, -errors)
+    errors, _ = propagate_errors(dt, trajectory, delta_position_n,
+                                 delta_velocity_n, delta_rph)
+    traj_error = correct_trajectory(trajectory, -errors)
 
-    f = FeedforwardFilter(dt, traj, 5, 1, 0.2, 0.05)
+    f = FeedforwardFilter(dt, trajectory, 5, 1, 0.2, 0.05)
     res = f.run(traj_error, [position_obs])
 
     x = errors.loc[3000:]
@@ -156,25 +156,25 @@ def test_FeedforwardFilter():
 
 def test_FeedbackFilter():
     dt = 0.9
-    traj = pd.DataFrame(index=np.arange(1 * 3600))
-    traj['lat'] = 50
-    traj['lon'] = 60
-    traj['alt'] = 100
-    traj['VE'] = 0
-    traj['VN'] = 0
-    traj['VU'] = 0
-    traj['roll'] = 0
-    traj['pitch'] = 0
-    traj['heading'] = 0
+    trajectory = pd.DataFrame(index=np.arange(1 * 3600))
+    trajectory['lat'] = 50
+    trajectory['lon'] = 60
+    trajectory['alt'] = 100
+    trajectory['VE'] = 0
+    trajectory['VN'] = 0
+    trajectory['VU'] = 0
+    trajectory['roll'] = 0
+    trajectory['pitch'] = 0
+    trajectory['heading'] = 0
 
-    _, gyro, accel = sim.from_position(dt, traj[['lat', 'lon', 'alt']],
-                                       traj[['roll', 'pitch', 'heading']])
+    _, gyro, accel = sim.from_position(dt, trajectory[['lat', 'lon', 'alt']],
+                                       trajectory[['roll', 'pitch', 'heading']])
     theta, dv = compute_theta_and_dv(gyro, accel)
 
     np.random.seed(0)
-    obs_data = pd.DataFrame(index=traj.index[::10])
+    obs_data = pd.DataFrame(index=trajectory.index[::10])
     obs_data[['lat', 'lon', 'alt']] = perturb_lla(
-        traj.loc[::10, ['lat', 'lon', 'alt']],
+        trajectory.loc[::10, ['lat', 'lon', 'alt']],
         10 * np.random.randn(len(obs_data), 3))
     position_obs = PositionObs(obs_data, 10)
 
@@ -190,12 +190,12 @@ def test_FeedbackFilter():
     d_p = 0.03
     d_h = 0.1
 
-    lla0 = perturb_lla(traj.loc[0, ['lat', 'lon', 'alt']],
+    lla0 = perturb_lla(trajectory.loc[0, ['lat', 'lon', 'alt']],
                        [d_lon, d_lat, d_alt])
     integrator = StrapdownIntegrator(dt, lla0, [d_VE, d_VN, d_VU],
                                      [d_r, d_p, d_h])
     res = f.run(integrator, theta, dv, observations=[position_obs])
-    error = difference_trajectories(res.traj, traj)
+    error = difference_trajectories(res.trajectory, trajectory)
     error = error.iloc[3000:]
 
     assert_allclose(error.east, 0, rtol=0, atol=10)
@@ -208,7 +208,7 @@ def test_FeedbackFilter():
     assert_(np.all(np.abs(res.residuals[0] < 4)))
 
     res = f.run_smoother(integrator, theta, dv, [position_obs])
-    error = difference_trajectories(res.traj, traj)
+    error = difference_trajectories(res.trajectory, trajectory)
     assert_allclose(error.east, 0, rtol=0, atol=10)
     assert_allclose(error.north, 0, rtol=0, atol=10)
     assert_allclose(error.VE, 0, rtol=0, atol=2e-2)

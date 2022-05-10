@@ -387,7 +387,7 @@ class ModifiedPsiModel(InsErrorModel):
         return result
 
 
-def propagate_errors(dt, traj,
+def propagate_errors(dt, trajectory,
                      delta_position_n=np.zeros(3),
                      delta_velocity_n=np.zeros(3),
                      delta_rph=np.zeros(3),
@@ -400,7 +400,7 @@ def propagate_errors(dt, traj,
     ----------
     dt : float
         Time step per stamp.
-    traj : DataFrame
+    trajectory : DataFrame
         Trajectory.
     delta_position_n : array_like, shape (3,)
         Initial position errors in meters resolved in NED.
@@ -410,7 +410,7 @@ def propagate_errors(dt, traj,
         Initial heading, pitch and roll errors.
     delta_gyro, delta_accel : float or array_like
         Gyro and accelerometer errors (in SI units). Can be constant or
-        specified for each time stamp in `traj`.
+        specified for each time stamp in `trajectory`.
     error_model : InsErrorModel
         Error model object to use for the propagation.
 
@@ -419,7 +419,7 @@ def propagate_errors(dt, traj,
     traj_err : DataFrame
         Trajectory errors.
     """
-    Fi, Fig, Fia = error_model.system_matrix(traj)
+    Fi, Fig, Fia = error_model.system_matrix(trajectory)
     Phi = 0.5 * (Fi[1:] + Fi[:-1]) * dt
     Phi[:] += np.identity(Phi.shape[-1])
 
@@ -428,7 +428,7 @@ def propagate_errors(dt, traj,
     delta_sensor = 0.5 * (delta_gyro[1:] + delta_gyro[:-1] +
                           delta_accel[1:] + delta_accel[:-1])
 
-    T = error_model.transform_to_output(traj)
+    T = error_model.transform_to_output(trajectory)
     x0 = np.hstack([delta_position_n, delta_velocity_n, np.deg2rad(delta_rph)])
     x0 = np.linalg.inv(T[0]).dot(x0)
 
@@ -438,13 +438,13 @@ def propagate_errors(dt, traj,
     for i in range(n_samples - 1):
         x[i + 1] = Phi[i].dot(x[i]) + delta_sensor[i] * dt
 
-    state = pd.DataFrame(data=x, index=traj.index,
+    state = pd.DataFrame(data=x, index=trajectory.index,
                          columns=list(error_model.STATES.keys()))
 
     x_out = util.mv_prod(T, x)
     x_out[:, error_model.DRPH] = np.rad2deg(x_out[:, error_model.DRPH])
     error_out = pd.DataFrame(data=x_out,
-                             index=traj.index,
+                             index=trajectory.index,
                              columns=['north', 'east', 'down',
                                       'VN', 'VE', 'VD',
                                       'roll', 'pitch', 'heading'])

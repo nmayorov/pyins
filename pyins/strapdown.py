@@ -87,7 +87,7 @@ class StrapdownIntegrator:
 
     Attributes
     ----------
-    traj : DataFrame
+    trajectory : DataFrame
         Computed trajectory so far.
 
     See Also
@@ -114,7 +114,7 @@ class StrapdownIntegrator:
         self.velocity_n = np.empty((self.INITIAL_SIZE, 3))
         self.Cnb = np.empty((self.INITIAL_SIZE, 3, 3))
 
-        self.traj = None
+        self.trajectory = None
 
         self._init_values = [lla, velocity_n, rph, stamp]
         self.reset()
@@ -125,7 +125,7 @@ class StrapdownIntegrator:
         self.lla[0] = lla
         self.velocity_n[0] = velocity_n
         self.Cnb[0] = transform.mat_from_rph(rph)
-        self.traj = pd.DataFrame(
+        self.trajectory = pd.DataFrame(
             data=np.atleast_2d(np.hstack((lla, velocity_n, rph))),
             columns=self.TRAJECTORY_COLUMNS,
             index=pd.Index([stamp], name='stamp'))
@@ -151,7 +151,7 @@ class StrapdownIntegrator:
         theta = np.asarray(theta)
         dv = np.asarray(dv)
 
-        n_data = self.traj.shape[0]
+        n_data = self.trajectory.shape[0]
         n_readings = theta.shape[0]
         size = self.lla.shape[0]
 
@@ -165,16 +165,18 @@ class StrapdownIntegrator:
         integrate_fast(self.dt, self.lla, self.velocity_n, self.Cnb,
                        theta, dv, offset=n_data-1)
         rph = transform.mat_to_rph(self.Cnb[n_data:n_data + n_readings])
-        index = pd.Index(self.traj.index[-1] + 1 + np.arange(n_readings),
+        index = pd.Index(self.trajectory.index[-1] + 1 + np.arange(n_readings),
                          name='stamp')
-        traj = pd.DataFrame(index=index)
-        traj[['lat', 'lon', 'alt']] = self.lla[n_data:n_data + n_readings]
-        traj[['VN', 'VE', 'VD']] = self.velocity_n[n_data:n_data + n_readings]
-        traj[['roll', 'pitch', 'heading']] = rph
+        trajectory = pd.DataFrame(index=index)
+        trajectory[['lat', 'lon', 'alt']] = self.lla[n_data:
+                                                     n_data + n_readings]
+        trajectory[['VN', 'VE', 'VD']] = self.velocity_n[n_data:
+                                                         n_data + n_readings]
+        trajectory[['roll', 'pitch', 'heading']] = rph
 
-        self.traj = pd.concat([self.traj, traj])
+        self.trajectory = pd.concat([self.trajectory, trajectory])
 
-        return self.traj.iloc[-n_readings - 1:]
+        return self.trajectory.iloc[-n_readings - 1:]
 
     def get_state(self):
         """Get current integrator state.
@@ -184,7 +186,7 @@ class StrapdownIntegrator:
         trajectory_point : pd.Series
             Trajectory point.
         """
-        return self.traj.iloc[-1]
+        return self.trajectory.iloc[-1]
 
     def set_state(self, trajectory_point):
         """Set (overwrite) the current integrator state.
@@ -194,9 +196,9 @@ class StrapdownIntegrator:
         trajectory_point : pd.Series
             Trajectory point.
         """
-        i = len(self.traj) - 1
+        i = len(self.trajectory) - 1
         self.lla[i] = trajectory_point[['lat', 'lon', 'alt']]
         self.velocity_n[i] = trajectory_point[['VN', 'VE', 'VD']]
         self.Cnb[i] = transform.mat_from_rph(
             trajectory_point[['roll', 'pitch', 'heading']])
-        self.traj.iloc[-1] = trajectory_point
+        self.trajectory.iloc[-1] = trajectory_point

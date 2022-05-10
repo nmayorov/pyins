@@ -358,9 +358,9 @@ def _refine_stamps(stamps, max_step):
     return np.hstack((stamps[0], stamps_new))
 
 
-def _compute_output_errors(traj, x, P, output_stamps,
+def _compute_output_errors(trajectory, x, P, output_stamps,
                            error_model, gyro_model, accel_model):
-    T = error_model.transform_to_output(traj.loc[output_stamps])
+    T = error_model.transform_to_output(trajectory.loc[output_stamps])
     y = util.mv_prod(T, x[:, :error_model.N_STATES])
     Py = util.mm_prod(T, P[:, :error_model.N_STATES, :error_model.N_STATES])
     Py = util.mm_prod(Py, T, bt=True)
@@ -551,11 +551,12 @@ class FeedforwardFilter:
         self.gyro_model = gyro_model
         self.accel_model = accel_model
 
-    def _validate_parameters(self, traj, observations, max_step, record_stamps):
-        if traj is None:
-            traj = self.traj_ref
+    def _validate_parameters(self, trajectory, observations, max_step,
+                             record_stamps):
+        if trajectory is None:
+            trajectory = self.traj_ref
 
-        if not np.all(traj.index == self.traj_ref.index):
+        if not np.all(trajectory.index == self.traj_ref.index):
             raise ValueError("Time stamps of reference and computed "
                              "trajectories don't match.")
 
@@ -566,7 +567,7 @@ class FeedforwardFilter:
         for obs in observations:
             stamps = stamps.union(obs.data.index)
 
-        start, end = traj.index[0], traj.index[-1]
+        start, end = trajectory.index[0], trajectory.index[-1]
         stamps = stamps.union(pd.Index([start, end]))
 
         if record_stamps is not None:
@@ -583,9 +584,9 @@ class FeedforwardFilter:
         if record_stamps is None:
             record_stamps = stamps
 
-        return traj, observations, stamps, record_stamps
+        return trajectory, observations, stamps, record_stamps
 
-    def _forward_pass(self, traj, observations, stamps,
+    def _forward_pass(self, trajectory, observations, stamps,
                       record_stamps, data_for_backward=False):
         inds = stamps - stamps[0]
 
@@ -624,7 +625,7 @@ class FeedforwardFilter:
                 Pa[i_save] = Pc
 
             for i_obs, obs in enumerate(observations):
-                ret = obs.compute_obs(stamp, traj.loc[stamp], self.error_model)
+                ret = obs.compute_obs(stamp, trajectory.loc[stamp], self.error_model)
                 if ret is not None:
                     z, H, R = ret
                     H_max[:H.shape[0], :self.error_model.N_STATES] = H
@@ -663,12 +664,13 @@ class FeedforwardFilter:
 
         return x, P, xa, Pa, Phi_arr, residuals
 
-    def run(self, traj=None, observations=[], max_step=1, record_stamps=None):
+    def run(self, trajectory=None, observations=[], max_step=1,
+            record_stamps=None):
         """Run the filter.
 
         Parameters
         ----------
-        traj : DataFrame or None
+        trajectory : DataFrame or None
             Trajectory computed by INS of which to estimate the errors.
             If None (default), use `traj_ref` from the constructor.
         observations : list of `Observation`
@@ -685,7 +687,7 @@ class FeedforwardFilter:
         -------
         Bunch object with the fields listed below. Note that all data frames
         contain stamps only presented in `record_stamps`.
-        traj : DataFrame
+        trajectory : DataFrame
             Trajectory corrected by estimated errors.
         err, sd : DataFrame
             Estimated trajectory errors and their standard deviations.
@@ -703,11 +705,11 @@ class FeedforwardFilter:
             observations residuals for each component of the observation
             vector `z`.
         """
-        traj, observations, stamps, record_stamps = \
-            self._validate_parameters(traj, observations, max_step,
+        trajectory, observations, stamps, record_stamps = \
+            self._validate_parameters(trajectory, observations, max_step,
                                       record_stamps)
 
-        x, P, _, _, _, residuals = self._forward_pass(traj, observations,
+        x, P, _, _, _, residuals = self._forward_pass(trajectory, observations,
                                                       stamps, record_stamps)
 
         err, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
@@ -715,13 +717,14 @@ class FeedforwardFilter:
                                    self.error_model, self.gyro_model,
                                    self.accel_model)
 
-        traj_corr = correct_trajectory(traj, err)
+        trajectory = correct_trajectory(trajectory, err)
 
-        return FiltResult(traj=traj_corr, err=err, sd=sd, gyro_err=gyro_err,
-                          gyro_sd=gyro_sd, accel_err=accel_err,
+        return FiltResult(trajectory=trajectory, err=err, sd=sd,
+                          gyro_err=gyro_err, gyro_sd=gyro_sd,
+                          accel_err=accel_err,
                           accel_sd=accel_sd, x=x, P=P, residuals=residuals)
 
-    def run_smoother(self, traj=None, observations=[], max_step=1,
+    def run_smoother(self, trajectory=None, observations=[], max_step=1,
                      record_stamps=None):
         """Run the smoother.
 
@@ -731,7 +734,7 @@ class FeedforwardFilter:
 
         Parameters
         ----------
-        traj : DataFrame or None
+        trajectory : DataFrame or None
             Trajectory computed by INS of which to estimate the errors.
             If None (default), use `traj_ref` from the constructor.
         observations : list of `Observation`
@@ -748,7 +751,7 @@ class FeedforwardFilter:
         -------
         Bunch object with the fields listed below. Note that all data frames
         contain stamps only presented in `record_stamps`.
-        traj : DataFrame
+        trajectory : DataFrame
             Trajectory corrected by estimated errors. It will only contain
             stamps presented in `record_stamps`.
         err, sd : DataFrame
@@ -773,12 +776,12 @@ class FeedforwardFilter:
                Estimates of Linear Dynamic Systems", AIAA Journal, Vol. 3,
                No. 8, August 1965.
         """
-        traj, observations, stamps, record_stamps = \
-            self._validate_parameters(traj, observations, max_step,
+        trajectory, observations, stamps, record_stamps = \
+            self._validate_parameters(trajectory, observations, max_step,
                                       record_stamps)
 
         x, P, xa, Pa, Phi_arr, residuals = self._forward_pass(
-            traj, observations, stamps, record_stamps, data_for_backward=True)
+            trajectory, observations, stamps, record_stamps, data_for_backward=True)
 
         kalman.smooth_rts(x, P, xa, Pa, Phi_arr)
 
@@ -791,11 +794,12 @@ class FeedforwardFilter:
                                    self.error_model, self.gyro_model,
                                    self.accel_model)
 
-        traj_corr = correct_trajectory(traj, err)
+        trajectory = correct_trajectory(trajectory, err)
 
-        return FiltResult(traj=traj_corr, err=err, sd=sd, gyro_err=gyro_err,
-                          gyro_sd=gyro_sd, accel_err=accel_err,
-                          accel_sd=accel_sd, x=x, P=P, residuals=residuals)
+        return FiltResult(trajectory=trajectory, err=err, sd=sd,
+                          gyro_err=gyro_err, gyro_sd=gyro_sd,
+                          accel_err=accel_err, accel_sd=accel_sd,
+                          x=x, P=P, residuals=residuals)
 
 
 class FeedbackFilter:
@@ -904,7 +908,7 @@ class FeedbackFilter:
         integrator.reset()
 
         n_readings = theta.shape[0]
-        initial_stamp = integrator.traj.index[-1]
+        initial_stamp = integrator.trajectory.index[-1]
 
         start = initial_stamp
         end = start + n_readings
@@ -938,7 +942,7 @@ class FeedbackFilter:
 
     def _forward_pass(self, integrator, theta, dv, observations, stamps,
                       record_stamps, feedback_period, data_for_backward=False):
-        start = integrator.traj.index[0]
+        start = integrator.trajectory.index[0]
 
         if data_for_backward:
             n_stamps = stamps.shape[0]
@@ -1144,7 +1148,7 @@ class FeedbackFilter:
         -------
         Bunch object with the fields listed below. Note that all data frames
         contain stamps only presented in `record_stamps`.
-        traj : DataFrame
+        trajectory : DataFrame
             Trajectory corrected by estimated errors. It will only contain
             stamps presented in `record_stamps`.
         sd : DataFrame
@@ -1176,14 +1180,15 @@ class FeedbackFilter:
                                                       record_stamps,
                                                       feedback_period)
 
-        traj = integrator.traj.loc[record_stamps]
+        trajectory = integrator.trajectory.loc[record_stamps]
         err, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
-            _compute_output_errors(traj, x, P, record_stamps, self.error_model,
-                                   self.gyro_model, self.accel_model)
+            _compute_output_errors(trajectory, x, P, record_stamps,
+                                   self.error_model, self.gyro_model,
+                                   self.accel_model)
 
-        traj_corr = correct_trajectory(integrator.traj, err)
+        trajectory = correct_trajectory(integrator.trajectory, err)
 
-        return FiltResult(traj=traj_corr, sd=sd, gyro_err=gyro_err,
+        return FiltResult(trajectory=trajectory, sd=sd, gyro_err=gyro_err,
                           gyro_sd=gyro_sd, accel_err=accel_err,
                           accel_sd=accel_sd, P=P, residuals=residuals)
 
@@ -1220,7 +1225,7 @@ class FeedbackFilter:
         -------
         Bunch object with the fields listed below. Note that all data frames
         contain stamps only presented in `record_stamps`.
-        traj : DataFrame
+        trajectory : DataFrame
             Trajectory corrected by estimated errors. It will only contain
             stamps presented in `record_stamps`.
         sd : DataFrame
@@ -1257,12 +1262,13 @@ class FeedbackFilter:
             integrator, theta, dv, observations, stamps, record_stamps,
             feedback_period, data_for_backward=True)
 
-        traj = integrator.traj.loc[record_stamps]
+        trajectory = integrator.trajectory.loc[record_stamps]
         err, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
-            _compute_output_errors(traj, x, P, record_stamps, self.error_model,
-                                   self.gyro_model, self.accel_model)
+            _compute_output_errors(trajectory, x, P, record_stamps,
+                                   self.error_model, self.gyro_model,
+                                   self.accel_model)
 
-        traj = correct_trajectory(traj, err)
+        trajectory = correct_trajectory(trajectory, err)
         xa[:, :self.error_model.N_STATES] -= x[:, :self.error_model.N_STATES]
         x[:, :self.error_model.N_STATES] = 0
 
@@ -1271,15 +1277,15 @@ class FeedbackFilter:
         ind = np.searchsorted(stamps, record_stamps)
         x = x[ind]
         P = P[ind]
-        traj = traj.iloc[ind]
+        trajectory = trajectory.iloc[ind]
 
         err, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
-            _compute_output_errors(traj, x, P, record_stamps[ind],
+            _compute_output_errors(trajectory, x, P, record_stamps[ind],
                                    self.error_model, self.gyro_model,
                                    self.accel_model)
 
-        traj = correct_trajectory(traj, err)
+        trajectory = correct_trajectory(trajectory, err)
 
-        return FiltResult(traj=traj, sd=sd, gyro_err=gyro_err,
+        return FiltResult(trajectory=trajectory, sd=sd, gyro_err=gyro_err,
                           gyro_sd=gyro_sd, accel_err=accel_err,
                           accel_sd=accel_sd, P=P, residuals=residuals)
