@@ -3,7 +3,6 @@ from collections import OrderedDict
 import numpy as np
 import pandas as pd
 from . import error_models, kalman, util, transform
-from .transform import correct_trajectory
 
 
 class InertialSensor:
@@ -702,7 +701,7 @@ class FeedforwardFilter:
                                    self.error_model, self.gyro_model,
                                    self.accel_model)
 
-        trajectory = correct_trajectory(trajectory, err)
+        trajectory = transform.correct_trajectory(trajectory, err)
 
         return util.Bunch(trajectory=trajectory, err=err, sd=sd,
                           gyro_err=gyro_err, gyro_sd=gyro_sd,
@@ -779,7 +778,7 @@ class FeedforwardFilter:
                                    self.error_model, self.gyro_model,
                                    self.accel_model)
 
-        trajectory = correct_trajectory(trajectory, err)
+        trajectory = transform.correct_trajectory(trajectory, err)
 
         return util.Bunch(trajectory=trajectory, err=err, sd=sd,
                           gyro_err=gyro_err, gyro_sd=gyro_sd,
@@ -1171,7 +1170,7 @@ class FeedbackFilter:
                                    self.error_model, self.gyro_model,
                                    self.accel_model)
 
-        trajectory = correct_trajectory(integrator.trajectory, err)
+        trajectory = transform.correct_trajectory(integrator.trajectory, err)
 
         return util.Bunch(trajectory=trajectory, sd=sd, gyro_err=gyro_err,
                           gyro_sd=gyro_sd, accel_err=accel_err,
@@ -1253,7 +1252,7 @@ class FeedbackFilter:
                                    self.error_model, self.gyro_model,
                                    self.accel_model)
 
-        trajectory = correct_trajectory(trajectory, err)
+        trajectory = transform.correct_trajectory(trajectory, err)
         xa[:, :self.error_model.N_STATES] -= x[:, :self.error_model.N_STATES]
         x[:, :self.error_model.N_STATES] = 0
 
@@ -1269,7 +1268,7 @@ class FeedbackFilter:
                                    self.error_model, self.gyro_model,
                                    self.accel_model)
 
-        trajectory = correct_trajectory(trajectory, err)
+        trajectory = transform.correct_trajectory(trajectory, err)
 
         return util.Bunch(trajectory=trajectory, sd=sd, gyro_err=gyro_err,
                           gyro_sd=gyro_sd, accel_err=accel_err,

@@ -4,11 +4,12 @@ import numpy as np
 import pandas as pd
 from pyins.filt import (InertialSensor, PositionObs,
                         FeedforwardFilter, FeedbackFilter,
-                        _refine_stamps, correct_trajectory)
+                        _refine_stamps)
 from pyins.error_models import propagate_errors
 from pyins import sim
 from pyins.strapdown import compute_theta_and_dv, StrapdownIntegrator
-from pyins.transform import perturb_lla, difference_trajectories
+from pyins.transform import (perturb_lla, difference_trajectories,
+                             correct_trajectory)
 
 
 def test_InertialSensor():
