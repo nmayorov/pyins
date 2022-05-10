@@ -340,14 +340,14 @@ def _align_matrix(align_angles):
 
 
 def _apply_errors(sensor_type, dt, readings, scale_error, scale_asym, align,
-                  bias, noise):
+                  bias, noise, rng):
     out = util.mv_prod(align, readings)
     if sensor_type == 'increment':
         out += bias * dt
-        out += noise * dt ** 0.5 * np.random.randn(*readings.shape)
+        out += noise * dt ** 0.5 * rng.randn(*readings.shape)
     elif sensor_type == 'rate':
         out += bias
-        out += noise * dt ** -0.5 * np.random.randn(*readings.shape)
+        out += noise * dt ** -0.5 * rng.randn(*readings.shape)
     else:
         assert False
     scale = 1 + scale_error + scale_asym * np.sign(out)
@@ -359,7 +359,8 @@ class ImuErrors:
     def __init__(self, gyro_scale_error=None, gyro_scale_asym=None,
                  gyro_align=None, gyro_bias=None, gyro_noise=None,
                  accel_scale_error=None, accel_scale_asym=None,
-                 accel_align=None, accel_bias=None, accel_noise=None):
+                 accel_align=None, accel_bias=None, accel_noise=None,
+                 rng=None):
         if gyro_scale_error is None:
             gyro_scale_error = 0
         else:
@@ -429,15 +430,16 @@ class ImuErrors:
         self.gyro_align_mars = gyro_align_mars
         self.accel_align_mars = accel_align_mars
         self.Cmb = Cmb
+        self.rng = check_random_state(rng)
 
     def apply(self, dt, gyro, accel, sensor_type='increment'):
         gyro_out = _apply_errors(sensor_type, dt, gyro,
                                  self.gyro_scale_error, self.gyro_scale_asym,
                                  self.gyro_align, self.gyro_bias,
-                                 self.gyro_noise)
+                                 self.gyro_noise, self.rng)
         accel_out = _apply_errors(sensor_type, dt, accel,
                                   self.accel_scale_error, self.accel_scale_asym,
                                   self.accel_align, self.accel_bias,
-                                  self.accel_noise)
+                                  self.accel_noise, self.rng)
 
         return gyro_out, accel_out
