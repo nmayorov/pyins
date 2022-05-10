@@ -1,7 +1,8 @@
 import numpy as np
 from numpy.testing import assert_allclose, run_module_suite
+from scipy.spatial.transform import Rotation
 from pyins.transform import lla_to_ecef, perturb_lla, phi_to_delta_rph
-from pyins import earth, dcm, transform
+from pyins import earth, transform
 
 
 def test_lla_to_ecef():
@@ -26,11 +27,11 @@ def test_perturb_ll():
 
 def test_phi_to_delta_rph():
     rph = [10, -20, 30]
-    mat = dcm.from_rph(rph)
+    mat = transform.mat_from_rph(rph)
     phi = np.array([-0.02, 0.01, -0.03])
-    mat_perturbed = dcm.from_rv(-phi) @ mat
+    mat_perturbed = Rotation.from_rotvec(-phi).as_matrix() @ mat
 
-    rph_perturbed = dcm.to_rph(mat_perturbed)
+    rph_perturbed = transform.mat_to_rph(mat_perturbed)
     delta_rph_true = rph_perturbed - rph
 
     T = phi_to_delta_rph(rph)

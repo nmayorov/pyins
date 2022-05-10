@@ -1,7 +1,7 @@
 """Strapdown INS integration algorithms."""
 import numpy as np
 import pandas as pd
-from . import dcm
+from . import transform
 from ._integrate import integrate_fast
 
 
@@ -124,7 +124,7 @@ class StrapdownIntegrator:
         lla, velocity_n, rph, stamp = self._init_values
         self.lla[0] = lla
         self.velocity_n[0] = velocity_n
-        self.Cnb[0] = dcm.from_rph(rph)
+        self.Cnb[0] = transform.mat_from_rph(rph)
         self.traj = pd.DataFrame(
             data=np.atleast_2d(np.hstack((lla, velocity_n, rph))),
             columns=self.TRAJECTORY_COLUMNS,
@@ -164,7 +164,7 @@ class StrapdownIntegrator:
 
         integrate_fast(self.dt, self.lla, self.velocity_n, self.Cnb,
                        theta, dv, offset=n_data-1)
-        rph = dcm.to_rph(self.Cnb[n_data:n_data + n_readings])
+        rph = transform.mat_to_rph(self.Cnb[n_data:n_data + n_readings])
         index = pd.Index(self.traj.index[-1] + 1 + np.arange(n_readings),
                          name='stamp')
         traj = pd.DataFrame(index=index)
@@ -197,6 +197,6 @@ class StrapdownIntegrator:
         i = len(self.traj) - 1
         self.lla[i] = trajectory_point[['lat', 'lon', 'alt']]
         self.velocity_n[i] = trajectory_point[['VN', 'VE', 'VD']]
-        self.Cnb[i] = dcm.from_rph(
+        self.Cnb[i] = transform.mat_from_rph(
             trajectory_point[['roll', 'pitch', 'heading']])
         self.traj.iloc[-1] = trajectory_point

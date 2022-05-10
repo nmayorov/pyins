@@ -2,7 +2,8 @@
 from collections import OrderedDict
 import numpy as np
 import pandas as pd
-from . import dcm, earth, util, transform
+from scipy.spatial.transform import Rotation
+from . import earth, util, transform
 
 
 class ErrorModel:
@@ -165,7 +166,7 @@ class ModifiedPhiModel(ErrorModel):
         Omega_n = earth.rate_n(trajectory.lat)
         rho_n = util.mv_prod(R, trajectory[['VN', 'VE', 'VD']])
         g_n = earth.gravity_n(trajectory.lat, trajectory.alt)
-        Cnb = dcm.from_rph(trajectory[['roll', 'pitch', 'heading']])
+        Cnb = transform.mat_from_rph(trajectory[['roll', 'pitch', 'heading']])
 
         F = np.zeros((n_samples, self.N_STATES, self.N_STATES))
         samples = np.arange(n_samples)
@@ -211,13 +212,13 @@ class ModifiedPhiModel(ErrorModel):
         return T[0] if series else T
 
     def correct_state(self, trajectory_point, error):
-        Ctp = dcm.from_rv(error[self.PHI])
+        Ctp = Rotation.from_rotvec(error[self.PHI]).as_matrix()
         lla = transform.perturb_lla(trajectory_point[['lat', 'lon', 'alt']],
                                     -error[self.DR])
         velocity_n = Ctp @ (trajectory_point[['VN', 'VE', 'VD']]
                             - error[self.DV])
-        rph = dcm.to_rph(
-            Ctp @ dcm.from_rph(trajectory_point[['roll', 'pitch', 'heading']]))
+        rph = transform.mat_to_rph(Ctp @ transform.mat_from_rph(
+            trajectory_point[['roll', 'pitch', 'heading']]))
 
         return pd.Series(data=np.hstack((lla, velocity_n, rph)),
                          index=trajectory_point.index)
@@ -235,7 +236,8 @@ class ModifiedPhiModel(ErrorModel):
         return result
 
     def body_velocity_error_jacobian(self, trajectory_point):
-        Cnb = dcm.from_rph(trajectory_point[['roll', 'pitch', 'heading']])
+        Cnb = transform.mat_from_rph(
+            trajectory_point[['roll', 'pitch', 'heading']])
         result = np.zeros((3, self.N_STATES))
         result[:, self.DV] = Cnb.transpose()
         return result
@@ -282,7 +284,7 @@ class ModifiedPsiModel(ErrorModel):
         rho_n = util.mv_prod(R, trajectory[['VN', 'VE', 'VD']])
         g_n_skew = util.skew_matrix(earth.gravity_n(trajectory.lat,
                                                     trajectory.alt))
-        Cnb = dcm.from_rph(trajectory[['roll', 'pitch', 'heading']])
+        Cnb = transform.mat_from_rph(trajectory[['roll', 'pitch', 'heading']])
 
         F = np.zeros((n_samples, self.N_STATES, self.N_STATES))
         samples = np.arange(n_samples)
@@ -331,13 +333,14 @@ class ModifiedPsiModel(ErrorModel):
 
     def correct_state(self, trajectory_point, error):
         R = earth.curvature_matrix(trajectory_point.lat, trajectory_point.alt)
-        Ctp = dcm.from_rv(error[self.PSI] + R @ error[self.DR])
+        Ctp = Rotation.from_rotvec(error[self.PSI] +
+                                   R @ error[self.DR]).as_matrix()
         lla = transform.perturb_lla(trajectory_point[['lat', 'lon', 'alt']],
                                     -error[self.DR])
         velocity_n = Ctp @ (trajectory_point[['VN', 'VE', 'VD']]
                             - error[self.DV])
-        rph = dcm.to_rph(
-            Ctp @ dcm.from_rph(trajectory_point[['roll', 'pitch', 'heading']]))
+        rph = transform.mat_to_rph(Ctp @ transform.mat_from_rph(
+            trajectory_point[['roll', 'pitch', 'heading']]))
 
         return pd.Series(data=np.hstack((lla, velocity_n, rph)),
                          index=trajectory_point.index)
@@ -355,7 +358,8 @@ class ModifiedPsiModel(ErrorModel):
         return result
 
     def body_velocity_error_jacobian(self, trajectory_point):
-        Cnb = dcm.from_rph(trajectory_point[['roll', 'pitch', 'heading']])
+        Cnb = transform.mat_from_rph(
+            trajectory_point[['roll', 'pitch', 'heading']])
         result = np.zeros((3, self.N_STATES))
         result[:, self.DV] = Cnb.transpose()
         return result

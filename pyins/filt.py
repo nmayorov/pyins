@@ -2,7 +2,7 @@
 from collections import OrderedDict
 import numpy as np
 import pandas as pd
-from . import dcm, error_models, kalman, util, transform
+from . import error_models, kalman, util, transform
 from .transform import correct_trajectory
 
 
@@ -333,7 +333,8 @@ class BodyVelocityObs(Observation):
         if stamp not in self.data.index:
             return None
 
-        Cnb = dcm.from_rph(trajectory_point[['roll', 'pitch', 'heading']])
+        Cnb = transform.mat_from_rph(
+            trajectory_point[['roll', 'pitch', 'heading']])
         z = Cnb.transpose() @ trajectory_point[['VN', 'VE', 'VD']] - \
             self.data.loc[stamp, ['VX', 'VY', 'VZ']]
         H = error_model.body_velocity_error_jacobian(trajectory_point)

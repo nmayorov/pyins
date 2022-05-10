@@ -5,7 +5,7 @@ from scipy.interpolate import CubicSpline, PPoly
 from scipy.linalg import solve_banded
 from scipy.spatial.transform import Rotation, RotationSpline
 from scipy._lib._util import check_random_state
-from . import dcm, earth, transform, util
+from . import earth, transform, util
 
 
 #: Degrees per hour to radians per second (SI units)
@@ -112,7 +112,7 @@ def from_position(dt, lla, rph, sensor_type='increment'):
     V[:, 1] -= earth.RATE * R[:, 0]
     V = util.mv_prod(Cin, V, at=True)
 
-    Cnb = dcm.from_rph(rph)
+    Cnb = transform.mat_from_rph(rph)
     Cib = util.mm_prod(Cin, Cnb)
 
     Cib_spline = RotationSpline(time, Rotation.from_matrix(Cib))
@@ -315,7 +315,7 @@ def generate_ned_velocity_observations(trajectory, error_sd, rng=None):
 def generate_body_velocity_observations(trajectory, error_sd, rng=None):
     rng = check_random_state(rng)
     error = error_sd * rng.randn(len(trajectory), 3)
-    Cnb = dcm.from_rph(trajectory[['roll', 'pitch', 'heading']])
+    Cnb = transform.mat_from_rph(trajectory[['roll', 'pitch', 'heading']])
     velocity_b = (util.mv_prod(Cnb, trajectory[['VN', 'VE', 'VD']], at=True)
                   + error)
     return pd.DataFrame(data=velocity_b, index=trajectory.index,
@@ -460,7 +460,7 @@ class TableRotations:
         self.rest_time = rest_time
 
         self.Cnb = np.empty((1, 3, 3))
-        self.Cnb[0] = dcm.from_rph([h0, p0, r0])
+        self.Cnb[0] = transform.mat_from_rph([h0, p0, r0])
         self._rest_intervals = []
 
     def rotate(self, axis, angle, rot_speed=None):
@@ -472,7 +472,7 @@ class TableRotations:
 
         rv = np.zeros((angle.shape[0], 3))
         rv[:, axis] = np.deg2rad(angle)
-        C = dcm.from_rv(rv)
+        C = Rotation.from_rotvec(rv).as_matrix()
         Cnb_batch = util.mm_prod(self.Cnb[-1], C)
         self.Cnb = np.vstack((self.Cnb, Cnb_batch))
 

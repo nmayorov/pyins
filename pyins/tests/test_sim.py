@@ -1,9 +1,7 @@
 import numpy as np
 from numpy.testing import assert_allclose, run_module_suite
-from scipy.spatial.transform import Rotation
 from pyins import sim
 from pyins import earth
-from pyins import dcm
 
 
 def test_sim_on_stationary():

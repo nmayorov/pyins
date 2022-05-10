@@ -244,3 +244,46 @@ def mat_en_from_ll(lat, lon):
     angles[:, 0] = lon
     angles[:, 1] = -90 - lat
     return Rotation.from_euler('ZY', angles, degrees=True).as_matrix()
+
+
+def mat_from_rph(rph):
+    """Create a rotation matrix from roll, pitch and heading.
+
+    The sequence of elemental rotations is as follows::
+
+           heading    pitch   roll
+        N ---------> ------> -----> B
+              3         2       1
+
+    The resulting matrix projects from B frame to N frame.
+
+    Parameters
+    ----------
+    rph : array_like, shape (3,) or (n, 3)
+        Heading, pitch and roll.
+
+    Returns
+    -------
+    dcm : ndarray, shape (3, 3) or (n, 3, 3)
+        Direction cosine matrices.
+    """
+    return Rotation.from_euler('xyz', rph, degrees=True).as_matrix()
+
+
+def mat_to_rph(mat):
+    """Convert a rotation matrix to roll, pitch, heading angles.
+
+    The returned heading is within [0, 360], the pitch is within [-90, 90]
+    and the roll is within [-90, 90].
+
+    Parameters
+    ----------
+    mat : array_like, shape (3, 3) or (n, 3, 3)
+        Direction cosine matrices.
+
+    Returns
+    -------
+    rph : ndarray, with shape (3,) or (n, 3)
+        Heading, pitch and roll.
+    """
+    return Rotation.from_matrix(mat).as_euler('xyz', degrees=True)
