@@ -92,19 +92,19 @@ def test_refine_stamps():
 
 
 def test_FeedbackFilter():
-    dt = 0.1
+    dt = 0.01
     rng = np.random.RandomState(0)
 
     trajectory, gyro_true, accel_true = sim.sinusoid_velocity_motion(
         dt, 300, [50, 60, 100], [1, -1, 0.5], [3, 3, 0.5])
 
     position_obs = filt.PositionObs(
-        sim.generate_position_observations(trajectory.iloc[::10], 1, rng), 1)
+        sim.generate_position_observations(trajectory.iloc[::100], 1, rng), 1)
     ned_velocity_obs = filt.NedVelocityObs(
-        sim.generate_ned_velocity_observations(trajectory.iloc[3::10], 0.5,
+        sim.generate_ned_velocity_observations(trajectory.iloc[30::100], 0.5,
                                                rng), 0.5)
     body_velocity_obs = filt.BodyVelocityObs(
-        sim.generate_body_velocity_observations(trajectory.iloc[6::10], 0.2,
+        sim.generate_body_velocity_observations(trajectory.iloc[60::100], 0.2,
                                                 rng), 0.2)
 
     imu_errors = sim.ImuErrors(
