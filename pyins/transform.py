@@ -3,10 +3,15 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 from . import earth
 
-
+#: Degrees to radians.
 DEG_TO_RAD = np.pi / 180
+#: Radians to degrees.
 RAD_TO_DEG = 1 / DEG_TO_RAD
+#: Degrees per hour to radians per second.
 DH_TO_RS = DEG_TO_RAD / 3600
+#: Radians per second to degrees per hour.
+RS_TO_DH = 1 / DH_TO_RS
+#: Degrees per root-hour to radians per root-second.
 DRH_TO_RRS = DEG_TO_RAD / 60
 
 
