@@ -95,10 +95,10 @@ def gravity_n(lat, alt):
     """
     g = gravity(lat, alt)
     if g.ndim == 0:
-        return np.array([0, 0, -g])
+        return np.array([0, 0, g])
     else:
         result = np.zeros((len(g), 3))
-        result[:, 2] = -g
+        result[:, 2] = g
         return result
 
 
@@ -126,8 +126,8 @@ def gravitation_ecef(lla):
     _, _, rp = principal_radii(lat, alt)
 
     g0_g = np.zeros((3,) + sin_lat.shape)
-    g0_g[1] = RATE**2 * rp * sin_lat
-    g0_g[2] = -gravity(lat, alt) - RATE ** 2 * rp * cos_lat
+    g0_g[0] = RATE**2 * rp * sin_lat
+    g0_g[2] = gravity(lat, alt) + RATE ** 2 * rp * cos_lat
     g0_g = g0_g.T
 
     Ceg = dcm.from_ll(lat, lon)
@@ -161,15 +161,15 @@ def curvature_matrix(lat, alt):
     n = 1 if re.ndim == 0 else len(re)
 
     result = np.zeros((n, 3, 3))
-    result[:, 0, 1] = -1 / rn
-    result[:, 1, 0] = 1 / re
-    result[:, 2, 0] = result[:, 1, 0] * np.tan(np.deg2rad(lat))
+    result[:, 0, 1] = 1 / re
+    result[:, 1, 0] = -1 / rn
+    result[:, 2, 1] = -result[:, 0, 1] * np.tan(np.deg2rad(lat))
 
     return result[0] if re.ndim == 0 else result
 
 
 def rate_n(lat):
-    """Compute Earth rate resolved in ENU frame.
+    """Compute Earth rate resolved in NED frame.
 
     Parameters
     ----------
@@ -183,6 +183,6 @@ def rate_n(lat):
     lat = np.asarray(lat)
     n = 1 if lat.ndim == 0 else len(lat)
     result = np.zeros((n, 3))
-    result[:, 1] = RATE * np.cos(np.deg2rad(lat))
-    result[:, 2] = RATE * np.sin(np.deg2rad(lat))
+    result[:, 0] = RATE * np.cos(np.deg2rad(lat))
+    result[:, 2] = -RATE * np.sin(np.deg2rad(lat))
     return result[0] if lat.ndim == 0 else result

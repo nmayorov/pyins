@@ -366,23 +366,23 @@ def _compute_output_errors(traj, x, P, output_stamps,
     sd_y = np.diagonal(Py, axis1=1, axis2=2) ** 0.5
 
     err = pd.DataFrame(index=output_stamps)
-    err['east'] = y[:, error_model.DRE]
     err['north'] = y[:, error_model.DRN]
-    err['up'] = y[:, error_model.DRU]
-    err['VE'] = y[:, error_model.DVE]
-    err['VN'] = y[:, error_model.DVN]
-    err['VU'] = y[:, error_model.DVU]
+    err['east'] = y[:, error_model.DRE]
+    err['down'] = y[:, error_model.DRD]
+    err['VE'] = y[:, error_model.DVN]
+    err['VN'] = y[:, error_model.DVE]
+    err['VU'] = y[:, error_model.DVD]
     err['roll'] = np.rad2deg(y[:, error_model.DROLL])
     err['pitch'] = np.rad2deg(y[:, error_model.DPITCH])
     err['heading'] = np.rad2deg(y[:, error_model.DHEADING])
 
     sd = pd.DataFrame(index=output_stamps)
-    sd['east'] = sd_y[:, error_model.DRE]
     sd['north'] = sd_y[:, error_model.DRN]
-    sd['up'] = sd_y[:, error_model.DRU]
-    sd['VE'] = sd_y[:, error_model.DVE]
-    sd['VN'] = sd_y[:, error_model.DVN]
-    sd['VU'] = sd_y[:, error_model.DVU]
+    sd['east'] = sd_y[:, error_model.DRE]
+    sd['down'] = sd_y[:, error_model.DRD]
+    sd['VE'] = sd_y[:, error_model.DVN]
+    sd['VN'] = sd_y[:, error_model.DVE]
+    sd['VU'] = sd_y[:, error_model.DVD]
     sd['roll'] = np.rad2deg(sd_y[:, error_model.DROLL])
     sd['pitch'] = np.rad2deg(sd_y[:, error_model.DPITCH])
     sd['heading'] = np.rad2deg(sd_y[:, error_model.DHEADING])
@@ -483,12 +483,12 @@ class FeedforwardFilter:
 
         T = np.linalg.inv(error_model.transform_to_output(traj_ref.iloc[0]))
         P_nav = np.zeros((error_model.N_STATES, error_model.N_STATES))
-        P_nav[error_model.DRE, error_model.DRE] = pos_sd ** 2
         P_nav[error_model.DRN, error_model.DRN] = pos_sd ** 2
-        P_nav[error_model.DRU, error_model.DRU] = pos_sd ** 2
-        P_nav[error_model.DVE, error_model.DVE] = vel_sd ** 2
+        P_nav[error_model.DRE, error_model.DRE] = pos_sd ** 2
+        P_nav[error_model.DRD, error_model.DRD] = pos_sd ** 2
         P_nav[error_model.DVN, error_model.DVN] = vel_sd ** 2
-        P_nav[error_model.DVU, error_model.DVU] = vel_sd ** 2
+        P_nav[error_model.DVE, error_model.DVE] = vel_sd ** 2
+        P_nav[error_model.DVD, error_model.DVD] = vel_sd ** 2
         P_nav[error_model.DROLL, error_model.DROLL] = level_sd ** 2
         P_nav[error_model.DPITCH, error_model.DPITCH] = level_sd ** 2
         P_nav[error_model.DHEADING, error_model.DHEADING] = azimuth_sd ** 2
@@ -850,12 +850,12 @@ class FeedbackFilter:
         azimuth_sd = np.deg2rad(azimuth_sd)
 
         P0_nav = np.zeros((error_model.N_STATES, error_model.N_STATES))
-        P0_nav[error_model.DRE, error_model.DRE] = pos_sd ** 2
         P0_nav[error_model.DRN, error_model.DRN] = pos_sd ** 2
-        P0_nav[error_model.DRU, error_model.DRU] = pos_sd ** 2
-        P0_nav[error_model.DVE, error_model.DVE] = vel_sd ** 2
+        P0_nav[error_model.DRE, error_model.DRE] = pos_sd ** 2
+        P0_nav[error_model.DRD, error_model.DRD] = pos_sd ** 2
         P0_nav[error_model.DVN, error_model.DVN] = vel_sd ** 2
-        P0_nav[error_model.DVU, error_model.DVU] = vel_sd ** 2
+        P0_nav[error_model.DVE, error_model.DVE] = vel_sd ** 2
+        P0_nav[error_model.DVD, error_model.DVD] = vel_sd ** 2
         P0_nav[error_model.DROLL, error_model.DROLL] = level_sd ** 2
         P0_nav[error_model.DPITCH, error_model.DPITCH] = level_sd ** 2
         P0_nav[error_model.DHEADING, error_model.DHEADING] = azimuth_sd ** 2

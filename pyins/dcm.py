@@ -74,12 +74,7 @@ def from_rph(rph):
     dcm : ndarray, shape (3, 3) or (n, 3, 3)
         Direction cosine matrices.
     """
-    angles = np.array(rph, copy=True)
-    if angles.ndim == 1:
-        angles[2] = -angles[2]
-    else:
-        angles[:, 2] = -angles[:, 2]
-    return Rotation.from_euler('yxz', angles, degrees=True).as_matrix()
+    return Rotation.from_euler('xyz', rph, degrees=True).as_matrix()
 
 
 def from_ll(lat, lon):
@@ -108,7 +103,7 @@ def from_ll(lat, lon):
     lon = np.asarray(lon)
 
     if lat.ndim == 0 and lon.ndim == 0:
-        return Rotation.from_euler('ZX', [90 + lon, 90 - lat],
+        return Rotation.from_euler('ZY', [lon, -90 - lat],
                                    degrees=True).as_matrix()
 
     lat = np.atleast_1d(lat)
@@ -116,9 +111,9 @@ def from_ll(lat, lon):
 
     n = max(len(lat), len(lon))
     angles = np.empty((n, 2))
-    angles[:, 0] = 90 + lon
-    angles[:, 1] = 90 - lat
-    return Rotation.from_euler('ZX', angles, degrees=True).as_matrix()
+    angles[:, 0] = lon
+    angles[:, 1] = -90 - lat
+    return Rotation.from_euler('ZY', angles, degrees=True).as_matrix()
 
 
 def to_rph(dcm):
@@ -137,13 +132,4 @@ def to_rph(dcm):
     rph : ndarray, with shape (3,) or (n, 3)
         Heading, pitch and roll.
     """
-    rph = Rotation.from_matrix(dcm).as_euler('yxz', degrees=True)
-    if rph.ndim == 1:
-        rph[2] = -rph[2]
-        if rph[2] < 0:
-            rph[2] += 360
-    else:
-        rph[:, 2] = -rph[:, 2]
-        rph[rph[:, 2] < 0, 2] += 360
-
-    return rph
+    return Rotation.from_matrix(dcm).as_euler('xyz', degrees=True)

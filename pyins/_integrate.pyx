@@ -110,17 +110,17 @@ def integrate_fast(double dt, double[:, :] lla, double[:, :] velocity_n,
         re = R0 / math.sqrt(x) + alt
         rn = re * (1 - E2) / x + alt
 
-        Omega1 = 0.0
-        Omega2 = RATE * clat
-        Omega3 = RATE * slat
+        Omega1 = RATE * clat
+        Omega2 = 0.0
+        Omega3 = -RATE * slat
 
         V1 = velocity_n[j, 0]
         V2 = velocity_n[j, 1]
         V3 = velocity_n[j, 2]
 
-        rho1 = -V2 / rn
-        rho2 = V1 / re
-        rho3 = rho2 * tlat
+        rho1 = V2 / re
+        rho2 = -V1 / rn
+        rho3 = -rho1 * tlat
         chi1 = Omega1 + rho1
         chi2 = Omega2 + rho2
         chi3 = Omega3 + rho3
@@ -141,22 +141,22 @@ def integrate_fast(double dt, double[:, :] lla, double[:, :] velocity_n,
         velocity_n[j + 1, 2] = V3 + dv3 + (- (chi1 + Omega1) * V2
                                            + (chi2 + Omega2) * V1
                                            - 0.5 * (chi1 * dv2 - chi2 * dv1)
-                                           - gravity(lat, alt + 0.5 * V3 * dt)
+                                           + gravity(lat, alt - 0.5 * V3 * dt)
                                            ) * dt
 
         V1 = 0.5 * (V1 + velocity_n[j + 1, 0])
         V2 = 0.5 * (V2 + velocity_n[j + 1, 1])
         V3 = 0.5 * (V3 + velocity_n[j + 1, 2])
-        rho1 = -V2 / rn
-        rho2 = V1 / re
-        rho3 = rho2 * tlat
+        rho1 = V2 / re
+        rho2 = -V1 / rn
+        rho3 = -rho1 * tlat
         chi1 = Omega1 + rho1
         chi2 = Omega2 + rho2
         chi3 = Omega3 + rho3
 
-        lla[j + 1, 0] = lla[j, 0] - RAD2DEG * rho1 * dt
-        lla[j + 1, 1] = lla[j, 1] + RAD2DEG * rho2 / clat * dt
-        lla[j + 1, 2] = lla[j, 2] + V3 * dt
+        lla[j + 1, 0] = lla[j, 0] - RAD2DEG * rho2 * dt
+        lla[j + 1, 1] = lla[j, 1] + RAD2DEG * rho1 / clat * dt
+        lla[j + 1, 2] = lla[j, 2] - V3 * dt
 
         xi[0] = -chi1 * dt
         xi[1] = -chi2 * dt

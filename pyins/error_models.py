@@ -17,18 +17,18 @@ class ErrorModel:
         vector.
     """
     N_STATES = 9
-    DRE = 0
-    DRN = 1
-    DRU = 2
-    DVE = 3
-    DVN = 4
-    DVU = 5
+    DRN = 0
+    DRE = 1
+    DRD = 2
+    DVN = 3
+    DVE = 4
+    DVD = 5
     DROLL = 6
     DPITCH = 7
     DHEADING = 8
 
-    DR_OUT = [DRE, DRN, DRU]
-    DV_OUT = [DVE, DVN, DVU]
+    DR_OUT = [DRN, DRE, DRD]
+    DV_OUT = [DVN, DVE, DVD]
     DRPH = [DROLL, DPITCH, DHEADING]
 
     STATES = None
@@ -419,7 +419,7 @@ def propagate_errors(dt, traj,
     x_out[:, error_model.DRPH] = np.rad2deg(x_out[:, error_model.DRPH])
     error_out = pd.DataFrame(data=x_out,
                              index=traj.index,
-                             columns=['east', 'north', 'up',
+                             columns=['north', 'east', 'down',
                                       'VE', 'VN', 'VU',
                                       'roll', 'pitch', 'heading'])
 

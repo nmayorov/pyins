@@ -27,7 +27,7 @@ def test_perturb_ll():
 def test_phi_to_delta_rph():
     rph = [10, -20, 30]
     mat = dcm.from_rph(rph)
-    phi = np.array([0.01, -0.02, 0.03])
+    phi = np.array([-0.02, 0.01, -0.03])
     mat_perturbed = dcm.from_rv(-phi) @ mat
 
     rph_perturbed = dcm.to_rph(mat_perturbed)

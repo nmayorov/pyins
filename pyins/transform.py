@@ -68,9 +68,9 @@ def perturb_lla(lla, delta_enu):
 
     _, rn, rp = earth.principal_radii(lla[:, 0], lla[:, 2])
 
-    lla[:, 0] += np.rad2deg(delta_enu[:, 1] / rn)
-    lla[:, 1] += np.rad2deg(delta_enu[:, 0] / rp)
-    lla[:, 2] += delta_enu[:, 2]
+    lla[:, 0] += np.rad2deg(delta_enu[:, 0] / rn)
+    lla[:, 1] += np.rad2deg(delta_enu[:, 1] / rp)
+    lla[:, 2] -= delta_enu[:, 2]
 
     return lla[0] if return_single else lla
 
@@ -97,9 +97,9 @@ def difference_lla(lla1, lla2):
                                       0.5 * (lla1[:, 2] + lla2[:, 2]))
     diff = lla1 - lla2
     result = np.empty_like(diff)
-    result[:, 0] = np.deg2rad(diff[:, 1]) * rp
-    result[:, 1] = np.deg2rad(diff[:, 0]) * rn
-    result[:, 2] = diff[:, 2]
+    result[:, 0] = np.deg2rad(diff[:, 0]) * rn
+    result[:, 1] = np.deg2rad(diff[:, 1]) * rp
+    result[:, 2] = -diff[:, 2]
     return result[0] if single else result
 
 
@@ -117,7 +117,7 @@ def difference_trajectories(t1, t2):
         Trajectory difference. It can be interpreted as errors in `t1` relative
         to `t2`.
     """
-    TRAJECTORY_ERROR_COLUMNS = ['east', 'north', 'up', 'VE', 'VN', 'VU',
+    TRAJECTORY_ERROR_COLUMNS = ['north', 'east', 'down', 'VE', 'VN', 'VU',
                                 'roll', 'pitch', 'heading']
 
     diff = t1 - t2
@@ -125,11 +125,12 @@ def difference_trajectories(t1, t2):
                                       0.5 * (t1.alt + t2.alt))
     diff.lat *= np.deg2rad(rn)
     diff.lon *= np.deg2rad(rp)
+    diff.alt = -diff.alt
     diff.heading %= 360
     diff.heading[diff.heading < -180] += 360
     diff.heading[diff.heading > 180] -= 360
 
-    diff = diff.rename(columns={'lon': 'east', 'lat': 'north', 'alt': 'up'})
+    diff = diff.rename(columns={'lat': 'north', 'lon': 'east', 'alt': 'down'})
 
     other_columns = [column for column in diff.columns
                      if column not in TRAJECTORY_ERROR_COLUMNS]
@@ -160,7 +161,7 @@ def correct_trajectory(trajectory, error):
     result = trajectory.copy()
     result['lat'] -= np.rad2deg(error.north / rn)
     result['lon'] -= np.rad2deg(error.east / rp)
-    result['alt'] -= error.up
+    result['alt'] += error.down
     result['VE'] -= error.VE
     result['VN'] -= error.VN
     result['VU'] -= error.VU
@@ -199,14 +200,12 @@ def phi_to_delta_rph(rph):
     sin = np.sin(np.deg2rad(rph))
     cos = np.cos(np.deg2rad(rph))
 
-    result[:, 0, 0] = -sin[:, 2] / cos[:, 1]
-    result[:, 0, 1] = -cos[:, 2] / cos[:, 1]
-
-    result[:, 1, 0] = -cos[:, 2]
-    result[:, 1, 1] = sin[:, 2]
-
-    result[:, 2, 0] = -sin[:, 2] * sin[:, 1] / cos[:, 1]
-    result[:, 2, 1] = -cos[:, 2] * sin[:, 1] / cos[:, 1]
-    result[:, 2, 2] = 1
+    result[:, 0, 0] = -cos[:, 2] / cos[:, 1]
+    result[:, 0, 1] = -sin[:, 2] / cos[:, 1]
+    result[:, 1, 0] = sin[:, 2]
+    result[:, 1, 1] = -cos[:, 2]
+    result[:, 2, 0] = -cos[:, 2] * sin[:, 1] / cos[:, 1]
+    result[:, 2, 1] = -sin[:, 2] * sin[:, 1] / cos[:, 1]
+    result[:, 2, 2] = -1
 
     return result[0] if single else result

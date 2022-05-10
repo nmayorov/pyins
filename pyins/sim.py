@@ -209,14 +209,14 @@ def from_velocity(dt, lla0, velocity_n, rph, sensor_type='increment'):
     n_points = len(velocity_n)
     time = np.arange(n_points) * dt
 
-    VU_spline = _QuadraticSpline(time, velocity_n[:, 2])
+    VU_spline = _QuadraticSpline(time, -velocity_n[:, 2])
     alt_spline = VU_spline.antiderivative()
     alt = lla0[2] + alt_spline(time)
 
     lat = lat0 = np.deg2rad(lla0[0])
     for iteration in range(MAX_ITER):
         _, rn, _ = earth.principal_radii(np.rad2deg(lat), alt)
-        dlat_spline = _QuadraticSpline(time, velocity_n[:, 1] / rn)
+        dlat_spline = _QuadraticSpline(time, velocity_n[:, 0] / rn)
         lat_spline = dlat_spline.antiderivative()
         lat_new = lat_spline(time) + lat0
         delta = (lat - lat_new) * rn
@@ -225,7 +225,7 @@ def from_velocity(dt, lla0, velocity_n, rph, sensor_type='increment'):
             break
 
     _, _, rp = earth.principal_radii(np.rad2deg(lat), alt)
-    dlon_spline = _QuadraticSpline(time, velocity_n[:, 0] / rp)
+    dlon_spline = _QuadraticSpline(time, velocity_n[:, 1] / rp)
     lon_spline = dlon_spline.antiderivative()
 
     lla = np.empty((n_points, 3))
