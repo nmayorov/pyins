@@ -147,14 +147,12 @@ def curvature_matrix(lat, alt):
 
     Parameters
     ----------
-    lat : array_like, shape (n,)
-        Latitude.
-    alt : array_like, shape (n,)
-        Altitude.
+    lat, alt : array_like
+        Latitude and altitude.
 
     Returns
     -------
-    F: ndarray, shape (n, 3, 3)
+    F: ndarray, shape (3, 3) or (n, 3, 3)
         Curvature matrix.
     """
     rn, re, _ = principal_radii(lat, alt)
@@ -178,7 +176,8 @@ def rate_n(lat):
 
     Returns
     -------
-    earth_rate_n : ndarray
+    earth_rate_n : ndarray, shape (3,) or (n, 3)
+        NED components of Earth rate.
     """
     lat = np.asarray(lat)
     n = 1 if lat.ndim == 0 else len(lat)
