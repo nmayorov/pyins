@@ -19,7 +19,7 @@ def test_sim_on_stationary():
     clat = (1 - slat**2) ** 0.5
 
     gyro = earth.RATE * np.array([clat, 0, -slat])
-    accel = np.array([0, 0, -earth.gravity(50)])
+    accel = np.array([0, 0, -earth.gravity(50, 0)])
 
     traj, gyro_g, accel_g = sim.from_position(dt, lla, hpr)
     assert_allclose(traj.lat, 50, rtol=1e-12)

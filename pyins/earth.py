@@ -54,21 +54,19 @@ def principal_radii(lat, alt):
     return rn + alt, re + alt, (re + alt) * cos_lat
 
 
-def gravity(lat, alt=0):
+def gravity(lat, alt):
     """Compute gravity according to a theoretical model.
 
     See `set_model` for the explanation of the formula used.
 
     Parameters
     ----------
-    lat : array_like
-        Latitude.
-    alt : array_like, optional
-        Altitude. Default is 0.
+    lat, alt : array_like
+        Latitude and altitude.
 
     Returns
     -------
-    g : ndarray
+    g : float or ndarray, shape (n,)
         Magnitude of the gravity.
     """
     sin_lat = np.sin(np.deg2rad(lat))
