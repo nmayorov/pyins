@@ -101,7 +101,7 @@ def from_position(dt, lla, rph, sensor_type='increment'):
 
     lla_inertial = lla.copy()
     lla_inertial[:, 1] += np.rad2deg(earth.RATE) * time
-    Cin = dcm.from_ll(lla_inertial[:, 0], lla_inertial[:, 1])
+    Cin = transform.mat_en_from_ll(lla_inertial[:, 0], lla_inertial[:, 1])
 
     R = transform.lla_to_ecef(lla_inertial)
     v_s = CubicSpline(time, R).derivative()

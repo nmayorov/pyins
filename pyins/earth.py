@@ -1,6 +1,6 @@
 """Earth geometry and gravity models."""
 import numpy as np
-from . import dcm
+from . import transform
 from . util import mv_prod
 
 
@@ -130,7 +130,7 @@ def gravitation_ecef(lla):
     g0_g[2] = gravity(lat, alt) + RATE ** 2 * rp * cos_lat
     g0_g = g0_g.T
 
-    Ceg = dcm.from_ll(lat, lon)
+    Ceg = transform.mat_en_from_ll(lat, lon)
 
     return mv_prod(Ceg, g0_g)
 

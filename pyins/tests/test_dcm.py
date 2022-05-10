@@ -3,12 +3,6 @@ import numpy as np
 from pyins import dcm, util
 
 
-def test_from_ll():
-    ll1 = np.array([-90, 0])
-    A1 = np.identity(3)
-    assert_allclose(dcm.from_ll(*ll1), A1, rtol=1e-10, atol=1e-10)
-
-
 def test_skew_matrix():
     vec = np.array([
         [0, 1, 2],

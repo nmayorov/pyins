@@ -77,45 +77,6 @@ def from_rph(rph):
     return Rotation.from_euler('xyz', rph, degrees=True).as_matrix()
 
 
-def from_ll(lat, lon):
-    """Create a direction cosine matrix from latitude and longitude.
-
-    The sequence of elemental rotations is as follows::
-
-           pi/2+lon    pi/2-lan
-        E ----------> ----------> N
-               3           1
-
-    Here E denotes the ECEF frame and N denotes the local level
-    north-pointing frame. The resulting DCM projects from N frame to E frame.
-
-    Parameters
-    ----------
-    lat, lon : float or array_like with shape (n,)
-        Latitude and longitude.
-
-    Returns
-    -------
-    dcm : ndarray, shape (3, 3) or (n, 3, 3)
-        Direction Cosine Matrices.
-    """
-    lat = np.asarray(lat)
-    lon = np.asarray(lon)
-
-    if lat.ndim == 0 and lon.ndim == 0:
-        return Rotation.from_euler('ZY', [lon, -90 - lat],
-                                   degrees=True).as_matrix()
-
-    lat = np.atleast_1d(lat)
-    lon = np.atleast_1d(lon)
-
-    n = max(len(lat), len(lon))
-    angles = np.empty((n, 2))
-    angles[:, 0] = lon
-    angles[:, 1] = -90 - lat
-    return Rotation.from_euler('ZY', angles, degrees=True).as_matrix()
-
-
 def to_rph(dcm):
     """Convert a direction cosine matrix to roll, pitch, heading angles.
 

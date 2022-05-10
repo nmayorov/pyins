@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.testing import assert_allclose, run_module_suite
 from pyins.transform import lla_to_ecef, perturb_lla, phi_to_delta_rph
-from pyins import earth, dcm
+from pyins import earth, dcm, transform
 
 
 def test_lla_to_ecef():
@@ -37,6 +37,17 @@ def test_phi_to_delta_rph():
     delta_rph_linear = np.rad2deg(T @ phi)
 
     assert_allclose(delta_rph_linear, delta_rph_true, rtol=1e-1)
+
+
+def test_mat_en_from_ll():
+    A1 = np.eye(3)
+    A2 = np.array([[0, 0, -1], [0, 1, 0], [1, 0, 0]])
+
+    assert_allclose(transform.mat_en_from_ll(-90, 0), A1,
+                    rtol=1e-10, atol=1e-10)
+    assert_allclose(transform.mat_en_from_ll(0, 0), A2, rtol=1e-10, atol=1e-10)
+    assert_allclose(transform.mat_en_from_ll([-90, 0], [0, 0]),
+                    np.stack([A1, A2]), rtol=1e-10, atol=1e-10)
 
 
 if __name__ == '__main__':

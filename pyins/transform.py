@@ -1,5 +1,6 @@
 """Coordinate transformations."""
 import numpy as np
+from scipy.spatial.transform import Rotation
 from . import earth
 
 
@@ -204,3 +205,42 @@ def phi_to_delta_rph(rph):
     result[:, 2, 2] = -1
 
     return result[0] if single else result
+
+
+def mat_en_from_ll(lat, lon):
+    """Create a direction cosine from ECEF to NED frame.
+
+    The sequence of elemental rotations is as follows::
+
+              lon      -90 - lat
+        E ----------> ----------> N
+               3           2
+
+    Here E denotes the ECEF frame and N denotes the local level
+    north-pointing frame. The resulting DCM projects from N frame to E frame.
+
+    Parameters
+    ----------
+    lat, lon : float or array_like with shape (n,)
+        Latitude and longitude.
+
+    Returns
+    -------
+    dcm : ndarray, shape (3, 3) or (n, 3, 3)
+        Direction Cosine Matrices.
+    """
+    lat = np.asarray(lat)
+    lon = np.asarray(lon)
+
+    if lat.ndim == 0 and lon.ndim == 0:
+        return Rotation.from_euler('ZY', [lon, -90 - lat],
+                                   degrees=True).as_matrix()
+
+    lat = np.atleast_1d(lat)
+    lon = np.atleast_1d(lon)
+
+    n = max(len(lat), len(lon))
+    angles = np.empty((n, 2))
+    angles[:, 0] = lon
+    angles[:, 1] = -90 - lat
+    return Rotation.from_euler('ZY', angles, degrees=True).as_matrix()
