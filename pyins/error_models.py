@@ -254,7 +254,7 @@ class ModifiedPhiModel(InsErrorModel):
         result = np.zeros((3, self.N_STATES))
         result[:, self.DV] = np.eye(3)
         result[:, self.PHI] = util.skew_matrix(
-            trajectory_point[['VE', 'VN', 'VU']])
+            trajectory_point[['VN', 'VE', 'VD']])
         return result
 
     def body_velocity_error_jacobian(self, trajectory_point):
