@@ -1,4 +1,5 @@
 """Utility functions."""
+from collections import OrderedDict
 import numpy as np
 
 
@@ -102,3 +103,25 @@ def skew_matrix(vec):
     result[:, 2, 0] = -vec[:, 1]
     result[:, 2, 1] = vec[:, 0]
     return result[0] if single else result
+
+
+class Bunch(OrderedDict):
+    def __getattr__(self, name):
+        try:
+            return self[name]
+        except KeyError:
+            raise AttributeError(name)
+
+    __setattr__ = OrderedDict.__setitem__
+    __delattr__ = OrderedDict.__delitem__
+
+    def __repr__(self):
+        if self.keys():
+            m = max(map(len, list(self.keys()))) + 1
+            return '\n'.join(['{}: {}'.format(k.rjust(m), type(v))
+                              for k, v in self.items()])
+        else:
+            return self.__class__.__name__ + "()"
+
+    def __dir__(self):
+        return list(self.keys())

@@ -6,21 +6,6 @@ from . import error_models, kalman, util, transform
 from .transform import correct_trajectory
 
 
-class FiltResult:
-    def __init__(self, **kwargs):
-        self.__dict__.update(kwargs)
-
-    def __repr__(self):
-        keys = list(self.__dict__.keys())
-        items = self.__dict__.items()
-        if keys:
-            m = max(map(len, keys)) + 1
-            return '\n'.join(["{} : {}".format(k.rjust(m), type(v))
-                              for k, v in sorted(items)])
-        else:
-            return self.__class__.__name__ + "()"
-
-
 class InertialSensor:
     """Inertial sensor triad description.
 
@@ -719,7 +704,7 @@ class FeedforwardFilter:
 
         trajectory = correct_trajectory(trajectory, err)
 
-        return FiltResult(trajectory=trajectory, err=err, sd=sd,
+        return util.Bunch(trajectory=trajectory, err=err, sd=sd,
                           gyro_err=gyro_err, gyro_sd=gyro_sd,
                           accel_err=accel_err,
                           accel_sd=accel_sd, x=x, P=P, residuals=residuals)
@@ -796,7 +781,7 @@ class FeedforwardFilter:
 
         trajectory = correct_trajectory(trajectory, err)
 
-        return FiltResult(trajectory=trajectory, err=err, sd=sd,
+        return util.Bunch(trajectory=trajectory, err=err, sd=sd,
                           gyro_err=gyro_err, gyro_sd=gyro_sd,
                           accel_err=accel_err, accel_sd=accel_sd,
                           x=x, P=P, residuals=residuals)
@@ -1188,7 +1173,7 @@ class FeedbackFilter:
 
         trajectory = correct_trajectory(integrator.trajectory, err)
 
-        return FiltResult(trajectory=trajectory, sd=sd, gyro_err=gyro_err,
+        return util.Bunch(trajectory=trajectory, sd=sd, gyro_err=gyro_err,
                           gyro_sd=gyro_sd, accel_err=accel_err,
                           accel_sd=accel_sd, P=P, residuals=residuals)
 
@@ -1286,6 +1271,6 @@ class FeedbackFilter:
 
         trajectory = correct_trajectory(trajectory, err)
 
-        return FiltResult(trajectory=trajectory, sd=sd, gyro_err=gyro_err,
+        return util.Bunch(trajectory=trajectory, sd=sd, gyro_err=gyro_err,
                           gyro_sd=gyro_sd, accel_err=accel_err,
                           accel_sd=accel_sd, P=P, residuals=residuals)
