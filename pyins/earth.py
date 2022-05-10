@@ -6,8 +6,6 @@ from . util import mv_prod
 
 #: Rotation rate of Earth in rad/s.
 RATE = 7.2921157e-5
-#: Schuller frequency.
-SF = 1.2383e-3
 #: Approximate value of gravity.
 G0 = 9.8
 #: Semi major axis of Earth ellipsoid (or radius of Earth approximately).
@@ -18,10 +16,6 @@ E2 = 6.6943799901413e-3
 GE = 9.7803253359
 #: Gravity at the pole.
 GP = 9.8321849378
-
-F = R0 * (1 - E2) ** 0.5 * GP / (GE * R0) - 1
-#: Standard gravitational parameter for Earth
-MU = 3.986004418e14
 
 
 def principal_radii(lat, alt):
@@ -79,8 +73,9 @@ def gravity(lat, alt=0):
     """
     sin_lat = np.sin(np.deg2rad(lat))
     alt = np.asarray(alt)
-
-    return GE * (1 + F * sin_lat**2) / (1 - E2 * sin_lat**2)**0.5 * (1 - 2 * alt / R0)
+    F = (1 - E2) ** 0.5 * GP / GE - 1
+    return (GE * (1 + F * sin_lat**2) / (1 - E2 * sin_lat**2)**0.5
+            * (1 - 2 * alt / R0))
 
 
 def gravity_n(lat, alt):
