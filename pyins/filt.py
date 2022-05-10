@@ -350,16 +350,16 @@ def _compute_output_errors(trajectory, x, P, output_stamps,
     Py = util.mm_prod(Py, T, bt=True)
     sd_y = np.diagonal(Py, axis1=1, axis2=2) ** 0.5
 
-    err = pd.DataFrame(index=output_stamps)
-    err['north'] = y[:, error_model.DRN]
-    err['east'] = y[:, error_model.DRE]
-    err['down'] = y[:, error_model.DRD]
-    err['VN'] = y[:, error_model.DVN]
-    err['VE'] = y[:, error_model.DVE]
-    err['VD'] = y[:, error_model.DVD]
-    err['roll'] = np.rad2deg(y[:, error_model.DROLL])
-    err['pitch'] = np.rad2deg(y[:, error_model.DPITCH])
-    err['heading'] = np.rad2deg(y[:, error_model.DHEADING])
+    error = pd.DataFrame(index=output_stamps)
+    error['north'] = y[:, error_model.DRN]
+    error['east'] = y[:, error_model.DRE]
+    error['down'] = y[:, error_model.DRD]
+    error['VN'] = y[:, error_model.DVN]
+    error['VE'] = y[:, error_model.DVE]
+    error['VD'] = y[:, error_model.DVD]
+    error['roll'] = np.rad2deg(y[:, error_model.DROLL])
+    error['pitch'] = np.rad2deg(y[:, error_model.DPITCH])
+    error['heading'] = np.rad2deg(y[:, error_model.DHEADING])
 
     sd = pd.DataFrame(index=output_stamps)
     sd['north'] = sd_y[:, error_model.DRN]
@@ -386,7 +386,7 @@ def _compute_output_errors(trajectory, x, P, output_stamps,
         accel_err[name] = x[:, n + ng + i]
         accel_sd[name] = P[:, n + ng + i, n + ng + i] ** 0.5
 
-    return err, sd, gyro_err, gyro_sd, accel_err, accel_sd
+    return error, sd, gyro_err, gyro_sd, accel_err, accel_sd
 
 
 class FeedforwardFilter:
@@ -673,7 +673,7 @@ class FeedforwardFilter:
         contain stamps only presented in `record_stamps`.
         trajectory : DataFrame
             Trajectory corrected by estimated errors.
-        err, sd : DataFrame
+        error, sd : DataFrame
             Estimated trajectory errors and their standard deviations.
         gyro_err, gyro_sd : DataFrame
             Estimated gyro error states and their standard deviations.
@@ -696,14 +696,14 @@ class FeedforwardFilter:
         x, P, _, _, _, residuals = self._forward_pass(trajectory, observations,
                                                       stamps, record_stamps)
 
-        err, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
+        error, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
             _compute_output_errors(self.traj_ref, x, P, record_stamps,
                                    self.error_model, self.gyro_model,
                                    self.accel_model)
 
-        trajectory = transform.correct_trajectory(trajectory, err)
+        trajectory = transform.correct_trajectory(trajectory, error)
 
-        return util.Bunch(trajectory=trajectory, err=err, sd=sd,
+        return util.Bunch(trajectory=trajectory, error=error, sd=sd,
                           gyro_err=gyro_err, gyro_sd=gyro_sd,
                           accel_err=accel_err,
                           accel_sd=accel_sd, x=x, P=P, residuals=residuals)
@@ -738,7 +738,7 @@ class FeedforwardFilter:
         trajectory : DataFrame
             Trajectory corrected by estimated errors. It will only contain
             stamps presented in `record_stamps`.
-        err, sd : DataFrame
+        error, sd : DataFrame
             Estimated trajectory errors and their standard deviations.
         gyro_err, gyro_sd : DataFrame
             Estimated gyro error states and their standard deviations.
@@ -765,7 +765,8 @@ class FeedforwardFilter:
                                       record_stamps)
 
         x, P, xa, Pa, Phi_arr, residuals = self._forward_pass(
-            trajectory, observations, stamps, record_stamps, data_for_backward=True)
+            trajectory, observations, stamps, record_stamps,
+            data_for_backward=True)
 
         kalman.smooth_rts(x, P, xa, Pa, Phi_arr)
 
@@ -773,14 +774,14 @@ class FeedforwardFilter:
         x = x[ind]
         P = P[ind]
 
-        err, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
+        error, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
             _compute_output_errors(self.traj_ref, x, P, record_stamps,
                                    self.error_model, self.gyro_model,
                                    self.accel_model)
 
-        trajectory = transform.correct_trajectory(trajectory, err)
+        trajectory = transform.correct_trajectory(trajectory, error)
 
-        return util.Bunch(trajectory=trajectory, err=err, sd=sd,
+        return util.Bunch(trajectory=trajectory, error=error, sd=sd,
                           gyro_err=gyro_err, gyro_sd=gyro_sd,
                           accel_err=accel_err, accel_sd=accel_sd,
                           x=x, P=P, residuals=residuals)
@@ -1165,12 +1166,12 @@ class FeedbackFilter:
                                                       feedback_period)
 
         trajectory = integrator.trajectory.loc[record_stamps]
-        err, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
+        error, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
             _compute_output_errors(trajectory, x, P, record_stamps,
                                    self.error_model, self.gyro_model,
                                    self.accel_model)
 
-        trajectory = transform.correct_trajectory(integrator.trajectory, err)
+        trajectory = transform.correct_trajectory(integrator.trajectory, error)
 
         return util.Bunch(trajectory=trajectory, sd=sd, gyro_err=gyro_err,
                           gyro_sd=gyro_sd, accel_err=accel_err,
@@ -1247,12 +1248,12 @@ class FeedbackFilter:
             feedback_period, data_for_backward=True)
 
         trajectory = integrator.trajectory.loc[record_stamps]
-        err, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
+        error, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
             _compute_output_errors(trajectory, x, P, record_stamps,
                                    self.error_model, self.gyro_model,
                                    self.accel_model)
 
-        trajectory = transform.correct_trajectory(trajectory, err)
+        trajectory = transform.correct_trajectory(trajectory, error)
         xa[:, :self.error_model.N_STATES] -= x[:, :self.error_model.N_STATES]
         x[:, :self.error_model.N_STATES] = 0
 
@@ -1263,12 +1264,12 @@ class FeedbackFilter:
         P = P[ind]
         trajectory = trajectory.iloc[ind]
 
-        err, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
+        error, sd, gyro_err, gyro_sd, accel_err, accel_sd = \
             _compute_output_errors(trajectory, x, P, record_stamps[ind],
                                    self.error_model, self.gyro_model,
                                    self.accel_model)
 
-        trajectory = transform.correct_trajectory(trajectory, err)
+        trajectory = transform.correct_trajectory(trajectory, error)
 
         return util.Bunch(trajectory=trajectory, sd=sd, gyro_err=gyro_err,
                           gyro_sd=gyro_sd, accel_err=accel_err,

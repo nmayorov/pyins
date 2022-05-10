@@ -127,7 +127,7 @@ def test_FeedforwardFilter():
     res = f.run(traj_error, [position_obs])
 
     x = errors.loc[3000:]
-    y = res.err.loc[3000:]
+    y = res.error.loc[3000:]
 
     assert_allclose(x.east, y.east, rtol=0, atol=10)
     assert_allclose(x.north, y.north, rtol=0, atol=10)
@@ -143,7 +143,7 @@ def test_FeedforwardFilter():
     # This smoother we don't need to wait until the filter converges,
     # the estimation accuracy is also improved some
     x = errors
-    y = res.err
+    y = res.error
 
     assert_allclose(x.east, y.east, rtol=0, atol=10)
     assert_allclose(x.north, y.north, rtol=0, atol=10)
