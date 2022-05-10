@@ -1,4 +1,4 @@
-"""Compute a navigation solution by integration of inertial readings."""
+"""Strapdown INS integration algorithms."""
 import numpy as np
 import pandas as pd
 from . import dcm
@@ -66,7 +66,7 @@ def compute_theta_and_dv(gyro, accel, dt=None):
     return gyro + coning, accel + sculling + 0.5 * np.cross(gyro, accel)
 
 
-class Integrator:
+class StrapdownIntegrator:
     """Integrate inertial readings by strapdown algorithm.
 
     The algorithm described in [1]_ and [2]_ is used with slight

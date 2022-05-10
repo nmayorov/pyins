@@ -8,7 +8,7 @@ from pyins.filt import (InertialSensor, PositionObs, EnuVelocityObs,
 from pyins.error_models import propagate_errors
 from pyins import earth
 from pyins import sim
-from pyins.integrate import compute_theta_and_dv, Integrator
+from pyins.strapdown import compute_theta_and_dv, StrapdownIntegrator
 from pyins.transform import perturb_lla, difference_trajectories
 
 
@@ -193,8 +193,8 @@ def test_FeedbackFilter():
 
     lla0 = perturb_lla(traj.loc[0, ['lat', 'lon', 'alt']],
                        [d_lon, d_lat, d_alt])
-    integrator = Integrator(dt, lla0, [d_VE, d_VN, d_VU],
-                            [d_r, d_p, d_h])
+    integrator = StrapdownIntegrator(dt, lla0, [d_VE, d_VN, d_VU],
+                                     [d_r, d_p, d_h])
     res = f.run(integrator, theta, dv, observations=[position_obs])
     error = difference_trajectories(res.traj, traj)
     error = error.iloc[3000:]
