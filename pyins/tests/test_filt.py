@@ -8,7 +8,7 @@ from pyins.filt import (InertialSensor, PositionObs, EnuVelocityObs,
 from pyins.error_models import propagate_errors
 from pyins import earth
 from pyins import sim
-from pyins.integrate import coning_sculling, Integrator
+from pyins.integrate import compute_theta_and_dv, Integrator
 from pyins.transform import perturb_lla, difference_trajectories
 
 
@@ -170,7 +170,7 @@ def test_FeedbackFilter():
 
     _, gyro, accel = sim.from_position(dt, traj[['lat', 'lon', 'alt']],
                                        traj[['roll', 'pitch', 'heading']])
-    theta, dv = coning_sculling(gyro, accel)
+    theta, dv = compute_theta_and_dv(gyro, accel)
 
     np.random.seed(0)
     obs_data = pd.DataFrame(index=traj.index[::10])

@@ -3,7 +3,7 @@ from numpy.testing import assert_allclose, run_module_suite
 import numpy as np
 from pyins import sim
 from pyins.transform import difference_trajectories
-from pyins.integrate import coning_sculling, Integrator
+from pyins.integrate import compute_theta_and_dv, Integrator
 
 
 def test_coning_sculling():
@@ -19,15 +19,15 @@ def test_coning_sculling():
     dv_true[:, 0] = 0
     dv_true[:, 1] = -0.5e-3
     dv_true[:, 2] = 0.1
-    theta, dv = coning_sculling(gyro, accel)
+    theta, dv = compute_theta_and_dv(gyro, accel)
     assert_allclose(theta, gyro, rtol=1e-10)
     assert_allclose(dv, dv_true, rtol=1e-10)
 
 
 def run_integration_test(reference_trajectory, gyro, accel, dt, sensor_type,
                          thresholds):
-    theta, dv = coning_sculling(gyro, accel,
-                                dt=dt if sensor_type == 'rate' else None)
+    theta, dv = compute_theta_and_dv(gyro, accel,
+                                     dt=dt if sensor_type == 'rate' else None)
     init = reference_trajectory.iloc[0]
     integrator = Integrator(dt,
                             init[['lat', 'lon', 'alt']],

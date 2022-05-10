@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 from pyins import earth, error_models, sim, transform
-from pyins.integrate import coning_sculling, Integrator
+from pyins.integrate import compute_theta_and_dv, Integrator
 from pyins.transform import perturb_lla, difference_trajectories
 
 
@@ -23,7 +23,7 @@ def test_propagate_errors(error_model):
 
     gyro += gyro_bias * dt
     accel += accel_bias * dt
-    theta, dv = coning_sculling(gyro, accel)
+    theta, dv = compute_theta_and_dv(gyro, accel)
 
     delta_position_n = [-200, 100, 20]
     delta_velocity_n = [0.1, -0.2, -0.05]

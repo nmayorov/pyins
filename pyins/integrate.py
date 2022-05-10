@@ -1,20 +1,21 @@
 """Compute a navigation solution by integration of inertial readings."""
 import numpy as np
 import pandas as pd
-from . import dcm, earth
+from . import dcm
 from ._integrate import integrate_fast
 
 
-def coning_sculling(gyro, accel, order=1, dt=None):
-    """Apply coning and sculling corrections to inertial readings.
+def compute_theta_and_dv(gyro, accel, order=1, dt=None):
+    """Compute attitude and velocity increments from IMU readings.
+
+    This function transforms raw gyro and accelerometer readings into
+    rotation vectors and velocity increments by applying coning and sculling
+    corrections and accounting for IMU rotation during a sampling period.
 
     The algorithm assumes a polynomial model for the angular velocity and the
     specific force, fitting coefficients by considering previous time
     intervals. The algorithm for a linear approximation is well known and
     described in [1]_ and [2]_.
-
-    The accelerometer readings are also corrected for body frame rotation
-    during a sampling period.
 
     Parameters
     ----------
@@ -25,11 +26,10 @@ def coning_sculling(gyro, accel, order=1, dt=None):
     order : {0, 1, 2}, optional
         Angular velocity and specific force polynomial model order.
         Note that 0 means not applying non-commutative corrections at all.
-        For
         Default is 1.
     dt : float or None, optional
-        If None (default), `gyro` and `accel` are assumed to contain increments.
-        If float, it is interpreted as sampling rate of rate sensors.
+        If None (default), `gyro` and `accel` are assumed to contain integral
+        increments. Float is interpreted as the sampling rate of rate sensors.
 
     Returns
     -------
