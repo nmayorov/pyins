@@ -57,7 +57,8 @@ def principal_radii(lat, alt):
 def gravity(lat, alt):
     """Compute gravity according to a theoretical model.
 
-    See `set_model` for the explanation of the formula used.
+    Somigliana model used in WGS84 with linear vertical correction is
+    implemented. See [1]_ for the discussion.
 
     Parameters
     ----------
@@ -68,6 +69,11 @@ def gravity(lat, alt):
     -------
     g : float or ndarray, shape (n,)
         Magnitude of the gravity.
+
+    References
+    ----------
+    .. [1] P. D. Groves, "Principles of GNSS, Inertial, and Multisensor
+           Integrated Navigation Systems".
     """
     sin_lat = np.sin(np.deg2rad(lat))
     alt = np.asarray(alt)
