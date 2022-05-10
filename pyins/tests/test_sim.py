@@ -77,49 +77,5 @@ def test_sim_on_stationary():
         assert_allclose(accel_g[:, i], accel[i], atol=1e-6)
 
 
-def test_stationary():
-    dt = 0.1
-    n_points = 100
-    t = dt * np.arange(n_points)
-    lat = 58
-    alt = -10
-    hpr = np.empty((n_points, 3))
-    hpr[:, 0] = 45
-    hpr[:, 1] = -10
-    hpr[:, 2] = 5
-    Cnb = dcm.from_rph(hpr)
-
-    slat = np.sin(np.deg2rad(lat))
-    clat = (1 - slat ** 2) ** 0.5
-    omega_n = earth.RATE * np.array([0, clat, slat])
-    g_n = np.array([0, 0, -earth.gravity(lat, alt)])
-    Omega_b = Cnb[0].T.dot(omega_n)
-    g_b = Cnb[0].T.dot(g_n)
-
-    gyro, accel = sim.stationary_rotation(0.1, lat, alt, Cnb)
-    gyro_true = np.tile(Omega_b * dt, (n_points - 1, 1))
-    accel_true = np.tile(-g_b * dt, (n_points - 1, 1))
-    assert_allclose(gyro, gyro_true)
-    assert_allclose(accel, accel_true, rtol=1e-5, atol=1e-8)
-
-    # Rotate around Earth's axis with additional rate.
-    rate = 6
-    rate_n = rate * np.array([0, clat, slat])
-    rate_s = Cnb[0].T.dot(rate_n)
-    Cbs = dcm.from_rv(rate_s * t[:, None])
-
-    gyro, accel = sim.stationary_rotation(0.1, lat, alt, Cnb, Cbs)
-    gyro_true = np.tile((Omega_b + rate_s) * dt, (n_points - 1, 1))
-    assert_allclose(gyro, gyro_true)
-
-    # Place IMU horizontally and rotate around vertical axis.
-    # Gravity components should be identically 0.
-    Cnb = Rotation.from_euler('Z', -hpr[:, 0], True).as_matrix()
-    Cbs = Rotation.from_euler('Z', rate * t, True).as_matrix()
-    gyro, accel = sim.stationary_rotation(0.1, lat, alt, Cnb, Cbs)
-    accel_true = np.tile(-g_n * dt, (n_points - 1, 1))
-    assert_allclose(accel, accel_true, rtol=1e-5, atol=1e-7)
-
-
 if __name__ == '__main__':
     run_module_suite()

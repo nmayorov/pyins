@@ -330,65 +330,6 @@ def perturb_navigation_state(lla, velocity_n, rph, position_sd, velocity_sd,
             rph + [level_sd, level_sd, azimuth_sd] * rng.randn(3))
 
 
-def stationary_rotation(dt, lat, alt, Cnb, Cbs=None):
-    """Simulate readings on a stationary bench.
-
-    Parameters
-    ----------
-    dt : float
-        Time step.
-    lat : float
-        Latitude of the place.
-    alt : float
-        Altitude of the place.
-    Cnb : ndarray, shape (n_points, 3, 3)
-        Body attitude matrix.
-    Cbs : ndarray with shape (3, 3) or (n_points, 3, 3) or None
-        Sensor assembly attitude matrix relative to the body axes. If None,
-        (default) identity attitude is assumed.
-
-    Returns
-    -------
-    gyro, accel : ndarray, shape (n_points - 1, 3)
-        Gyro and accelerometer readings.
-    """
-    n_points = Cnb.shape[0]
-    time = dt * np.arange(n_points)
-
-    lla_inertial = np.empty((n_points, 3))
-    lla_inertial[:, 0] = lat
-    lla_inertial[:, 1] = np.rad2deg(earth.RATE) * time
-    lla_inertial[:, 2] = alt
-
-    Cin = dcm.from_ll(lla_inertial[:, 0], lla_inertial[:, 1])
-
-    R = transform.lla_to_ecef(lla_inertial)
-    v_s = CubicSpline(time, R).derivative()
-
-    if Cbs is None:
-        Cns = Cnb
-    else:
-        Cns = util.mm_prod(Cnb, Cbs)
-
-    Cis = util.mm_prod(Cin, Cns)
-    Cib_spline = RotationSpline(time, Rotation.from_matrix(Cis))
-    a = Cib_spline.interpolator.c[2]
-    b = Cib_spline.interpolator.c[1]
-    c = Cib_spline.interpolator.c[0]
-
-    g = earth.gravitation_ecef(lla_inertial)
-    a_s = v_s.derivative()
-    d = a_s.c[1] - g[:-1]
-    e = a_s.c[0] - np.diff(g, axis=0) / dt
-
-    d = util.mv_prod(Cis[:-1], d, at=True)
-    e = util.mv_prod(Cis[:-1], e, at=True)
-
-    gyros, accels = _compute_increment_readings(dt, a, b, c, d, e)
-
-    return gyros, accels
-
-
 def _align_matrix(align_angles):
     align_angles = np.deg2rad(align_angles)
     theta1 = align_angles[0]
