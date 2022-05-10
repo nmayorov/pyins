@@ -1,6 +1,6 @@
-from numpy.testing import assert_allclose, run_module_suite
 import numpy as np
-from pyins import dcm, util
+from numpy.testing import assert_allclose
+from pyins import util
 
 
 def test_skew_matrix():
@@ -12,13 +12,9 @@ def test_skew_matrix():
         [-2, 3, 6],
         [0, -2, 3]
     ])
-    assert_allclose(dcm.skew_matrix(vec[0]) @ check[0],
+    assert_allclose(util.skew_matrix(vec[0]) @ check[0],
                     np.cross(vec[0], check[0]))
-    assert_allclose(dcm.skew_matrix(vec[1]) @ check[1],
+    assert_allclose(util.skew_matrix(vec[1]) @ check[1],
                     np.cross(vec[1], check[1]))
-    assert_allclose(util.mv_prod(dcm.skew_matrix(vec), check),
+    assert_allclose(util.mv_prod(util.skew_matrix(vec), check),
                     np.cross(vec, check))
-
-
-if __name__ == '__main__':
-    run_module_suite()

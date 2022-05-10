@@ -160,7 +160,7 @@ class ModifiedPhiModel(ErrorModel):
     def system_matrix(self, trajectory):
         n_samples = trajectory.shape[0]
 
-        V_skew = dcm.skew_matrix(trajectory[['VN', 'VE', 'VD']])
+        V_skew = util.skew_matrix(trajectory[['VN', 'VE', 'VD']])
         R = earth.curvature_matrix(trajectory.lat, trajectory.alt)
         Omega_n = earth.rate_n(trajectory.lat)
         rho_n = util.mv_prod(R, trajectory[['VN', 'VE', 'VD']])
@@ -173,17 +173,17 @@ class ModifiedPhiModel(ErrorModel):
         F[np.ix_(samples, self.DR, self.DV)] = np.eye(3)
         F[np.ix_(samples, self.DR, self.PHI)] = V_skew
 
-        F[np.ix_(samples, self.DV, self.DV)] = -dcm.skew_matrix(
+        F[np.ix_(samples, self.DV, self.DV)] = -util.skew_matrix(
             2 * Omega_n + rho_n)
-        F[np.ix_(samples, self.DV, self.PHI)] = -dcm.skew_matrix(g_n)
+        F[np.ix_(samples, self.DV, self.PHI)] = -util.skew_matrix(g_n)
         F[:, self.DV3, self.DR3] = 2 * earth.gravity(trajectory.lat,
                                                      trajectory.alt) / earth.R0
 
         F[np.ix_(samples, self.PHI, self.DR)] = util.mm_prod(
-            dcm.skew_matrix(Omega_n), R)
+            util.skew_matrix(Omega_n), R)
         F[np.ix_(samples, self.PHI, self.DV)] = R
         F[np.ix_(samples, self.PHI, self.PHI)] = \
-            -dcm.skew_matrix(rho_n + Omega_n) + util.mm_prod(R, V_skew)
+            -util.skew_matrix(rho_n + Omega_n) + util.mm_prod(R, V_skew)
 
         B_gyro = np.zeros((n_samples, self.N_STATES, 3))
         B_gyro[np.ix_(samples, self.DV, [0, 1, 2])] = util.mm_prod(V_skew, Cnb)
@@ -203,7 +203,7 @@ class ModifiedPhiModel(ErrorModel):
         samples = np.arange(len(trajectory))
         T[np.ix_(samples, self.DR_OUT, self.DR)] = np.eye(3)
         T[np.ix_(samples, self.DV_OUT, self.DV)] = np.eye(3)
-        T[np.ix_(samples, self.DV_OUT, self.PHI)] = dcm.skew_matrix(
+        T[np.ix_(samples, self.DV_OUT, self.PHI)] = util.skew_matrix(
             trajectory[['VN', 'VE', 'VD']])
         T[np.ix_(samples, self.DRPH, self.PHI)] = transform.phi_to_delta_rph(
             trajectory[['roll', 'pitch', 'heading']])
@@ -230,7 +230,7 @@ class ModifiedPhiModel(ErrorModel):
     def ned_velocity_error_jacobian(self, trajectory_point):
         result = np.zeros((3, self.N_STATES))
         result[:, self.DV] = np.eye(3)
-        result[:, self.PHI] = dcm.skew_matrix(
+        result[:, self.PHI] = util.skew_matrix(
             trajectory_point[['VE', 'VN', 'VU']])
         return result
 
@@ -276,12 +276,12 @@ class ModifiedPsiModel(ErrorModel):
     def system_matrix(self, trajectory):
         n_samples = trajectory.shape[0]
 
-        V_skew = dcm.skew_matrix(trajectory[['VN', 'VE', 'VD']])
+        V_skew = util.skew_matrix(trajectory[['VN', 'VE', 'VD']])
         R = earth.curvature_matrix(trajectory.lat, trajectory.alt)
         Omega_n = earth.rate_n(trajectory.lat)
         rho_n = util.mv_prod(R, trajectory[['VN', 'VE', 'VD']])
-        g_n_skew = dcm.skew_matrix(earth.gravity_n(trajectory.lat,
-                                                   trajectory.alt))
+        g_n_skew = util.skew_matrix(earth.gravity_n(trajectory.lat,
+                                                    trajectory.alt))
         Cnb = dcm.from_rph(trajectory[['roll', 'pitch', 'heading']])
 
         F = np.zeros((n_samples, self.N_STATES, self.N_STATES))
@@ -290,15 +290,15 @@ class ModifiedPsiModel(ErrorModel):
         F[np.ix_(samples, self.DR, self.DV)] = np.eye(3)
         F[np.ix_(samples, self.DR, self.PSI)] = V_skew
 
-        F[np.ix_(samples, self.DV, self.DV)] = -dcm.skew_matrix(
+        F[np.ix_(samples, self.DV, self.DV)] = -util.skew_matrix(
             2 * Omega_n + rho_n)
         F[np.ix_(samples, self.DV, self.DR)] = -g_n_skew @ R
         F[np.ix_(samples, self.DV, self.PSI)] = -g_n_skew
         F[:, self.DV3, self.DR3] += 2 * earth.gravity(trajectory.lat,
                                                       trajectory.alt) / earth.R0
 
-        F[np.ix_(samples, self.PSI, self.PSI)] = -dcm.skew_matrix(rho_n +
-                                                                  Omega_n)
+        F[np.ix_(samples, self.PSI, self.PSI)] = -util.skew_matrix(rho_n +
+                                                                   Omega_n)
 
         B_gyro = np.zeros((n_samples, self.N_STATES, 3))
         B_gyro[np.ix_(samples, self.DV, [0, 1, 2])] = util.mm_prod(V_skew, Cnb)
@@ -318,7 +318,7 @@ class ModifiedPsiModel(ErrorModel):
         samples = np.arange(len(trajectory))
         T[np.ix_(samples, self.DR_OUT, self.DR)] = np.eye(3)
         T[np.ix_(samples, self.DV_OUT, self.DV)] = np.eye(3)
-        T[np.ix_(samples, self.DV_OUT, self.PSI)] = dcm.skew_matrix(
+        T[np.ix_(samples, self.DV_OUT, self.PSI)] = util.skew_matrix(
             trajectory[['VN', 'VE', 'VD']])
 
         T_rph_phi = transform.phi_to_delta_rph(
@@ -350,7 +350,7 @@ class ModifiedPsiModel(ErrorModel):
     def ned_velocity_error_jacobian(self, trajectory_point):
         result = np.zeros((3, self.N_STATES))
         result[:, self.DV] = np.eye(3)
-        result[:, self.PSI] = dcm.skew_matrix(
+        result[:, self.PSI] = util.skew_matrix(
             trajectory_point[['VN', 'VE', 'VD']])
         return result
 
