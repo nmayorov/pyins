@@ -1,6 +1,41 @@
 """Kalman filter functions."""
 import numpy as np
-from scipy.linalg import cholesky, cho_solve, solve_triangular
+from scipy.linalg import cholesky, cho_solve, solve_triangular, expm
+
+
+def compute_process_matrices(F, Q, dt, algorithm='first-order'):
+    """Compute discrete process matrices for Kalman Filter prediction
+       using first order approximation or matrix exponential [1]_.
+
+    Parameters
+    ----------
+    F : ndarray, shape (n_states, n_states)
+        Conitious process transition matrix.
+    Q : ndarray, shape (n_states, n_states)
+        Continious process noise matrix.
+    dt : float
+        Time step.
+    algorithm : 'first-order' or 'expm', optional
+        Algorith to use: first order approximation or matrix exponetial.
+
+    References
+    ----------
+    .. [1] CHARLES F. VAN LOAN, "Computing Integrals Involving the
+           Matrix Exponential", IEEE TRANSACTIONS ON AUTOMATICCONIROL,
+           VOL. AC-23, NO. 3, JUNE 1978.
+    """
+    n = F.shape[0]
+    if algorithm == 'first-order':
+        return np.eye(n) + F * dt, Q * dt
+    elif algorithm == 'expm':
+        H = np.zeros((2*n, 2*n))
+        H[:n, :n] = F
+        H[:n, n:] = Q
+        H[n:, n:] = -F.T
+        H = expm(H*dt)
+        return H[:n, :n], H[:n, n:].dot(H[:n, :n].T)
+    else:
+        assert False
 
 
 def correct(x, P, z, H, R):

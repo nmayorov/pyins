@@ -22,3 +22,13 @@ def test_kalman_correct():
     kalman.correct(x, P, z, H, R)
     assert_allclose(x, x_true)
     assert_allclose(P, P_true)
+
+
+def test_process_matrices():
+    F = np.array([[0, 1], [0, 0]])
+    Q = np.array([[0, 0], [0, 1]])
+
+    Phi, Qd = kalman.compute_process_matrices(F, Q, 1, 'expm')
+    assert_allclose(Phi, np.array([[1, 1], [0, 1]]))
+    test = F.dot(Qd) + Qd.dot(F.T) + Q - Phi.dot(Q).dot(Phi.T)
+    assert_allclose(test, 0)
