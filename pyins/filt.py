@@ -5,6 +5,9 @@ import pandas as pd
 from . import error_models, kalman, util, transform
 
 
+FIRST_ORDER_TIMESTEP_MAX = 0.1
+
+
 class InertialSensor:
     """Inertial sensor triad description.
 
@@ -622,12 +625,13 @@ class FeedforwardFilter:
                 P[i_save] = Pc
                 i_save += 1
 
+            F = 0.5 * (self.F[ind] + self.F[next_ind])
+            Q = 0.5 * (self.G[ind] + self.G[next_ind]) * self.q
+            Q = np.dot(Q, Q.T)
+
             dt = self.dt * (next_ind - ind)
-            Phi = 0.5 * (self.F[ind] + self.F[next_ind]) * dt
-            Phi[np.diag_indices_from(Phi)] += 1
-            Qd = 0.5 * (self.G[ind] + self.G[next_ind])
-            Qd *= self.q
-            Qd = np.dot(Qd, Qd.T) * dt
+            Phi, Qd = kalman.compute_process_matrices(F, Q, dt,
+                'expm' if dt > FIRST_ORDER_TIMESTEP_MAX else 'first-order')
 
             if data_for_backward:
                 Phi_arr[i] = Phi
@@ -1067,12 +1071,12 @@ class FeedbackFilter:
                     G1[:n, s: s + 3] = Fia[i]
                     G2[:n, s: s + 3] = Fia[i_next]
 
-                Phi = 0.5 * (F1 + F2) * dt
-                Phi[np.diag_indices_from(Phi)] += 1
+                F = 0.5 * (F1 + F2)
+                Q = 0.5 * (G1 + G2) * self.q
+                Q = np.dot(Q, Q.T)
 
-                Qd = 0.5 * (G1 + G2)
-                Qd *= self.q
-                Qd = np.dot(Qd, Qd.T) * dt
+                Phi, Qd = kalman.compute_process_matrices(F, Q, dt,
+                    'expm' if dt > FIRST_ORDER_TIMESTEP_MAX else 'first-order')
 
                 xc = Phi.dot(xc)
                 Pc = Phi.dot(Pc).dot(Phi.T) + Qd
