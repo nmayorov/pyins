@@ -38,8 +38,9 @@ def test_process_matrices():
 
     np.random.seed(0)
     F = np.random.randn(15, 15)
-    Q = np.eye(15)
+    Q = np.random.randn(15, 15)
+    Q = Q.dot(Q.T)
 
-    Phi, Qd = kalman.compute_process_matrices(F, Q, 1, 'expm')
+    Phi, Qd = kalman.compute_process_matrices(F, Q, 0.5, 'expm')
     test = F.dot(Qd) + Qd.dot(F.T) + Q - Phi.dot(Q).dot(Phi.T)
     assert_allclose(test, 0, atol=1E-12)
