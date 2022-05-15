@@ -4,8 +4,10 @@ from scipy.linalg import cholesky, cho_solve, solve_triangular, expm
 
 
 def compute_process_matrices(F, Q, dt, algorithm='first-order'):
-    """Compute discrete process matrices for Kalman Filter prediction
-       using first order approximation or matrix exponential [1]_.
+    """Compute discrete process matrices for Kalman Filter prediction.
+
+    Support first order approximation and alogirithm using
+    matrix exponential [1]_.
 
     Parameters
     ----------
@@ -28,12 +30,12 @@ def compute_process_matrices(F, Q, dt, algorithm='first-order'):
     if algorithm == 'first-order':
         return np.eye(n) + F * dt, Q * dt
     elif algorithm == 'expm':
-        H = np.zeros((2*n, 2*n))
+        H = np.zeros((2 * n, 2 * n))
         H[:n, :n] = F
         H[:n, n:] = Q
         H[n:, n:] = -F.T
-        H = expm(H*dt)
-        return H[:n, :n], H[:n, n:].dot(H[:n, :n].T)
+        H = expm(H * dt)
+        return H[:n, :n], H[:n, n:] @ H[:n, :n].T
     else:
         assert False
 
