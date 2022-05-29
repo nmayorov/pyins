@@ -295,7 +295,7 @@ class ModifiedPsiModel(InsErrorModel):
 
     STATES = OrderedDict(DR1=DR1, DR2=DR2, DR3=DR3,
                          DV1=DV1, DV2=DV2, DV3=DV3,
-                         PSI1=PSI1, PSI2=PSI1, PSI3=PSI1)
+                         PSI1=PSI1, PSI2=PSI2, PSI3=PSI3)
 
     def system_matrix(self, trajectory):
         n_samples = trajectory.shape[0]
