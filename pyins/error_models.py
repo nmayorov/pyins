@@ -393,7 +393,8 @@ def propagate_errors(dt, trajectory,
                      delta_rph=np.zeros(3),
                      delta_gyro=np.zeros(3),
                      delta_accel=np.zeros(3),
-                     error_model=ModifiedPhiModel()):
+                     error_model=ModifiedPhiModel(),
+                     decoupled_vertical=False):
     """Deterministic linear propagation of INS errors.
 
     Parameters
@@ -413,6 +414,8 @@ def propagate_errors(dt, trajectory,
         specified for each time stamp in `trajectory`.
     error_model : InsErrorModel
         Error model object to use for the propagation.
+    decoupled_vertical : boolean
+        If True decouple vertical channel from other states, default is False.
 
     Returns
     -------
@@ -421,6 +424,12 @@ def propagate_errors(dt, trajectory,
     """
     Fi, Fig, Fia = error_model.system_matrix(trajectory)
     Phi = 0.5 * (Fi[1:] + Fi[:-1]) * dt
+    if decoupled_vertical:
+        DECOUPLED_STATES = [idx for state, idx in error_model.STATES.items()
+                            if state not in ['DR3', 'DV3']]
+        DR3_DV3 = [error_model.DR3, error_model.DV3]
+        Phi[np.ix_(np.arange(Phi.shape[0]), DR3_DV3, DECOUPLED_STATES)] = 0
+        Phi[np.ix_(np.arange(Phi.shape[0]), DECOUPLED_STATES, DR3_DV3)] = 0
     Phi[:] += np.identity(Phi.shape[-1])
 
     delta_gyro = util.mv_prod(Fig, delta_gyro)
