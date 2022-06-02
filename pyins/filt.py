@@ -1109,7 +1109,7 @@ class FeedbackFilter:
         return x, P, xa, Pa, Phi_arr, residuals
 
     def run(self, integrator, theta, dv, observations=[], max_step=1,
-            feedback_period=500, record_stamps=None):
+            feedback_period=5, record_stamps=None):
         """Run the filter.
 
         Parameters
@@ -1128,7 +1128,7 @@ class FeedbackFilter:
             desire the smallest possible step.
         feedback_period : float
             Time after which INS state will be corrected by the estimated
-            errors. Default is 500 seconds.
+            errors. Default is 5 seconds.
         record_stamps : array_like or None
             At which stamps record estimated errors. If None (default), errors
             will be saved at each stamp used internally in the filter.
