@@ -75,7 +75,7 @@ cdef double gravity(double lat, double alt):
 
 def integrate_fast(double dt, double[:, :] lla, double[:, :] velocity_n,
                    double[:, :, :] Cnb, double[:, ::1] theta, double[:, ::1] dv,
-                   int offset=0):
+                   int offset, bint with_altitude):
     cdef int i, j
     cdef double lat, alt
     cdef double slat, clat, tlat
@@ -138,11 +138,14 @@ def integrate_fast(double dt, double[:, :] lla, double[:, :] velocity_n,
                                            + (chi1 + Omega1) * V3
                                            - 0.5 * (chi3 * dv1 - chi1 * dv3)
                                            ) * dt
-        velocity_n[j + 1, 2] = V3 + dv3 + (- (chi1 + Omega1) * V2
-                                           + (chi2 + Omega2) * V1
-                                           - 0.5 * (chi1 * dv2 - chi2 * dv1)
-                                           + gravity(lat, alt - 0.5 * V3 * dt)
-                                           ) * dt
+        if with_altitude:
+            velocity_n[j + 1, 2] = V3 + dv3 + (- (chi1 + Omega1) * V2
+                                               + (chi2 + Omega2) * V1
+                                               - 0.5 * (chi1 * dv2 - chi2 * dv1)
+                                               + gravity(lat, alt - 0.5 * V3 * dt)
+                                              ) * dt
+        else:
+            velocity_n[j + 1, 2] = 0.0
 
         V1 = 0.5 * (V1 + velocity_n[j + 1, 0])
         V2 = 0.5 * (V2 + velocity_n[j + 1, 1])

@@ -82,6 +82,10 @@ class StrapdownIntegrator:
         Initial velocity in NED frame.
     rph : array_like, shape (3,)
         Initial heading, pitch and roll.
+    with_altitude : bool, optional
+        Whether to compute altitude and vertical velocity. Default is True.
+        If False, then vertical velocity is set to zero and altitude is kept
+        as constant.
 
     Attributes
     ----------
@@ -105,8 +109,11 @@ class StrapdownIntegrator:
                           'roll', 'pitch', 'heading']
     INITIAL_SIZE = 10000
 
-    def __init__(self, dt, lla, velocity_n, rph):
+    def __init__(self, dt, lla, velocity_n, rph, with_altitude=True):
         self.dt = dt
+        self.with_altitude = with_altitude
+        if not with_altitude:
+            velocity_n[2] = 0.0
 
         self.lla = np.empty((self.INITIAL_SIZE, 3))
         self.velocity_n = np.empty((self.INITIAL_SIZE, 3))
@@ -161,7 +168,7 @@ class StrapdownIntegrator:
             self.Cnb.resize((new_size, 3, 3), refcheck=False)
 
         integrate_fast(self.dt, self.lla, self.velocity_n, self.Cnb,
-                       theta, dv, offset=n_data-1)
+                       theta, dv, n_data-1, self.with_altitude)
         rph = transform.mat_to_rph(self.Cnb[n_data:n_data + n_readings])
         index = pd.Index(self.trajectory.index[-1] + 1 + np.arange(n_readings),
                          name='stamp')
