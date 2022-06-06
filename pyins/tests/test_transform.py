@@ -1,5 +1,6 @@
 import numpy as np
 from numpy.testing import assert_allclose, run_module_suite
+import pandas as pd
 from scipy.spatial.transform import Rotation
 from pyins import earth, transform
 
@@ -48,6 +49,28 @@ def test_mat_en_from_ll():
     assert_allclose(transform.mat_en_from_ll(0, 0), A2, rtol=1e-10, atol=1e-10)
     assert_allclose(transform.mat_en_from_ll([-90, 0], [0, 0]),
                     np.stack([A1, A2]), rtol=1e-10, atol=1e-10)
+
+
+def test_correct_trajectory():
+    traj = pd.DataFrame(index=range(2))
+    traj[['lat', 'lon', 'alt']] = [[30, 30, 100], [-30, -30, -100]]
+    traj[['VN', 'VE', 'VD']] = [[-1, 2, 3], [3, -1, -2]]
+    traj[['roll', 'pitch', 'heading']] = [[10, -20, 45], [-30, -50, 180]]
+
+    error = pd.DataFrame(index=range(2))
+    error[['north', 'east', 'down']] = [[12000, -20000, 50000],
+                                       [-20000, 15000, -70000]]
+    error[['VN', 'VE', 'VD']] = [[-2, 1, 2], [2, -2, -3]]
+    error[['roll', 'pitch', 'heading']] = [[10, -20, 45], [-30, -50, 180]]
+
+    traj_new = transform.correct_trajectory(traj, error)
+    assert_allclose(traj_new[['VN', 'VE', 'VD']], 1)
+    assert_allclose(traj_new[['roll', 'pitch', 'heading']], 0)
+
+    error_back = transform.difference_trajectories(traj, traj_new)
+    print(error)
+    print(error_back)
+    assert_allclose(error, error_back)
 
 
 if __name__ == '__main__':
