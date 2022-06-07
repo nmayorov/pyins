@@ -348,36 +348,36 @@ def _refine_stamps(stamps, max_step):
 def _compute_output_errors(trajectory, x, P, output_stamps,
                            error_model, gyro_model, accel_model):
     T = error_model.transform_to_output(trajectory.loc[output_stamps])
-    y = util.mv_prod(T, x[:, :error_model.N_STATES])
-    Py = util.mm_prod(T, P[:, :error_model.N_STATES, :error_model.N_STATES])
+    y = util.mv_prod(T, x[:, :error_model.n_states])
+    Py = util.mm_prod(T, P[:, :error_model.n_states, :error_model.n_states])
     Py = util.mm_prod(Py, T, bt=True)
     sd_y = np.diagonal(Py, axis1=1, axis2=2) ** 0.5
 
     error = pd.DataFrame(index=output_stamps)
-    error['north'] = y[:, error_model.DRN]
-    error['east'] = y[:, error_model.DRE]
-    error['down'] = y[:, error_model.DRD]
-    error['VN'] = y[:, error_model.DVN]
-    error['VE'] = y[:, error_model.DVE]
-    error['VD'] = y[:, error_model.DVD]
-    error['roll'] = np.rad2deg(y[:, error_model.DROLL])
-    error['pitch'] = np.rad2deg(y[:, error_model.DPITCH])
-    error['heading'] = np.rad2deg(y[:, error_model.DHEADING])
+    error['north'] = y[:, error_model.drn]
+    error['east'] = y[:, error_model.dre]
+    error['down'] = y[:, error_model.drd]
+    error['VN'] = y[:, error_model.dvn]
+    error['VE'] = y[:, error_model.dve]
+    error['VD'] = y[:, error_model.dvd]
+    error['roll'] = np.rad2deg(y[:, error_model.droll])
+    error['pitch'] = np.rad2deg(y[:, error_model.dpitch])
+    error['heading'] = np.rad2deg(y[:, error_model.dheading])
 
     sd = pd.DataFrame(index=output_stamps)
-    sd['north'] = sd_y[:, error_model.DRN]
-    sd['east'] = sd_y[:, error_model.DRE]
-    sd['down'] = sd_y[:, error_model.DRD]
-    sd['VN'] = sd_y[:, error_model.DVN]
-    sd['VE'] = sd_y[:, error_model.DVE]
-    sd['VD'] = sd_y[:, error_model.DVD]
-    sd['roll'] = np.rad2deg(sd_y[:, error_model.DROLL])
-    sd['pitch'] = np.rad2deg(sd_y[:, error_model.DPITCH])
-    sd['heading'] = np.rad2deg(sd_y[:, error_model.DHEADING])
+    sd['north'] = sd_y[:, error_model.drn]
+    sd['east'] = sd_y[:, error_model.dre]
+    sd['down'] = sd_y[:, error_model.drd]
+    sd['VN'] = sd_y[:, error_model.dvn]
+    sd['VE'] = sd_y[:, error_model.dve]
+    sd['VD'] = sd_y[:, error_model.dvd]
+    sd['roll'] = np.rad2deg(sd_y[:, error_model.droll])
+    sd['pitch'] = np.rad2deg(sd_y[:, error_model.dpitch])
+    sd['heading'] = np.rad2deg(sd_y[:, error_model.dheading])
 
     gyro_estimates = pd.DataFrame(index=output_stamps)
     gyro_sd = pd.DataFrame(index=output_stamps)
-    n = error_model.N_STATES
+    n = error_model.n_states
     for i, name in enumerate(gyro_model.states):
         gyro_estimates[name] = x[:, n + i]
         gyro_sd[name] = P[:, n + i, n + i] ** 0.5
@@ -445,7 +445,7 @@ class FeedforwardFilter:
         self.traj_ref = traj_ref
 
         n_points = traj_ref.shape[0]
-        n_states = error_model.N_STATES + gyro_model.n_states + \
+        n_states = error_model.n_states + gyro_model.n_states + \
                    accel_model.n_states
         n_noises = (gyro_model.n_noises + accel_model.n_noises +
                     3 * (gyro_model.noise is not None) +
@@ -456,11 +456,11 @@ class FeedforwardFilter:
         q = np.zeros(n_noises)
         P0 = np.zeros((n_states, n_states))
 
-        n = error_model.N_STATES
+        n = error_model.n_states
         n1 = gyro_model.n_states
         n2 = accel_model.n_states
 
-        states = error_model.STATES.copy()
+        states = error_model.states.copy()
         for name, state in gyro_model.states.items():
             states['GYRO_' + name] = n + state
         for name, state in accel_model.states.items():
@@ -470,16 +470,16 @@ class FeedforwardFilter:
         azimuth_sd = np.deg2rad(azimuth_sd)
 
         T = np.linalg.inv(error_model.transform_to_output(traj_ref.iloc[0]))
-        P_nav = np.zeros((error_model.N_STATES, error_model.N_STATES))
-        P_nav[error_model.DRN, error_model.DRN] = pos_sd ** 2
-        P_nav[error_model.DRE, error_model.DRE] = pos_sd ** 2
-        P_nav[error_model.DRD, error_model.DRD] = pos_sd ** 2
-        P_nav[error_model.DVN, error_model.DVN] = vel_sd ** 2
-        P_nav[error_model.DVE, error_model.DVE] = vel_sd ** 2
-        P_nav[error_model.DVD, error_model.DVD] = vel_sd ** 2
-        P_nav[error_model.DROLL, error_model.DROLL] = level_sd ** 2
-        P_nav[error_model.DPITCH, error_model.DPITCH] = level_sd ** 2
-        P_nav[error_model.DHEADING, error_model.DHEADING] = azimuth_sd ** 2
+        P_nav = np.zeros((error_model.n_states, error_model.n_states))
+        P_nav[error_model.drn, error_model.drn] = pos_sd ** 2
+        P_nav[error_model.dre, error_model.dre] = pos_sd ** 2
+        P_nav[error_model.drd, error_model.drd] = pos_sd ** 2
+        P_nav[error_model.dvn, error_model.dvn] = vel_sd ** 2
+        P_nav[error_model.dve, error_model.dve] = vel_sd ** 2
+        P_nav[error_model.dvd, error_model.dvd] = vel_sd ** 2
+        P_nav[error_model.droll, error_model.droll] = level_sd ** 2
+        P_nav[error_model.dpitch, error_model.dpitch] = level_sd ** 2
+        P_nav[error_model.dheading, error_model.dheading] = azimuth_sd ** 2
 
         P0[:n, :n] = T @ P_nav @ T.transpose()
         P0[n: n + n1, n: n + n1] = gyro_model.P
@@ -615,7 +615,7 @@ class FeedforwardFilter:
                 ret = obs.compute_obs(stamp, trajectory.loc[stamp], self.error_model)
                 if ret is not None:
                     z, H, R = ret
-                    H_max[:H.shape[0], :self.error_model.N_STATES] = H
+                    H_max[:H.shape[0], :self.error_model.n_states] = H
                     res = kalman.correct(xc, Pc, z, H_max[:H.shape[0]], R)
                     obs_stamps[i_obs].append(stamp)
                     obs_residuals[i_obs].append(res)
@@ -827,7 +827,7 @@ class FeedbackFilter:
         if accel_model is None:
             accel_model = InertialSensor()
 
-        n_states = error_model.N_STATES + gyro_model.n_states + \
+        n_states = error_model.n_states + gyro_model.n_states + \
                    accel_model.n_states
         n_noises = (gyro_model.n_noises + accel_model.n_noises +
                     3 * (gyro_model.noise is not None) +
@@ -836,23 +836,23 @@ class FeedbackFilter:
         q = np.zeros(n_noises)
         P0 = np.zeros((n_states, n_states))
 
-        n = error_model.N_STATES
+        n = error_model.n_states
         n1 = gyro_model.n_states
         n2 = accel_model.n_states
 
         level_sd = np.deg2rad(level_sd)
         azimuth_sd = np.deg2rad(azimuth_sd)
 
-        P0_nav = np.zeros((error_model.N_STATES, error_model.N_STATES))
-        P0_nav[error_model.DRN, error_model.DRN] = pos_sd ** 2
-        P0_nav[error_model.DRE, error_model.DRE] = pos_sd ** 2
-        P0_nav[error_model.DRD, error_model.DRD] = pos_sd ** 2
-        P0_nav[error_model.DVN, error_model.DVN] = vel_sd ** 2
-        P0_nav[error_model.DVE, error_model.DVE] = vel_sd ** 2
-        P0_nav[error_model.DVD, error_model.DVD] = vel_sd ** 2
-        P0_nav[error_model.DROLL, error_model.DROLL] = level_sd ** 2
-        P0_nav[error_model.DPITCH, error_model.DPITCH] = level_sd ** 2
-        P0_nav[error_model.DHEADING, error_model.DHEADING] = azimuth_sd ** 2
+        P0_nav = np.zeros((error_model.n_states, error_model.n_states))
+        P0_nav[error_model.drn, error_model.drn] = pos_sd ** 2
+        P0_nav[error_model.dre, error_model.dre] = pos_sd ** 2
+        P0_nav[error_model.drd, error_model.drd] = pos_sd ** 2
+        P0_nav[error_model.dvn, error_model.dvn] = vel_sd ** 2
+        P0_nav[error_model.dve, error_model.dve] = vel_sd ** 2
+        P0_nav[error_model.dvd, error_model.dvd] = vel_sd ** 2
+        P0_nav[error_model.droll, error_model.droll] = level_sd ** 2
+        P0_nav[error_model.dpitch, error_model.dpitch] = level_sd ** 2
+        P0_nav[error_model.dheading, error_model.dheading] = azimuth_sd ** 2
 
         P0[n: n + n1, n: n + n1] = gyro_model.P
         P0[n + n1: n + n1 + n2, n + n1: n + n1 + n2] = accel_model.P
@@ -873,7 +873,7 @@ class FeedbackFilter:
 
         self.q = q
 
-        states = error_model.STATES.copy()
+        states = error_model.states.copy()
         for name, state in gyro_model.states.items():
             states['GYRO_' + name] = n + state
         for name, state in accel_model.states.items():
@@ -953,7 +953,7 @@ class FeedbackFilter:
         Pc = self.P0.copy()
         T = np.linalg.inv(
             self.error_model.transform_to_output(integrator.get_state()))
-        Pc[:self.error_model.N_STATES, :self.error_model.N_STATES] = \
+        Pc[:self.error_model.n_states, :self.error_model.n_states] = \
             T @ self.P0_nav @ T.transpose()
 
         H_max = np.zeros((10, self.n_states))
@@ -963,7 +963,7 @@ class FeedbackFilter:
         # Index of current position in x and P arrays for saving xc and Pc.
         i_save = 0
 
-        n = self.error_model.N_STATES
+        n = self.error_model.n_states
         n1 = self.gyro_model.n_states
         n2 = self.accel_model.n_states
 
@@ -1029,7 +1029,7 @@ class FeedbackFilter:
                                           self.error_model)
                     if ret is not None:
                         z, H, R = ret
-                        H_max[:H.shape[0], :self.error_model.N_STATES] = H
+                        H_max[:H.shape[0], :self.error_model.n_states] = H
                         res = kalman.correct(xc, Pc, z, H_max[:H.shape[0]], R)
                         obs_stamps[i_obs].append(stamp)
                         obs_residuals[i_obs].append(res)
@@ -1092,7 +1092,7 @@ class FeedbackFilter:
             integrator.set_state(self.error_model.correct_state(
                 integrator.get_state(), xc))
 
-            xc[:self.error_model.N_STATES] = 0
+            xc[:self.error_model.n_states] = 0
 
         if record_stamps[i_save] == stamps[i_stamp]:
             x[i_save] = xc
@@ -1259,8 +1259,8 @@ class FeedbackFilter:
                                    self.accel_model)
 
         trajectory = transform.correct_trajectory(trajectory, error)
-        xa[:, :self.error_model.N_STATES] -= x[:, :self.error_model.N_STATES]
-        x[:, :self.error_model.N_STATES] = 0
+        xa[:, :self.error_model.n_states] -= x[:, :self.error_model.n_states]
+        x[:, :self.error_model.n_states] = 0
 
         kalman.smooth_rts(x, P, xa, Pa, Phi_arr)
 
