@@ -356,10 +356,8 @@ def _compute_output_errors(trajectory, x, P, output_stamps,
     error = pd.DataFrame(index=output_stamps)
     error['north'] = y[:, error_model.drn]
     error['east'] = y[:, error_model.dre]
-    error['down'] = y[:, error_model.drd]
     error['VN'] = y[:, error_model.dvn]
     error['VE'] = y[:, error_model.dve]
-    error['VD'] = y[:, error_model.dvd]
     error['roll'] = np.rad2deg(y[:, error_model.droll])
     error['pitch'] = np.rad2deg(y[:, error_model.dpitch])
     error['heading'] = np.rad2deg(y[:, error_model.dheading])
@@ -367,13 +365,22 @@ def _compute_output_errors(trajectory, x, P, output_stamps,
     sd = pd.DataFrame(index=output_stamps)
     sd['north'] = sd_y[:, error_model.drn]
     sd['east'] = sd_y[:, error_model.dre]
-    sd['down'] = sd_y[:, error_model.drd]
     sd['VN'] = sd_y[:, error_model.dvn]
     sd['VE'] = sd_y[:, error_model.dve]
-    sd['VD'] = sd_y[:, error_model.dvd]
     sd['roll'] = np.rad2deg(sd_y[:, error_model.droll])
     sd['pitch'] = np.rad2deg(sd_y[:, error_model.dpitch])
     sd['heading'] = np.rad2deg(sd_y[:, error_model.dheading])
+
+    if error_model.with_altitude:
+        error['down'] = y[:, error_model.drd]
+        error['VD'] = y[:, error_model.dvd]
+        sd['down'] = sd_y[:, error_model.drd]
+        sd['VD'] = sd_y[:, error_model.dvd]
+    else:
+        error['down'] = 0
+        error['VD'] = 0
+        sd['down'] = np.nan
+        sd['VD'] = np.nan
 
     gyro_estimates = pd.DataFrame(index=output_stamps)
     gyro_sd = pd.DataFrame(index=output_stamps)
@@ -473,10 +480,11 @@ class FeedforwardFilter:
         P_nav = np.zeros((error_model.n_states, error_model.n_states))
         P_nav[error_model.drn, error_model.drn] = pos_sd ** 2
         P_nav[error_model.dre, error_model.dre] = pos_sd ** 2
-        P_nav[error_model.drd, error_model.drd] = pos_sd ** 2
         P_nav[error_model.dvn, error_model.dvn] = vel_sd ** 2
         P_nav[error_model.dve, error_model.dve] = vel_sd ** 2
-        P_nav[error_model.dvd, error_model.dvd] = vel_sd ** 2
+        if error_model.with_altitude:
+            P_nav[error_model.drd, error_model.drd] = pos_sd ** 2
+            P_nav[error_model.dvd, error_model.dvd] = vel_sd ** 2
         P_nav[error_model.droll, error_model.droll] = level_sd ** 2
         P_nav[error_model.dpitch, error_model.dpitch] = level_sd ** 2
         P_nav[error_model.dheading, error_model.dheading] = azimuth_sd ** 2
@@ -846,10 +854,11 @@ class FeedbackFilter:
         P0_nav = np.zeros((error_model.n_states, error_model.n_states))
         P0_nav[error_model.drn, error_model.drn] = pos_sd ** 2
         P0_nav[error_model.dre, error_model.dre] = pos_sd ** 2
-        P0_nav[error_model.drd, error_model.drd] = pos_sd ** 2
         P0_nav[error_model.dvn, error_model.dvn] = vel_sd ** 2
         P0_nav[error_model.dve, error_model.dve] = vel_sd ** 2
-        P0_nav[error_model.dvd, error_model.dvd] = vel_sd ** 2
+        if error_model.with_altitude:
+            P0_nav[error_model.drd, error_model.drd] = pos_sd ** 2
+            P0_nav[error_model.dvd, error_model.dvd] = vel_sd ** 2
         P0_nav[error_model.droll, error_model.droll] = level_sd ** 2
         P0_nav[error_model.dpitch, error_model.dpitch] = level_sd ** 2
         P0_nav[error_model.dheading, error_model.dheading] = azimuth_sd ** 2
