@@ -555,6 +555,11 @@ class FeedforwardFilter:
             raise ValueError("Time stamps of reference and computed "
                              "trajectories don't match.")
 
+        has_vertical_velocity = (trajectory.VD != 0).any()
+        if not self.error_model.with_altitude == has_vertical_velocity:
+            raise ValueError("Altitude mode of the integrator and the "
+                             "error_model don't match.")
+
         if observations is None:
             observations = []
 
@@ -899,6 +904,9 @@ class FeedbackFilter:
 
     def _validate_parameters(self, integrator, theta, dv, observations,
                              max_step, record_stamps, feedback_period):
+        if not self.error_model.with_altitude == integrator.with_altitude:
+            raise ValueError("Altitude mode of the integrator and the "
+                             "error_model don't match.")
         stamps = pd.Index([])
         for obs in observations:
             stamps = stamps.union(obs.data.index)
