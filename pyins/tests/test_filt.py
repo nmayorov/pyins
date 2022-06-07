@@ -2,9 +2,10 @@ from numpy.testing import (assert_, assert_allclose, run_module_suite,
                            assert_equal)
 import numpy as np
 import pandas as pd
+import pytest
 from pyins.filt import (InertialSensor, PositionObs,
                         FeedforwardFilter, _refine_stamps)
-from pyins.error_models import propagate_errors
+from pyins.error_models import propagate_errors, ModifiedPhiModel
 from pyins import filt, sim, strapdown, transform, util
 from pyins.transform import perturb_lla, correct_trajectory
 
@@ -91,12 +92,21 @@ def test_refine_stamps():
     assert_equal(stamps, stamps_true)
 
 
-def test_FeedbackFilter():
+@pytest.mark.parametrize("with_altitude", [True, False])
+def test_FeedbackFilter(with_altitude):
     dt = 0.01
     rng = np.random.RandomState(0)
 
-    trajectory, gyro_true, accel_true = sim.sinusoid_velocity_motion(
-        dt, 300, [50, 60, 100], [1, -1, 0.5], [3, 3, 0.5])
+    if with_altitude:
+        trajectory, gyro_true, accel_true = sim.sinusoid_velocity_motion(
+            dt, 300, [50, 60, 100], [1, -1, 0.5], [3, 3, 0.5])
+        error_cols = ['north', 'east', 'down', 'VN', 'VE', 'VD',
+                      'roll', 'pitch', 'heading']
+    else:
+        trajectory, gyro_true, accel_true = sim.sinusoid_velocity_motion(
+            dt, 300, [50, 60, 100], [1, -1, 0], [3, 3, 0.2],
+            velocity_change_phase_offset=[0, 90, 90])
+        error_cols = ['north', 'east', 'VN', 'VE', 'roll', 'pitch', 'heading']
 
     position_obs = filt.PositionObs(
         sim.generate_position_observations(trajectory.iloc[::100], 1, rng), 1)
@@ -133,10 +143,15 @@ def test_FeedbackFilter():
         pos_sd, vel_sd, level_sd, azimuth_sd,
         rng=rng)
 
+    if with_altitude == False:
+        lla[2] = trajectory.loc[0].alt
+
     f = filt.FeedbackFilter(dt, pos_sd=pos_sd, vel_sd=vel_sd,
                             azimuth_sd=azimuth_sd, level_sd=level_sd,
-                            gyro_model=gyro_model, accel_model=accel_model)
-    integrator = strapdown.StrapdownIntegrator(dt, lla, velocity_n, rph)
+                            gyro_model=gyro_model, accel_model=accel_model,
+                            error_model=ModifiedPhiModel(with_altitude))
+    integrator = strapdown.StrapdownIntegrator(dt, lla, velocity_n, rph,
+                                               with_altitude=with_altitude)
 
     result = f.run(integrator, theta, dv,
                    observations=[position_obs, ned_velocity_obs,
@@ -145,8 +160,8 @@ def test_FeedbackFilter():
 
     error = transform.difference_trajectories(result.trajectory, trajectory)
 
-    relative_error = error / result.sd
-    assert (util.compute_rms(relative_error) < 1.5).all()
+    relative_error = (error / result.sd)
+    assert (util.compute_rms(relative_error[error_cols]) < 1.5).all()
 
     gyro_bias_relative_error = (np.abs(result.gyro_estimates.iloc[-1] -
                                        imu_errors.gyro_bias)
@@ -156,7 +171,7 @@ def test_FeedbackFilter():
     accel_bias_relative_error = (np.abs(result.accel_estimates.iloc[-1] -
                                         imu_errors.accel_bias)
                                  / result.accel_sd.iloc[-1])
-    assert (accel_bias_relative_error < 2.0).all()
+    assert (accel_bias_relative_error < 2.0).all(axis=None)
 
     result = f.run_smoother(integrator, theta, dv,
                             observations=[position_obs, ned_velocity_obs,
@@ -166,7 +181,7 @@ def test_FeedbackFilter():
     error = transform.difference_trajectories(result.trajectory, trajectory)
 
     relative_error = error / result.sd
-    assert (util.compute_rms(relative_error) < 1.6).all()
+    assert (util.compute_rms(relative_error[error_cols]) < 1.5).all()
 
     gyro_bias_relative_error = np.abs(result.gyro_estimates -
                                       imu_errors.gyro_bias) / result.gyro_sd
@@ -174,15 +189,25 @@ def test_FeedbackFilter():
 
     accel_bias_relative_error = np.abs(result.accel_estimates -
                                        imu_errors.accel_bias) / result.accel_sd
+
     assert (accel_bias_relative_error < 2.0).all(axis=None)
 
 
-def test_FeedforwardFilter():
+@pytest.mark.parametrize("with_altitude", [True, False])
+def test_FeedforwardFilter(with_altitude):
     dt = 0.01
     rng = np.random.RandomState(0)
 
-    trajectory, gyro_true, accel_true = sim.sinusoid_velocity_motion(
-        dt, 300, [50, 60, 100], [1, -1, 0.5], [3, 3, 0.5])
+    if with_altitude:
+        trajectory, gyro_true, accel_true = sim.sinusoid_velocity_motion(
+            dt, 300, [50, 60, 100], [1, -1, 0.5], [3, 3, 0.5])
+        error_cols = ['north', 'east', 'down', 'VN', 'VE', 'VD',
+                      'roll', 'pitch', 'heading']
+    else:
+        trajectory, gyro_true, accel_true = sim.sinusoid_velocity_motion(
+            dt, 300, [50, 60, 100], [1, -1, 0], [3, 3, 0.2],
+            velocity_change_phase_offset=[0, 90, 90])
+        error_cols = ['north', 'east', 'VN', 'VE', 'roll', 'pitch', 'heading']
 
     position_obs = filt.PositionObs(
         sim.generate_position_observations(trajectory.iloc[::100], 1, rng), 1)
@@ -219,12 +244,17 @@ def test_FeedforwardFilter():
         pos_sd, vel_sd, level_sd, azimuth_sd,
         rng=rng)
 
-    integrator = strapdown.StrapdownIntegrator(dt, lla, velocity_n, rph)
+    if with_altitude == False:
+        lla[2] = trajectory.loc[0].alt
+
+    integrator = strapdown.StrapdownIntegrator(dt, lla, velocity_n, rph,
+                                               with_altitude=with_altitude)
     trajectory_computed = integrator.integrate(theta, dv)
 
     f = filt.FeedforwardFilter(dt, trajectory, pos_sd=pos_sd, vel_sd=vel_sd,
                                azimuth_sd=azimuth_sd, level_sd=level_sd,
-                               gyro_model=gyro_model, accel_model=accel_model)
+                               gyro_model=gyro_model, accel_model=accel_model,
+                               error_model=ModifiedPhiModel(with_altitude))
 
     result = f.run(trajectory_computed,
                    observations=[position_obs, ned_velocity_obs,
@@ -233,7 +263,7 @@ def test_FeedforwardFilter():
     error = transform.difference_trajectories(result.trajectory, trajectory)
 
     relative_error = error / result.sd
-    assert (util.compute_rms(relative_error) < 1.6).all()
+    assert (util.compute_rms(relative_error[error_cols]) < 1.6).all()
 
     gyro_bias_relative_error = (np.abs(result.gyro_estimates.iloc[-1] -
                                        imu_errors.gyro_bias)
@@ -252,7 +282,7 @@ def test_FeedforwardFilter():
     error = transform.difference_trajectories(result.trajectory, trajectory)
 
     relative_error = error / result.sd
-    assert (util.compute_rms(relative_error) < 2.0).all()
+    assert (util.compute_rms(relative_error[error_cols]) < 2.0).all()
 
     gyro_bias_relative_error = np.abs(result.gyro_estimates -
                                       imu_errors.gyro_bias) / result.gyro_sd
