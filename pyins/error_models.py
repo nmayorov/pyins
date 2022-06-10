@@ -95,7 +95,8 @@ class InsErrorModel:
         """
         raise NotImplementedError
 
-    def position_error_jacobian(self, trajectory_point):
+    def position_error_jacobian(self, trajectory_point,
+                                imu_to_antenna_b=None):
         """Compute position error Jacobian matrix.
 
         This is the matrix which linearly relates the position error in
@@ -105,6 +106,9 @@ class InsErrorModel:
         ----------
         trajectory_point : pd.Series
             Point of trajectory.
+        imu_to_antenna_b : array_like or None, optional
+            Vector from IMU to antenna (measurement point) expressed in body
+            frame. If None, assumed to be zero.
 
         Returns
         -------
@@ -245,9 +249,13 @@ class ModifiedPhiModel(InsErrorModel):
         return pd.Series(data=np.hstack((lla, velocity_n, rph)),
                          index=trajectory_point.index)
 
-    def position_error_jacobian(self, trajectory_point):
+    def position_error_jacobian(self, trajectory_point, imu_to_antenna_b=None):
         result = np.zeros((3, self.N_STATES))
         result[:, self.DR] = np.eye(3)
+        if imu_to_antenna_b is not None:
+            mat_nb = transform.mat_from_rph(
+                trajectory_point[['roll', 'pitch', 'heading']])
+            result[:, self.PHI] = util.skew_matrix(mat_nb @ imu_to_antenna_b)
         return result
 
     def ned_velocity_error_jacobian(self, trajectory_point):
@@ -367,9 +375,19 @@ class ModifiedPsiModel(InsErrorModel):
         return pd.Series(data=np.hstack((lla, velocity_n, rph)),
                          index=trajectory_point.index)
 
-    def position_error_jacobian(self, trajectory_point):
+    def position_error_jacobian(self, trajectory_point,
+                                imu_to_antenna_b=None):
         result = np.zeros((3, self.N_STATES))
         result[:, self.DR] = np.eye(3)
+        if imu_to_antenna_b is not None:
+            mat_nb = transform.mat_from_rph(
+                trajectory_point[['roll', 'pitch', 'heading']])
+            S = util.skew_matrix(mat_nb @ imu_to_antenna_b)
+            F = earth.curvature_matrix(trajectory_point.lat,
+                                       trajectory_point.alt)
+            result[:, self.DR] += S @ F
+            result[:, self.PSI] = S
+
         return result
 
     def ned_velocity_error_jacobian(self, trajectory_point):
