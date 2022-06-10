@@ -243,15 +243,19 @@ class PositionObs(Observation):
         longitude and altitude. Index must contain time stamps.
     sd : float
         Measurement accuracy in meters.
+    imu_to_antenna_b : array_like, shape (3,) or None, optional
+        Vector from IMU to antenna (measurement point) expressed in body
+        frame. If None, assumed to be zero.
 
     Attributes
     ----------
     data : DataFrame
         Data saved from the constructor.
     """
-    def __init__(self, data, sd):
+    def __init__(self, data, sd, imu_to_antenna_b=None):
         super(PositionObs, self).__init__(data)
         self.R = sd**2 * np.eye(3)
+        self.imu_to_antenna_b = imu_to_antenna_b
 
     def compute_obs(self, stamp, trajectory_point, error_model):
         if stamp not in self.data.index:
@@ -260,7 +264,13 @@ class PositionObs(Observation):
         z = transform.difference_lla(trajectory_point[['lat', 'lon', 'alt']],
                                      self.data.loc[stamp,
                                                    ['lat', 'lon', 'alt']])
-        H = error_model.position_error_jacobian(trajectory_point)
+        if self.imu_to_antenna_b:
+            mat_nb = transform.mat_from_rph(
+                trajectory_point[['roll', 'pitch', 'heading']])
+            z += mat_nb @ self.imu_to_antenna_b
+
+        H = error_model.position_error_jacobian(trajectory_point,
+                                                self.imu_to_antenna_b)
 
         return z, H, self.R
 
