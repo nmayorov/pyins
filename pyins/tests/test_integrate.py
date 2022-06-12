@@ -71,7 +71,7 @@ def test_integrate_constant_velocity():
     dt = 1e-1
     total_time = 3600
 
-    lla0 = [55.0, 37.0, 150.0]
+    lla0 = [55.0, 37.0, 1500.0]
     velocity_n = [5.0, -3.0, 0.2]
 
     thresholds = pd.Series({
