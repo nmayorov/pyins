@@ -107,8 +107,9 @@ def integrate_fast(double dt, double[:, :] lla, double[:, :] velocity_n,
         tlat = slat / clat
 
         x = 1 - E2 * slat * slat
-        re = R0 / math.sqrt(x) + alt
+        re = R0 / math.sqrt(x)
         rn = re * (1 - E2) / x + alt
+        re += alt
 
         Omega1 = RATE * clat
         Omega2 = 0.0

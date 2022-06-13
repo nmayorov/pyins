@@ -281,7 +281,7 @@ def sinusoid_velocity_motion(dt, total_time, lla0, velocity_mean,
     rph = np.zeros_like(velocity_n)
     rph[:, 1] = np.rad2deg(np.arctan2(
         velocity_n[:, 2], np.hypot(velocity_n[:, 0], velocity_n[:, 1])))
-    rph[:, 2] = np.rad2deg(np.arctan2(velocity_n[:, 0], velocity_n[:, 1]))
+    rph[:, 2] = np.rad2deg(np.arctan2(velocity_n[:, 1], velocity_n[:, 0]))
     return from_velocity(dt, lla0, velocity_n, rph, sensor_type)
 
 
