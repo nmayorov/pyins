@@ -44,4 +44,4 @@ def test_propagate_errors(error_model):
 
     error_scale = np.mean(np.abs(error_true))
     rel_diff = (error_linear - error_true) / error_scale
-    assert_allclose(rel_diff, 0, atol=0.1)
+    assert_allclose(rel_diff, 0, atol=0.12)
