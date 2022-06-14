@@ -92,15 +92,15 @@ def difference_lla(lla1, lla2):
     Returns
     -------
     difference_ned : ndarray
-        Difference in meters resolved in NED.
+        Difference in meters resolved in NED. It can be interpreted as errors
+        in `lla1` relative to `lla2`.
     """
     lla1 = np.asarray(lla1)
     lla2 = np.asarray(lla2)
     single = lla1.ndim == 1 and lla2.ndim == 1
     lla1 = np.atleast_2d(lla1)
     lla2 = np.atleast_2d(lla2)
-    rn, _, rp = earth.principal_radii(0.5 * (lla1[:, 0] + lla2[:, 0]),
-                                      0.5 * (lla1[:, 2] + lla2[:, 2]))
+    rn, _, rp = earth.principal_radii(lla1[:, 0], lla1[:, 2])
     diff = lla1 - lla2
     result = np.empty_like(diff)
     result[:, 0] = np.deg2rad(diff[:, 0]) * rn
@@ -127,8 +127,7 @@ def difference_trajectories(t1, t2):
                                 'roll', 'pitch', 'heading']
 
     diff = t1 - t2
-    rn, _, rp = earth.principal_radii(0.5 * (t1.lat + t2.lat),
-                                      0.5 * (t1.alt + t2.alt))
+    rn, _, rp = earth.principal_radii(t1.lat, t1.alt)
     diff.lat *= np.deg2rad(rn)
     diff.lon *= np.deg2rad(rp)
     diff.alt = -diff.alt
