@@ -1,63 +1,7 @@
 """Helper Functions"""
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.patches import FancyArrowPatch
-from mpl_toolkits.mplot3d import proj3d
 from scipy import interpolate
-
-
-class Arrow3D(FancyArrowPatch):
-    def __init__(self, xs, ys, zs, *args, **kwargs):
-        FancyArrowPatch.__init__(self, (0, 0), (0, 0), *args, **kwargs)
-        self._verts3d = xs, ys, zs
-
-    def draw(self, renderer):
-        xs3d, ys3d, zs3d = self._verts3d
-        xs, ys, zs = proj3d.proj_transform(xs3d, ys3d, zs3d, renderer.M)
-        self.set_positions((xs[0], ys[0]), (xs[1], ys[1]))
-        FancyArrowPatch.draw(self, renderer)
-
-
-def plot_nb(Cnb, plotNframe=True):
-    fig = plt.figure()
-    ax = fig.gca(projection='3d')
-    ax.grid(False)
-    lim = [-0.75, 0.75]
-    ax.set_xlim3d(lim)
-    ax.set_xticks([])
-    ax.set_ylim3d(lim)
-    ax.set_yticks([])
-    ax.set_zlim3d(lim)
-    ax.set_zticks([])
-    plt.axis('off')
-
-    # plot the navigation frame N in black
-    if plotNframe:
-        z = [0, 0]
-        xn = Arrow3D([0, 1], z, z, mutation_scale=20,
-                     lw=1, arrowstyle="-|>", color='k')
-        ax.add_artist(xn)
-        yn = Arrow3D(z, [0, 1], z, mutation_scale=20,
-                     lw=1, arrowstyle="-|>", color='k')
-        ax.add_artist(yn)
-        zn = Arrow3D(z, z, [0, 1], mutation_scale=20,
-                     lw=1, arrowstyle="-|>", color='k')
-        ax.add_artist(zn)
-
-    # plot the body frame B
-    xb = Arrow3D([0, Cnb[0, 0]], [0, Cnb[1, 0]], [0, Cnb[2, 0]], mutation_scale=20,
-                 lw=1, arrowstyle="-|>", color='b', label='$x_b$')
-    ax.add_artist(xb)
-    yb = Arrow3D([0, Cnb[0, 1]], [0, Cnb[1, 1]], [0, Cnb[2, 1]], mutation_scale=20,
-                 lw=1, arrowstyle="-|>", color='orange', label='$y_b$')
-    ax.add_artist(yb)
-    zb = Arrow3D([0, Cnb[0, 2]], [0, Cnb[1, 2]], [0, Cnb[2, 2]], mutation_scale=20,
-                 lw=1, arrowstyle="-|>", color='g', label='$z_b$')
-    ax.add_artist(zb)
-
-    plt.legend(handles=[xb, yb, zb])
-    plt.show()
-
 
 def plot_inertial_readings(dt, gyros, accels, step=1):
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
