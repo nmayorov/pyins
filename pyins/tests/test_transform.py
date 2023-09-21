@@ -1,5 +1,5 @@
 import numpy as np
-from numpy.testing import assert_allclose, run_module_suite
+from numpy.testing import assert_allclose
 from scipy.spatial.transform import Rotation
 from pyins import earth, transform
 
@@ -48,7 +48,3 @@ def test_mat_en_from_ll():
     assert_allclose(transform.mat_en_from_ll(0, 0), A2, rtol=1e-10, atol=1e-10)
     assert_allclose(transform.mat_en_from_ll([-90, 0], [0, 0]),
                     np.stack([A1, A2]), rtol=1e-10, atol=1e-10)
-
-
-if __name__ == '__main__':
-    run_module_suite()

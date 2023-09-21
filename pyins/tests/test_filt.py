@@ -1,5 +1,4 @@
-from numpy.testing import (assert_, assert_allclose, run_module_suite,
-                           assert_equal)
+from numpy.testing import assert_, assert_allclose, assert_equal
 import numpy as np
 import pandas as pd
 from pyins.filt import (InertialSensor, PositionObs,
@@ -261,7 +260,3 @@ def test_FeedforwardFilter():
     accel_bias_relative_error = np.abs(result.accel_estimates -
                                        imu_errors.accel_bias) / result.accel_sd
     assert (accel_bias_relative_error < 2.0).all(axis=None)
-
-
-if __name__ == '__main__':
-    run_module_suite()

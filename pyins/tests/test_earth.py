@@ -1,4 +1,4 @@
-from numpy.testing import assert_allclose, run_module_suite
+from numpy.testing import assert_allclose
 from pyins import earth
 
 
@@ -48,7 +48,3 @@ def test_gravitation_ecef():
                [0, -earth.gravity(0, 0) - earth.RATE**2 * earth.R0, 0]]
     assert_allclose(earth.gravitation_ecef([[90, 0, 100], [0, 90, 0]]),
                     g0_true, atol=1e-12)
-
-
-if __name__ == '__main__':
-    run_module_suite()

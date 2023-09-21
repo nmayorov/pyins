@@ -1,5 +1,5 @@
 import pandas as pd
-from numpy.testing import assert_allclose, run_module_suite
+from numpy.testing import assert_allclose
 import numpy as np
 from pyins import sim
 from pyins.transform import difference_trajectories
@@ -89,7 +89,3 @@ def test_integrate_constant_velocity():
                                                     lla0, velocity_n,
                                                     sensor_type='rate')
     run_integration_test(ref, gyro, accel, dt, 'rate', thresholds)
-
-
-if __name__ == '__main__':
-    run_module_suite()

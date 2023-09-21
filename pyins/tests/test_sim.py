@@ -1,5 +1,5 @@
 import numpy as np
-from numpy.testing import assert_allclose, run_module_suite
+from numpy.testing import assert_allclose
 from pyins import sim
 from pyins import earth
 
@@ -74,7 +74,3 @@ def test_sim_on_stationary():
     for i in range(3):
         assert_allclose(gyro_g[:, i], gyro[i], atol=1e-14)
         assert_allclose(accel_g[:, i], accel[i], atol=1e-6)
-
-
-if __name__ == '__main__':
-    run_module_suite()
