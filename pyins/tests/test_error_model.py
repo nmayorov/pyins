@@ -42,6 +42,6 @@ def test_propagate_errors(error_model):
                                                     gyro_bias, accel_bias,
                                                     error_model=error_model())
 
-    error_scale = np.mean(np.abs(error_true))
+    error_scale = error_true.abs().mean()
     rel_diff = (error_linear - error_true) / error_scale
     assert_allclose(rel_diff, 0, atol=0.12)
