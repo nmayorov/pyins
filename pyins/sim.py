@@ -1,8 +1,7 @@
 """Strapdown sensors simulator."""
 import numpy as np
 import pandas as pd
-from scipy.interpolate import CubicSpline, PPoly
-from scipy.linalg import solve_banded
+from scipy.interpolate import CubicSpline
 from scipy.spatial.transform import Rotation, RotationSpline
 from scipy._lib._util import check_random_state
 from . import earth, transform, util
@@ -134,35 +133,6 @@ def from_position(dt, lla, rph, sensor_type='increment'):
     return trajectory, gyros, accels
 
 
-class _QuadraticSpline(PPoly):
-    def __init__(self, x, y):
-        x = np.asarray(x, dtype=float)
-        y = np.asarray(y, dtype=float)
-
-        n = x.shape[0]
-        dx = np.diff(x)
-        dy = np.diff(y, axis=0)
-        dxr = dx.reshape([dx.shape[0]] + [1] * (y.ndim - 1))
-
-        c = np.empty((3, n - 1) + y.shape[1:])
-        if n > 2:
-            A = np.ones((2, n))
-            b = np.empty((n,) + y.shape[1:])
-            b[0] = 0
-            b[1:] = 2 * dy / dxr
-            s = solve_banded((1, 0), A, b, overwrite_ab=True, overwrite_b=True,
-                             check_finite=False)
-            c[0] = np.diff(s, axis=0) / (2 * dxr)
-            c[1] = s[:-1]
-            c[2] = y[:-1]
-        else:
-            c[0] = 0
-            c[1] = dy / dxr
-            c[2] = y[:-1]
-
-        super(_QuadraticSpline, self).__init__(c, x)
-
-
 def from_velocity(dt, lla0, velocity_n, rph, sensor_type='increment'):
     """Generate inertial readings given velocity and attitude.
 
@@ -199,14 +169,14 @@ def from_velocity(dt, lla0, velocity_n, rph, sensor_type='increment'):
     n_points = len(velocity_n)
     time = np.arange(n_points) * dt
 
-    VU_spline = _QuadraticSpline(time, -velocity_n[:, 2])
+    VU_spline = CubicSpline(time, -velocity_n[:, 2])
     alt_spline = VU_spline.antiderivative()
     alt = lla0[2] + alt_spline(time)
 
     lat = lat0 = np.deg2rad(lla0[0])
     for iteration in range(MAX_ITER):
         rn, _, _ = earth.principal_radii(np.rad2deg(lat), alt)
-        dlat_spline = _QuadraticSpline(time, velocity_n[:, 0] / rn)
+        dlat_spline = CubicSpline(time, velocity_n[:, 0] / rn)
         lat_spline = dlat_spline.antiderivative()
         lat_new = lat_spline(time) + lat0
         delta = (lat - lat_new) * rn
@@ -215,7 +185,7 @@ def from_velocity(dt, lla0, velocity_n, rph, sensor_type='increment'):
             break
 
     _, _, rp = earth.principal_radii(np.rad2deg(lat), alt)
-    dlon_spline = _QuadraticSpline(time, velocity_n[:, 1] / rp)
+    dlon_spline = CubicSpline(time, velocity_n[:, 1] / rp)
     lon_spline = dlon_spline.antiderivative()
 
     lla = np.empty((n_points, 3))
