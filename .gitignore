@@ -1,5 +1,6 @@
 build
 .idea
+pyins.egg-info
 examples/.ipynb_checkpoints
 
 *.c
