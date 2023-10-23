@@ -31,34 +31,18 @@ class InertialSensor:
     scale : array_like or None
         Standard deviation of a scale factor, which is modeled as a random
         constant (plus an optional random walk).
-    scale_walk : array_like or None
-        Strength of white noise which is integrated into the scale factor.
-        Can be set only if `scale` is set.
-    corr_sd, corr_time : array_like or None
-        Steady state standard deviation and correlation time for exponentially
-        correlated noise. You need to set both or none of these values.
     """
-    MAX_STATES = 9
-    MAX_NOISES = 9
+    MAX_STATES = 6
+    MAX_NOISES = 6
 
-    def __init__(self, bias=None, noise=None, bias_walk=None,
-                 scale=None, scale_walk=None, corr_sd=None, corr_time=None):
+    def __init__(self, bias=None, noise=None, bias_walk=None, scale=None):
         bias = self._verify_param(bias, 'bias')
         noise = self._verify_param(noise, 'noise')
         bias_walk = self._verify_param(bias_walk, 'bias_walk')
         scale = self._verify_param(scale, 'scale')
-        scale_walk = self._verify_param(scale_walk, 'scale_walk')
-        corr_time = self._verify_param(corr_time, 'corr_time', True)
-        corr_sd = self._verify_param(corr_sd, 'corr_sd')
-
-        if (corr_sd is None) + (corr_time is None) == 1:
-            raise ValueError("Set both `corr_sd` and `corr_time`.")
 
         if bias is None and bias_walk is not None:
             raise ValueError("Set `bias` if you want to use `bias_walk`.")
-
-        if scale is None and scale_walk is not None:
-            raise ValueError("Set `scale` if you want to use `scale_walk`.")
 
         F = np.zeros((self.MAX_STATES, self.MAX_STATES))
         G = np.zeros((self.MAX_STATES, self.MAX_NOISES))
@@ -77,7 +61,7 @@ class InertialSensor:
             states['BIAS_2'] = n_states + 1
             states['BIAS_3'] = n_states + 2
             n_states += 3
-        if scale is not None or scale_walk is not None:
+        if scale is not None:
             P[n_states: n_states + 3, n_states: n_states + 3] = I * scale ** 2
             states['SCALE_1'] = n_states
             states['SCALE_2'] = n_states + 1
@@ -86,21 +70,6 @@ class InertialSensor:
         if bias_walk is not None:
             G[:3, :3] = I
             q[:3] = bias_walk
-            n_noises += 3
-        if scale_walk is not None:
-            G[n_noises: n_noises + 3, n_noises: n_noises + 3] = I
-            q[n_noises: n_noises + 3] = scale_walk
-            n_noises += 3
-        if corr_sd is not None:
-            F[n_states:n_states + 3, n_states:n_states + 3] = -I / corr_time
-            G[n_noises:n_noises + 3, n_noises:n_noises + 3] = I
-            H[:, n_states: n_states + 3] = I
-            P[n_states:n_states + 3, n_states:n_states + 3] = I * corr_sd ** 2
-            q[n_noises:n_noises + 3] = (2 / corr_time) ** 0.5 * corr_sd
-            states['CORR_1'] = n_states
-            states['CORR_2'] = n_states + 1
-            states['CORR_3'] = n_states + 2
-            n_states += 3
             n_noises += 3
 
         F = F[:n_states, :n_states]
@@ -116,9 +85,6 @@ class InertialSensor:
         self.noise = noise
         self.bias_walk = bias_walk
         self.scale = scale
-        self.scale_walk = scale_walk
-        self.corr_sd = corr_sd
-        self.corr_time = corr_time
         self.P = P
         self.q = q
         self.F = F
