@@ -1,11 +1,8 @@
-from numpy.testing import assert_, assert_allclose, assert_equal
+from numpy.testing import assert_allclose, assert_equal
 import numpy as np
-import pandas as pd
 from pyins.filt import (InertialSensor, PositionObs,
                         FeedforwardFilter, _refine_stamps)
-from pyins.error_models import propagate_errors
 from pyins import filt, sim, strapdown, transform, util
-from pyins.transform import perturb_lla, correct_trajectory
 
 
 def test_InertialSensor():
@@ -157,24 +154,6 @@ def test_FeedbackFilter():
                                  / result.accel_sd.iloc[-1])
     assert (accel_bias_relative_error < 2.0).all()
 
-    result = f.run_smoother(integrator, theta, dv,
-                            observations=[position_obs, ned_velocity_obs,
-                                          body_velocity_obs],
-                            feedback_period=5)
-
-    error = transform.difference_trajectories(result.trajectory, trajectory)
-
-    relative_error = error / result.sd
-    assert (util.compute_rms(relative_error) < 1.6).all()
-
-    gyro_bias_relative_error = np.abs(result.gyro_estimates -
-                                      imu_errors.gyro_bias) / result.gyro_sd
-    assert (gyro_bias_relative_error < 2.0).all(axis=None)
-
-    accel_bias_relative_error = np.abs(result.accel_estimates -
-                                       imu_errors.accel_bias) / result.accel_sd
-    assert (accel_bias_relative_error < 2.0).all(axis=None)
-
 
 def test_FeedforwardFilter():
     dt = 0.01
@@ -243,20 +222,3 @@ def test_FeedforwardFilter():
                                         imu_errors.accel_bias)
                                  / result.accel_sd.iloc[-1])
     assert (accel_bias_relative_error < 2.0).all()
-
-    result = f.run_smoother(trajectory_computed,
-                            observations=[position_obs, ned_velocity_obs,
-                                          body_velocity_obs])
-
-    error = transform.difference_trajectories(result.trajectory, trajectory)
-
-    relative_error = error / result.sd
-    assert (util.compute_rms(relative_error) < 2.0).all()
-
-    gyro_bias_relative_error = np.abs(result.gyro_estimates -
-                                      imu_errors.gyro_bias) / result.gyro_sd
-    assert (gyro_bias_relative_error < 2.0).all(axis=None)
-
-    accel_bias_relative_error = np.abs(result.accel_estimates -
-                                       imu_errors.accel_bias) / result.accel_sd
-    assert (accel_bias_relative_error < 2.0).all(axis=None)
