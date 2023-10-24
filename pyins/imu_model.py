@@ -28,18 +28,22 @@ class InertialSensor:
     bias_walk : array_like or None
         Strength of white noise which is integrated into the bias. Known as
         a rate random walk for gyros. Can be set only if `bias` is set.
-    scale : array_like or None
-        Standard deviation of a scale factor, which is modeled as a random
-        constant (plus an optional random walk).
+    scale_misal : array_like, shape (3, 3) or None
+        Standard deviations of matrix elements which represent sensor triad
+        scale factor errors and misalignment. Non-positive elements will
+        disable the corresponding effect estimation.
     """
-    MAX_STATES = 6
+    MAX_STATES = 12
     MAX_NOISES = 6
 
-    def __init__(self, bias=None, noise=None, bias_walk=None, scale=None):
+    def __init__(self, bias=None, noise=None, bias_walk=None, scale_misal=None):
         bias = self._verify_param(bias, 'bias')
         noise = self._verify_param(noise, 'noise')
         bias_walk = self._verify_param(bias_walk, 'bias_walk')
-        scale = self._verify_param(scale, 'scale')
+        if scale_misal is not None:
+            scale_misal = np.asarray(scale_misal)
+            if scale_misal.shape != (3, 3):
+                raise ValueError("`scale_misal` must have shape (3, 3)")
 
         if bias is None and bias_walk is not None:
             raise ValueError("Set `bias` if you want to use `bias_walk`.")
@@ -61,12 +65,21 @@ class InertialSensor:
             states['BIAS_2'] = n_states + 1
             states['BIAS_3'] = n_states + 2
             n_states += 3
-        if scale is not None:
-            P[n_states: n_states + 3, n_states: n_states + 3] = I * scale ** 2
-            states['SCALE_1'] = n_states
-            states['SCALE_2'] = n_states + 1
-            states['SCALE_3'] = n_states + 2
-            n_states += 3
+
+        output_axes = []
+        input_axes = []
+        scale_misal_states = []
+        if scale_misal is not None:
+            for i in range(3):
+                for j in range(3):
+                    if scale_misal[i, j] > 0.0:
+                        output_axes.append(i)
+                        input_axes.append(j)
+                        scale_misal_states.append(n_states)
+                        P[n_states, n_states] = scale_misal[i, j] ** 2
+                        states[f'SCALE_MISAL_{i + 1}{j + 1}'] = n_states
+                        n_states += 1
+
         if bias_walk is not None:
             G[:3, :3] = I
             q[:3] = bias_walk
@@ -84,7 +97,8 @@ class InertialSensor:
         self.bias = bias
         self.noise = noise
         self.bias_walk = bias_walk
-        self.scale = scale
+        self.readings_required = bool(output_axes)
+        self.scale_misal_data = output_axes, input_axes, scale_misal_states
         self.P = P
         self.q = q
         self.F = F
@@ -111,29 +125,20 @@ class InertialSensor:
         return param
 
     def output_matrix(self, readings=None):
-        if self.scale is not None and readings is None:
-            raise ValueError("Inertial `readings` are required when "
-                             "`self.scale` is set.")
-
-        if self.scale is not None:
-            readings = np.asarray(readings)
-            if readings.ndim == 1:
-                H = self._H.copy()
-                i1 = self.states['SCALE_1']
-                i2 = self.states['SCALE_3'] + 1
-                H[:, i1: i2] = np.diag(readings)
-            else:
-                n_readings = readings.shape[0]
-                H = np.zeros((n_readings, 3, self.n_states))
-                H[:] = self._H
-                i1 = self.states['SCALE_1']
-                i2 = self.states['SCALE_3'] + 1
-
-                I1 = np.repeat(np.arange(n_readings), 3)
-                I2 = np.tile(np.arange(3), n_readings)
-
-                H_view = H[:, :, i1: i2]
-                H_view[I1, I2, I2] = readings.ravel()
-            return H
-        else:
+        if not self.readings_required:
             return self._H
+
+        if readings is None:
+            raise ValueError("Inertial `readings` are required when "
+                             "`self.scale_misal` is set.")
+
+        readings = np.asarray(readings)
+        output_axes, input_axes, states = self.scale_misal_data
+        if readings.ndim == 1:
+            H = self._H.copy()
+            H[output_axes, states] = readings[input_axes]
+        else:
+            H = np.zeros((len(readings), 3, self.n_states))
+            H[:] = self._H
+            H[:, output_axes, states] = readings[:, input_axes]
+        return H

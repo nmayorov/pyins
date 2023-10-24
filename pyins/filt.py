@@ -276,12 +276,14 @@ class FeedforwardFilter:
         if accel_model is None:
             accel_model = InertialSensor()
 
-        if gyro_model.scale is not None and gyro is None:
-            raise ValueError("`gyro_model` contains scale factor errors, "
-                             "thus you must provide `gyro`.")
-        if accel_model.scale is not None and accel is None:
-            raise ValueError("`accel_model` contains scale factor errors, "
-                             "thus you must provide `accel`.")
+        if gyro_model.readings_required and gyro is None:
+            raise ValueError(
+                "`gyro_model` contains scale factor or misalignment errors, "
+                "thus you must provide `gyro`.")
+        if accel_model.readings_required and accel is None:
+            raise ValueError(
+                "`accel_model` contains scale factor or misalignment errors, "
+                "thus you must provide `accel`.")
 
         self.traj_ref = traj_ref
 
@@ -695,13 +697,13 @@ class FeedbackFilter:
         n1 = self.gyro_model.n_states
         n2 = self.accel_model.n_states
 
-        if self.gyro_model.scale is not None:
+        if self.gyro_model.readings_required is not None:
             gyro = theta / self.dt
             gyro = np.vstack((gyro, 2 * gyro[-1] - gyro[-2]))
         else:
             gyro = None
 
-        if self.accel_model.scale is not None:
+        if self.accel_model.readings_required is not None:
             accel = dv / self.dt
             accel = np.vstack((accel, 2 * accel[-1] - accel[-2]))
         else:
