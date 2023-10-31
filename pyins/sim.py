@@ -326,90 +326,50 @@ def _apply_errors(sensor_type, dt, readings, scale_error, scale_asym, align,
 
 
 class ImuErrors:
-    def __init__(self, gyro_scale_error=None, gyro_scale_asym=None,
-                 gyro_align=None, gyro_bias=None, gyro_noise=None,
-                 accel_scale_error=None, accel_scale_asym=None,
-                 accel_align=None, accel_bias=None, accel_noise=None,
+    def __init__(self, transform=None, bias=None, noise=None, bias_walk=None,
                  rng=None):
-        if gyro_scale_error is None:
-            gyro_scale_error = 0
-        else:
-            gyro_scale_error = np.asarray(gyro_scale_error)
+        if transform is None:
+            transform = np.identity(3)
+        if bias is None:
+            bias = 0
+        if bias_walk is None:
+            bias_walk = 0
+        if noise is None:
+            noise = 0
 
-        if gyro_scale_asym is None:
-            gyro_scale_asym = 0
-        else:
-            gyro_scale_asym = np.asarray(gyro_scale_asym)
-
-        if gyro_align is None:
-            gyro_align = np.eye(3)
-        else:
-            gyro_align = _align_matrix(gyro_align)
-
-        if gyro_bias is None:
-            gyro_bias = 0
-        else:
-            gyro_bias = np.asarray(gyro_bias)
-
-        if gyro_noise is None:
-            gyro_noise = 0
-        else:
-            gyro_noise = np.asarray(gyro_noise)
-
-        if accel_scale_error is None:
-            accel_scale_error = 0
-        else:
-            accel_scale_error = np.asarray(accel_scale_error)
-
-        if accel_scale_asym is None:
-            accel_scale_asym = 0
-        else:
-            accel_scale_asym = np.asarray(accel_scale_asym)
-
-        if accel_align is None:
-            accel_align = np.eye(3)
-        else:
-            accel_align = _align_matrix(accel_align)
-
-        if accel_bias is None:
-            accel_bias = 0
-        else:
-            accel_bias = np.asarray(accel_bias)
-
-        if accel_noise is None:
-            accel_noise = 0
-        else:
-            accel_noise = np.asarray(accel_noise)
-
-        U, S, VT = np.linalg.svd(gyro_align)
-        Cmb = np.dot(U, VT)
-        gyro_align_mars = gyro_align.dot(Cmb.T)
-        accel_align_mars = accel_align.dot(Cmb.T)
-
-        self.gyro_scale_error = gyro_scale_error
-        self.gyro_scale_asym = gyro_scale_asym
-        self.gyro_align = gyro_align
-        self.gyro_bias = gyro_bias
-        self.gyro_noise = gyro_noise
-        self.accel_scale_error = accel_scale_error
-        self.accel_scale_asym = accel_scale_asym
-        self.accel_align = accel_align
-        self.accel_bias = accel_bias
-        self.accel_noise = accel_noise
-
-        self.gyro_align_mars = gyro_align_mars
-        self.accel_align_mars = accel_align_mars
-        self.Cmb = Cmb
+        self.transform = np.asarray(transform)
+        self.bias = np.asarray(bias)
+        self.bias_walk = np.asarray(bias_walk)
+        self.noise = np.asarray(noise)
         self.rng = check_random_state(rng)
 
-    def apply(self, dt, gyro, accel, sensor_type='increment'):
-        gyro_out = _apply_errors(sensor_type, dt, gyro,
-                                 self.gyro_scale_error, self.gyro_scale_asym,
-                                 self.gyro_align, self.gyro_bias,
-                                 self.gyro_noise, self.rng)
-        accel_out = _apply_errors(sensor_type, dt, accel,
-                                  self.accel_scale_error, self.accel_scale_asym,
-                                  self.accel_align, self.accel_bias,
-                                  self.accel_noise, self.rng)
+    @classmethod
+    def from_inertial_sensor_model(cls, inertial_sensor_model, rng=None):
+        rng = check_random_state(rng)
+        transform = (np.eye(3) +
+                     inertial_sensor_model.scale_misal * rng.randn(3, 3))
+        if inertial_sensor_model.bias is None:
+            bias = None
+        else:
+            bias = inertial_sensor_model.bias * rng.randn(3)
+        return cls(transform, bias, inertial_sensor_model.noise,
+                   inertial_sensor_model.bias_walk, rng)
 
-        return gyro_out, accel_out
+    def apply(self, readings, dt, sensor_type):
+        readings = np.asarray(readings)
+        if readings.ndim != 2 or readings.shape[1] != 3:
+            raise ValueError("`readings` must be a (n, 3) array")
+
+        bias = self.bias + self.bias_walk * np.cumsum(
+            self.rng.randn(*readings.shape), axis=0) * dt**0.5
+        result = util.mv_prod(self.transform, readings)
+        if sensor_type == 'rate':
+            result += bias
+            result += self.noise * dt**-0.5 * self.rng.randn(*readings.shape)
+        elif sensor_type == 'increment':
+            result += bias * dt
+            result += self.noise * dt**0.5 * self.rng.randn(*readings.shape)
+        else:
+            raise ValueError(
+                "`sensor_type` must be either 'rate' or 'increment ")
+        return result

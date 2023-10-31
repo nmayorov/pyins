@@ -40,10 +40,12 @@ class InertialSensor:
         bias = self._verify_param(bias, 'bias')
         noise = self._verify_param(noise, 'noise')
         bias_walk = self._verify_param(bias_walk, 'bias_walk')
-        if scale_misal is not None:
-            scale_misal = np.asarray(scale_misal)
-            if scale_misal.shape != (3, 3):
-                raise ValueError("`scale_misal` must have shape (3, 3)")
+
+        if scale_misal is None:
+            scale_misal = np.zeros((3, 3))
+        scale_misal = np.asarray(scale_misal)
+        if scale_misal.shape != (3, 3):
+            raise ValueError("`scale_misal` must have shape (3, 3)")
 
         if bias is None and bias_walk is not None:
             raise ValueError("Set `bias` if you want to use `bias_walk`.")
@@ -98,6 +100,7 @@ class InertialSensor:
         self.noise = noise
         self.bias_walk = bias_walk
         self.readings_required = bool(output_axes)
+        self.scale_misal = scale_misal
         self.scale_misal_data = output_axes, input_axes, scale_misal_states
         self.P = P
         self.q = q
@@ -106,7 +109,7 @@ class InertialSensor:
         self._H = H
 
     @staticmethod
-    def _verify_param(param, name, only_positive=False):
+    def _verify_param(param, name):
         if param is None:
             return None
 
@@ -116,9 +119,7 @@ class InertialSensor:
         if param.shape != (3,):
             raise ValueError("`{}` might be float or array with "
                              "3 elements.".format(name))
-        if only_positive and np.any(param <= 0):
-            raise ValueError("`{}` must contain positive values.".format(name))
-        elif np.any(param < 0):
+        if np.any(param < 0):
             raise ValueError("`{}` must contain non-negative values."
                              .format(name))
 
