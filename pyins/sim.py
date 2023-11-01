@@ -290,41 +290,6 @@ def perturb_navigation_state(lla, velocity_n, rph, position_sd, velocity_sd,
             rph + [level_sd, level_sd, azimuth_sd] * rng.randn(3))
 
 
-def _align_matrix(align_angles):
-    align_angles = np.deg2rad(align_angles)
-    theta1 = align_angles[0]
-    phi1 = align_angles[1]
-    theta2 = align_angles[2]
-    phi2 = align_angles[3]
-    theta3 = align_angles[4]
-    phi3 = align_angles[5]
-
-    return np.array([
-        [np.cos(theta1), np.sin(theta1) * np.cos(phi1),
-         np.sin(theta1) * np.sin(phi1)],
-        [np.sin(theta2) * np.sin(phi2), np.cos(theta2),
-         np.sin(theta2) * np.cos(phi2)],
-        [np.sin(theta3) * np.cos(phi3), np.sin(theta3) * np.sin(phi3),
-         np.cos(theta3)]
-    ])
-
-
-def _apply_errors(sensor_type, dt, readings, scale_error, scale_asym, align,
-                  bias, noise, rng):
-    out = util.mv_prod(align, readings)
-    if sensor_type == 'increment':
-        out += bias * dt
-        out += noise * dt ** 0.5 * rng.randn(*readings.shape)
-    elif sensor_type == 'rate':
-        out += bias
-        out += noise * dt ** -0.5 * rng.randn(*readings.shape)
-    else:
-        assert False
-    scale = 1 + scale_error + scale_asym * np.sign(out)
-    out *= scale
-    return out
-
-
 class ImuErrors:
     def __init__(self, transform=None, bias=None, noise=None, bias_walk=None,
                  rng=None):
