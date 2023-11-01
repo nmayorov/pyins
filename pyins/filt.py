@@ -296,7 +296,6 @@ class FeedforwardFilter:
 
         F = np.zeros((n_points, n_states, n_states))
         G = np.zeros((n_points, n_states, n_noises))
-        q = np.zeros(n_noises)
         P0 = np.zeros((n_states, n_states))
 
         n = error_model.N_STATES
@@ -350,25 +349,19 @@ class FeedforwardFilter:
         F[:, :n, n: n + n1] = util.mm_prod(Fig, H_gyro)
         F[:, :n, n + n1: n + n1 + n2] = util.mm_prod(Fia, H_accel)
 
-        s = 0
+        G[:, :n, :gyro_model.n_output_noises] = util.mm_prod(Fig, gyro_model.J)
+        s = gyro_model.n_output_noises
+        G[:, :n, s : s + accel_model.n_output_noises] = util.mm_prod(Fia, accel_model.J)
+        s += accel_model.n_output_noises
+
         s1 = gyro_model.n_noises
         s2 = accel_model.n_noises
-        if gyro_model.noise is not None:
-            G[:, :n, :3] = Fig
-            q[:3] = gyro_model.noise
-            s += 3
-        if accel_model.noise is not None:
-            G[:, :n, s: s + 3] = Fia
-            q[s: s + 3] = accel_model.noise
-            s += 3
 
         G[:, n: n + n1, s: s + s1] = gyro_model.G
-        q[s: s + s1] = gyro_model.q
         G[:, n + n1: n + n1 + n2, s + s1: s + s1 + s2] = accel_model.G
-        q[s + s1: s + s1 + s2] = accel_model.q
 
         self.F = F
-        self.q = q
+        self.q = np.hstack((gyro_model.v, accel_model.v, gyro_model.q, accel_model.q))
         self.G = G
 
         self.dt = dt
@@ -569,13 +562,10 @@ class FeedbackFilter:
         if accel_model is None:
             accel_model = InertialSensor()
 
-        n_states = error_model.N_STATES + gyro_model.n_states + \
-                   accel_model.n_states
+        n_states = error_model.N_STATES + gyro_model.n_states + accel_model.n_states
         n_noises = (gyro_model.n_noises + accel_model.n_noises +
-                    3 * (gyro_model.noise is not None) +
-                    3 * (accel_model.noise is not None))
+                    gyro_model.n_output_noises + accel_model.n_output_noises)
 
-        q = np.zeros(n_noises)
         P0 = np.zeros((n_states, n_states))
 
         n = error_model.N_STATES
@@ -601,20 +591,7 @@ class FeedbackFilter:
         self.P0_nav = P0_nav
         self.P0 = P0
 
-        s = 0
-        s1 = gyro_model.n_noises
-        s2 = accel_model.n_noises
-        if gyro_model.noise is not None:
-            q[:3] = gyro_model.noise
-            s += 3
-        if accel_model.noise is not None:
-            q[s: s + 3] = accel_model.noise
-            s += 3
-        q[s: s + s1] = gyro_model.q
-        q[s + s1: s + s1 + s2] = accel_model.q
-
-        self.q = q
-
+        self.q = np.hstack((gyro_model.v, accel_model.v, gyro_model.q, accel_model.q))
         states = error_model.STATES.copy()
         for name, state in gyro_model.states.items():
             states['GYRO_' + name] = n + state
@@ -718,13 +695,9 @@ class FeedbackFilter:
         F1 = F
         F2 = F.copy()
 
-        s = 0
+        s = self.gyro_model.n_output_noises + self.accel_model.n_output_noises
         s1 = self.gyro_model.n_noises
         s2 = self.accel_model.n_noises
-        if self.gyro_model.noise is not None:
-            s += 3
-        if self.accel_model.noise is not None:
-            s += 3
 
         G = np.zeros((self.n_states, self.n_noises))
         G[n: n + n1, s: s + s1] = self.gyro_model.G
@@ -788,14 +761,17 @@ class FeedbackFilter:
                 F1[:n, n + n1: n + n1 + n2] = Fia[i].dot(H_accel_i)
                 F2[:n, n + n1: n + n1 + n2] = Fia[i_next].dot(H_accel_i_next)
 
-                s = 0
-                if self.gyro_model.noise is not None:
-                    G1[:n, :3] = Fig[i]
-                    G2[:n, :3] = Fig[i_next]
-                    s += 3
-                if self.accel_model.noise is not None:
-                    G1[:n, s: s + 3] = Fia[i]
-                    G2[:n, s: s + 3] = Fia[i_next]
+                G1[:n, :self.gyro_model.n_output_noises] = Fig[i] @ self.gyro_model.J
+                G2[:n, :self.gyro_model.n_output_noises] = (
+                    Fig[i_next] @ self.gyro_model.J
+                )
+                s = self.gyro_model.n_output_noises
+                G1[:n, s : s + self.accel_model.n_output_noises] = (
+                    Fia[i] @ self.accel_model.J
+                )
+                G2[:n, s : s + self.accel_model.n_output_noises] = (
+                    Fia[i_next] @ self.accel_model.J
+                )
 
                 F = 0.5 * (F1 + F2)
                 Q = 0.5 * (G1 + G2) * self.q

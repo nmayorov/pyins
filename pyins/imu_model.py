@@ -6,10 +6,11 @@ import numpy as np
 class InertialSensor:
     """Inertial sensor triad description.
 
-    Below all parameters might be floats or arrays with 3 elements. In the
-    former case the parameter is assumed to be the same for each of 3 sensors.
-    Setting a parameter to None means that such error is not presented in
-    a sensor.
+    Below all parameters might be floats or arrays. In the former case the parameter
+    is assumed to be the same for each of 3 sensors. In the latter case a non-positive
+    elements disables the effect for the corresponding axis (or axes in case of
+    `scale_misal`). Setting a parameter to None completely disables the effect for all
+    axes.
 
     Note that all parameters are measured in International System of Units.
 
@@ -24,7 +25,7 @@ class InertialSensor:
         (plus an optional random walk).
     noise : array_like or None
         Strength of additive white noise. Known as an angle random walk for
-        gyros.
+        gyros and velocity random walk for accelerometers.
     bias_walk : array_like or None
         Strength of white noise which is integrated into the bias. Known as
         a rate random walk for gyros. Can be set only if `bias` is set.
@@ -34,58 +35,67 @@ class InertialSensor:
         disable the corresponding effect estimation.
     """
     MAX_STATES = 12
-    MAX_NOISES = 6
+    MAX_NOISES = 3
+    MAX_OUTPUT_NOISES = 3
 
     def __init__(self, bias=None, noise=None, bias_walk=None, scale_misal=None):
-        bias = self._verify_param(bias, 'bias')
-        noise = self._verify_param(noise, 'noise')
-        bias_walk = self._verify_param(bias_walk, 'bias_walk')
+        bias = self._verify_param(bias, (3,), "bias")
+        noise = self._verify_param(noise, (3,), "noise")
+        bias_walk = self._verify_param(bias_walk, (3,), "bias_walk")
+        scale_misal = self._verify_param(scale_misal, (3, 3), "scale_misal")
 
-        if scale_misal is None:
-            scale_misal = np.zeros((3, 3))
-        scale_misal = np.asarray(scale_misal)
-        if scale_misal.shape != (3, 3):
-            raise ValueError("`scale_misal` must have shape (3, 3)")
-
-        if bias is None and bias_walk is not None:
-            raise ValueError("Set `bias` if you want to use `bias_walk`.")
+        if np.any(bias_walk[bias <= 0] > 0):
+            raise ValueError(
+                "``bias_walk` can be enabled only for axes where `bias` enabled")
 
         F = np.zeros((self.MAX_STATES, self.MAX_STATES))
         G = np.zeros((self.MAX_STATES, self.MAX_NOISES))
         H = np.zeros((3, self.MAX_STATES))
+
         P = np.zeros((self.MAX_STATES, self.MAX_STATES))
         q = np.zeros(self.MAX_NOISES)
-        I = np.identity(3)
+
+        J = np.zeros((3, self.MAX_OUTPUT_NOISES))
+        v = np.zeros(self.MAX_OUTPUT_NOISES)
 
         n_states = 0
         n_noises = 0
         states = OrderedDict()
-        if bias is not None:
-            P[:3, :3] = I * bias ** 2
-            H[:, :3] = I
-            states['BIAS_1'] = n_states
-            states['BIAS_2'] = n_states + 1
-            states['BIAS_3'] = n_states + 2
-            n_states += 3
+        for axis in range(3):
+            if bias[axis] > 0:
+                P[n_states, n_states] = bias[axis] ** 2
+                H[axis, n_states] = 1
+                states[f"BIAS_{axis + 1}"] = n_states
+
+                if bias_walk[axis] > 0:
+                    G[n_states, n_noises] = 1
+                    q[n_noises] = bias_walk[axis]
+                    n_noises += 1
+
+                n_states += 1
 
         output_axes = []
         input_axes = []
         scale_misal_states = []
         if scale_misal is not None:
-            for i in range(3):
-                for j in range(3):
-                    if scale_misal[i, j] > 0.0:
-                        output_axes.append(i)
-                        input_axes.append(j)
+            for output_axis in range(3):
+                for input_axis in range(3):
+                    if scale_misal[output_axis, input_axis] > 0:
+                        output_axes.append(output_axis)
+                        input_axes.append(input_axis)
                         scale_misal_states.append(n_states)
-                        P[n_states, n_states] = scale_misal[i, j] ** 2
-                        states[f'SCALE_MISAL_{i + 1}{j + 1}'] = n_states
+                        P[n_states, n_states] = scale_misal[
+                            output_axis, input_axis] ** 2
+                        states[
+                            f"SCALE_MISAL_{output_axis + 1}{input_axis + 1}"] = n_states
                         n_states += 1
 
-        if bias_walk is not None:
-            G[:3, :3] = I
-            q[:3] = bias_walk
-            n_noises += 3
+        n_output_noises = 0
+        for axis in range(3):
+            if noise[axis] > 0:
+                J[axis, n_output_noises] = 1
+                v[n_output_noises] = noise[axis]
+                n_output_noises += 1
 
         F = F[:n_states, :n_states]
         G = G[:n_states, :n_noises]
@@ -93,8 +103,12 @@ class InertialSensor:
         P = P[:n_states, :n_states]
         q = q[:n_noises]
 
+        J = J[:, :n_output_noises]
+        v = v[:n_output_noises]
+
         self.n_states = n_states
         self.n_noises = n_noises
+        self.n_output_noises = n_output_noises
         self.states = states
         self.bias = bias
         self.noise = noise
@@ -106,40 +120,39 @@ class InertialSensor:
         self.q = q
         self.F = F
         self.G = G
-        self._H = H
+        self.H = H
+        self.J = J
+        self.v = v
 
     @staticmethod
-    def _verify_param(param, name):
+    def _verify_param(param, shape, name):
         if param is None:
-            return None
+            return np.zeros(shape)
 
         param = np.asarray(param)
         if param.ndim == 0:
             param = np.resize(param, 3)
-        if param.shape != (3,):
-            raise ValueError("`{}` might be float or array with "
-                             "3 elements.".format(name))
-        if np.any(param < 0):
-            raise ValueError("`{}` must contain non-negative values."
-                             .format(name))
+        if param.shape != shape:
+            raise ValueError(f"`{name}` might be float or array with shape {shape}")
 
         return param
 
     def output_matrix(self, readings=None):
         if not self.readings_required:
-            return self._H
+            return self.H
 
         if readings is None:
-            raise ValueError("Inertial `readings` are required when "
-                             "`self.scale_misal` is set.")
+            raise ValueError(
+                "Inertial `readings` are required when " "`self.scale_misal` is set."
+            )
 
         readings = np.asarray(readings)
         output_axes, input_axes, states = self.scale_misal_data
         if readings.ndim == 1:
-            H = self._H.copy()
+            H = self.H.copy()
             H[output_axes, states] = readings[input_axes]
         else:
             H = np.zeros((len(readings), 3, self.n_states))
-            H[:] = self._H
+            H[:] = self.H
             H[:, output_axes, states] = readings[:, input_axes]
         return H
