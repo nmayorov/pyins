@@ -2,6 +2,7 @@ import numpy as np
 from numpy.testing import assert_allclose, assert_equal
 from pyins import sim
 from pyins import earth
+from pyins.imu_model import InertialSensor
 
 
 def test_sim_on_stationary():
@@ -106,3 +107,22 @@ def test_ImuErrors():
         readings_with_error = imu_errors.apply(readings, 0.1, sensor_type)
         assert_equal(readings[:, :2], readings_with_error[:, :2])
         assert np.all(readings[:, 2] != readings_with_error[:, 2])
+
+
+def test_ImuErrors_from_inertial_sensor_model():
+    model = InertialSensor(bias=1,
+                           scale_misal=[[0.01, 0.0, 0.0],
+                                        [0.0, 0.0, 0.01],
+                                        [0.0, 0.01, 0.0]])
+    imu_errors = sim.ImuErrors.from_inertial_sensor_model(model, 0)
+    assert np.all(imu_errors.bias != 0)
+    T = imu_errors.transform
+    assert T[0, 0] != 1
+    assert T[0, 1] == 0
+    assert T[0, 2] == 0
+    assert T[1, 0] == 0
+    assert T[1, 1] == 1
+    assert T[1, 2] != 0
+    assert T[2, 0] == 0
+    assert T[2, 1] != 0
+    assert T[2, 2] == 1
