@@ -1,7 +1,7 @@
 """Strapdown sensors simulator."""
 import numpy as np
 import pandas as pd
-from scipy.interpolate import CubicSpline
+from scipy.interpolate import CubicSpline, CubicHermiteSpline
 from scipy.spatial.transform import Rotation, RotationSpline
 from scipy._lib._util import check_random_state
 from . import earth, transform, util
@@ -54,52 +54,98 @@ def _compute_increment_readings(dt, a, b, c, d, e):
     return gyros, accels
 
 
-def from_position(dt, lla, rph, sensor_type='increment'):
-    """Generate inertial readings given position and attitude.
+def generate_imu(dt, lla, rph, velocity_n=None, sensor_type='rate'):
+    """Generate IMU readings from the trajectory.
+
+    Attitude angles (`rph`) must be always given and there are 3 options with
+    respect to position and velocity:
+
+        - Both position and velocity are given
+        - Only position is given
+        - Initial position and velocity are given
 
     Parameters
     ----------
     dt : float
         Time step.
-    lla : array_like, shape (n_points, 3)
-        Time series of latitude, longitude and altitude.
+    lla : array_like, shape (n_points, 3) or (3,)
+        Either time series of latitude, longitude and altitude or initial
+        values of those.
     rph : array_like, shape (n_points, 3)
         Time series of roll, pitch and heading angles.
+    velocity_n : array_like, shape (n_points, 3) or None
+        Time series of velocity expressed in NED frame.
     sensor_type: 'increment' or 'rate', optional
-        Type of sensor to generate. If 'increment' (default), then integrals
-        over sampling intervals are generated (in rad and m/s).
-        If 'rate', then instantaneous rate values are generated
-        (in rad/s and /m/s/s).
+        Type of sensor to generate. If 'rate' (default), then instantaneous
+        rate values are generated (in rad/s and m/s/s). If 'increment', then
+        integrals over sampling intervals are generated (in rad and m/s).
 
     Returns
     -------
     trajectory : DataFrame
-        Trajectory. Contains n_points rows.
+        Trajectory with n_points rows.
     gyro : ndarray, shape (n_points - 1, 3) or (n_points, 3)
         Gyro readings.
     accel : ndarray, shape (n_points - 1, 3) or (n_points, 3)
         Accelerometer readings.
     """
+    MAX_ITER = 3
+    ACCURACY = 0.01
+
     if sensor_type not in ['rate', 'increment']:
         raise ValueError("`sensor_type` must be 'rate' or 'increment'.")
 
-    lla = np.asarray(lla, dtype=float)
+    lla = np.asarray(lla)
+
+    if lla.ndim == 1 and velocity_n is None:
+        raise ValueError("`velocity_n` must be provided when `lla` contains only "
+                         "initial values")
+
     rph = np.asarray(rph, dtype=float)
-    n_points = len(lla)
-    time = dt * np.arange(n_points)
+    n_points = len(rph)
+    time = np.arange(n_points) * dt
+
+    if lla.ndim == 1:
+        lat0, lon0, alt0 = lla
+        velocity_n = np.asarray(velocity_n, dtype=float)
+        VU_spline = CubicSpline(time, -velocity_n[:, 2])
+        alt_spline = VU_spline.antiderivative()
+        alt = alt0 + alt_spline(time)
+
+        lat0 = np.deg2rad(lat0)
+        lat = lat0
+        for iteration in range(MAX_ITER):
+            rn, _, _ = earth.principal_radii(np.rad2deg(lat), alt)
+            dlat_spline = CubicSpline(time, velocity_n[:, 0] / rn)
+            lat_spline = dlat_spline.antiderivative()
+            lat_new = lat_spline(time) + lat0
+            delta = (lat - lat_new) * rn
+            lat = lat_new
+            if np.all(np.abs(delta) < ACCURACY):
+                break
+
+        _, _, rp = earth.principal_radii(np.rad2deg(lat), alt)
+        dlon_spline = CubicSpline(time, velocity_n[:, 1] / rp)
+        lon_spline = dlon_spline.antiderivative()
+
+        lla = np.empty((n_points, 3))
+        lla[:, 0] = np.rad2deg(lat)
+        lla[:, 1] = lon0 + np.rad2deg(lon_spline(time))
+        lla[:, 2] = alt
 
     lla_inertial = lla.copy()
     lla_inertial[:, 1] += np.rad2deg(earth.RATE) * time
     Cin = transform.mat_en_from_ll(lla_inertial[:, 0], lla_inertial[:, 1])
 
-    R = transform.lla_to_ecef(lla_inertial)
-    v_s = CubicSpline(time, R).derivative()
-    v = v_s(time)
-
-    V = v.copy()
-    V[:, 0] += earth.RATE * R[:, 1]
-    V[:, 1] -= earth.RATE * R[:, 0]
-    V = util.mv_prod(Cin, V, at=True)
+    r_i = transform.lla_to_ecef(lla_inertial)
+    earth_rate_i = [0, 0, earth.RATE]
+    if velocity_n is None:
+        v_s = CubicSpline(time, r_i).derivative()
+        velocity_n = util.mv_prod(Cin, v_s(time) - np.cross(earth_rate_i, r_i),
+                                  True)
+    else:
+        v_i = util.mv_prod(Cin, velocity_n) + np.cross(earth_rate_i, r_i)
+        v_s = CubicHermiteSpline(time, r_i, v_i).derivative()
 
     Cnb = transform.mat_from_rph(rph)
     Cib = util.mm_prod(Cin, Cnb)
@@ -128,72 +174,9 @@ def from_position(dt, lla, rph, sensor_type='increment'):
 
     trajectory = pd.DataFrame(index=np.arange(time.shape[0]))
     trajectory[['lat', 'lon', 'alt']] = lla
-    trajectory[['VN', 'VE', 'VD']] = V
+    trajectory[['VN', 'VE', 'VD']] = velocity_n
     trajectory[['roll', 'pitch', 'heading']] = rph
     return trajectory, gyros, accels
-
-
-def from_velocity(dt, lla0, velocity_n, rph, sensor_type='increment'):
-    """Generate inertial readings given velocity and attitude.
-
-    Parameters
-    ----------
-    dt : float
-        Time step.
-    lla0 : array_like, shape (3,)
-        Initial values of latitude, longitude and altitude.
-    velocity_n : array_like, shape (n_points, 3)
-        Time series of East, North and vertical velocity components.
-    rph : array_like, shape (n_points, 3)
-        Time series of roll, pitch and heading.
-    sensor_type: 'increment' or 'rate', optional
-        Type of sensor to generate. If 'increment' (default), then integrals
-        over sampling intervals are generated (in rad and m/s).
-        If 'rate', then instantaneous rate values are generated
-        (in rad/s and /m/s/s).
-
-    Returns
-    -------
-    trajectory : DataFrame
-        Trajectory. Contains n_points rows.
-    gyro : ndarray, shape (n_points - 1, 3)
-        Gyro readings.
-    accel : ndarray, shape (n_points - 1, 3)
-        Accelerometer readings.
-    """
-    MAX_ITER = 3
-    ACCURACY = 0.01
-
-    velocity_n = np.asarray(velocity_n, dtype=float)
-    rph = np.asarray(rph, dtype=float)
-    n_points = len(velocity_n)
-    time = np.arange(n_points) * dt
-
-    VU_spline = CubicSpline(time, -velocity_n[:, 2])
-    alt_spline = VU_spline.antiderivative()
-    alt = lla0[2] + alt_spline(time)
-
-    lat = lat0 = np.deg2rad(lla0[0])
-    for iteration in range(MAX_ITER):
-        rn, _, _ = earth.principal_radii(np.rad2deg(lat), alt)
-        dlat_spline = CubicSpline(time, velocity_n[:, 0] / rn)
-        lat_spline = dlat_spline.antiderivative()
-        lat_new = lat_spline(time) + lat0
-        delta = (lat - lat_new) * rn
-        lat = lat_new
-        if np.all(np.abs(delta) < ACCURACY):
-            break
-
-    _, _, rp = earth.principal_radii(np.rad2deg(lat), alt)
-    dlon_spline = CubicSpline(time, velocity_n[:, 1] / rp)
-    lon_spline = dlon_spline.antiderivative()
-
-    lla = np.empty((n_points, 3))
-    lla[:, 0] = np.rad2deg(lat)
-    lla[:, 1] = lla0[1] + np.rad2deg(lon_spline(time))
-    lla[:, 2] = alt
-
-    return from_position(dt, lla, rph, sensor_type)
 
 
 def sinusoid_velocity_motion(dt, total_time, lla0, velocity_mean,
@@ -252,7 +235,7 @@ def sinusoid_velocity_motion(dt, total_time, lla0, velocity_mean,
     rph[:, 1] = np.rad2deg(np.arctan2(
         velocity_n[:, 2], np.hypot(velocity_n[:, 0], velocity_n[:, 1])))
     rph[:, 2] = np.rad2deg(np.arctan2(velocity_n[:, 1], velocity_n[:, 0]))
-    return from_velocity(dt, lla0, velocity_n, rph, sensor_type)
+    return generate_imu(dt, lla0, rph, velocity_n, sensor_type)
 
 
 def generate_position_observations(trajectory, error_sd, rng=None):

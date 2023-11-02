@@ -60,10 +60,10 @@ def test_integrate_stationary():
         'roll': 1e-8, 'pitch': 1e-8, 'heading': 1e-8
     })
 
-    ref, gyro, accel = sim.from_position(dt, lla, rph, sensor_type='increment')
+    ref, gyro, accel = sim.generate_imu(dt, lla, rph, sensor_type='increment')
     run_integration_test(ref, gyro, accel, dt, 'increment', thresholds)
 
-    ref, gyro, accel = sim.from_position(dt, lla, rph, sensor_type='rate')
+    ref, gyro, accel = sim.generate_imu(dt, lla, rph, sensor_type='rate')
     run_integration_test(ref, gyro, accel, dt, 'rate', thresholds)
 
 
