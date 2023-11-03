@@ -809,7 +809,7 @@ class FeedbackFilter:
 
         Parameters
         ----------
-        integrator : `pyins.integrate.Integrator` instance
+        integrator : `strapdown.Integrator` instance
             Integrator to use for INS state propagation. It will be reset
             before the filter start.
         theta, dv : ndarray, shape (n_readings, 3)

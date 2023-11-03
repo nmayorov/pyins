@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 from pyins import earth, error_models, sim, transform
-from pyins.strapdown import compute_theta_and_dv, StrapdownIntegrator
+from pyins.strapdown import compute_theta_and_dv, Integrator
 from pyins.transform import perturb_lla, difference_trajectories
 
 
@@ -32,7 +32,7 @@ def test_propagate_errors(error_model):
     V0_n = trajectory.loc[0, ['VN', 'VE', 'VD']] + delta_velocity_n
     rph0 = trajectory.loc[0, ['roll', 'pitch', 'heading']] + delta_rph
 
-    integrator = StrapdownIntegrator(dt, lla0, V0_n, rph0)
+    integrator = Integrator(dt, lla0, V0_n, rph0)
     traj_c = integrator.integrate(theta, dv)
     error_true = difference_trajectories(traj_c, trajectory)
 

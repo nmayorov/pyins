@@ -3,7 +3,7 @@ from numpy.testing import assert_allclose
 import numpy as np
 from pyins import sim
 from pyins.transform import difference_trajectories
-from pyins.strapdown import compute_theta_and_dv, StrapdownIntegrator
+from pyins.strapdown import compute_theta_and_dv, Integrator
 
 
 def test_coning_sculling():
@@ -29,10 +29,10 @@ def run_integration_test(reference_trajectory, gyro, accel, dt, sensor_type,
     theta, dv = compute_theta_and_dv(gyro, accel,
                                      dt=dt if sensor_type == 'rate' else None)
     init = reference_trajectory.iloc[0]
-    integrator = StrapdownIntegrator(dt,
-                                     init[['lat', 'lon', 'alt']],
-                                     init[['VN', 'VE', 'VD']],
-                                     init[['roll', 'pitch', 'heading']])
+    integrator = Integrator(dt,
+                            init[['lat', 'lon', 'alt']],
+                            init[['VN', 'VE', 'VD']],
+                            init[['roll', 'pitch', 'heading']])
     result = integrator.integrate(theta, dv)
     diff = difference_trajectories(
         result, reference_trajectory).abs().max(axis=0)

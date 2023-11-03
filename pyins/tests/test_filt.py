@@ -54,7 +54,7 @@ def test_FeedbackFilter():
     f = filt.FeedbackFilter(dt, pos_sd=pos_sd, vel_sd=vel_sd,
                             azimuth_sd=azimuth_sd, level_sd=level_sd,
                             gyro_model=gyro_model, accel_model=accel_model)
-    integrator = strapdown.StrapdownIntegrator(dt, lla, velocity_n, rph)
+    integrator = strapdown.Integrator(dt, lla, velocity_n, rph)
 
     result = f.run(integrator, theta, dv,
                    observations=[position_obs, ned_velocity_obs,
@@ -119,7 +119,7 @@ def test_FeedforwardFilter():
         pos_sd, vel_sd, level_sd, azimuth_sd,
         rng=rng)
 
-    integrator = strapdown.StrapdownIntegrator(dt, lla, velocity_n, rph)
+    integrator = strapdown.Integrator(dt, lla, velocity_n, rph)
     trajectory_computed = integrator.integrate(theta, dv)
 
     f = filt.FeedforwardFilter(dt, trajectory, pos_sd=pos_sd, vel_sd=vel_sd,

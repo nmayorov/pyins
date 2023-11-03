@@ -66,7 +66,7 @@ def compute_theta_and_dv(gyro, accel, dt=None):
     return gyro + coning, accel + sculling + 0.5 * np.cross(gyro, accel)
 
 
-class StrapdownIntegrator:
+class Integrator:
     """Integrate inertial readings by strapdown algorithm.
 
     The algorithm described in [1]_ and [2]_ is used with slight
