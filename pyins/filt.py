@@ -670,13 +670,13 @@ class FeedbackFilter:
         n1 = self.gyro_model.n_states
         n2 = self.accel_model.n_states
 
-        if self.gyro_model.readings_required is not None:
+        if self.gyro_model.readings_required:
             gyro = increments[THETA_COLS].values / self.dt
             gyro = np.vstack((gyro, 2 * gyro[-1] - gyro[-2]))
         else:
             gyro = None
 
-        if self.accel_model.readings_required is not None:
+        if self.accel_model.readings_required:
             accel = increments[DV_COLS].values / self.dt
             accel = np.vstack((accel, 2 * accel[-1] - accel[-2]))
         else:
