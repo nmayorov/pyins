@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from scipy.spatial.transform import Rotation
 from . import earth, util, transform
+from .util import LLA_COLS, VEL_COLS, RPH_COLS
 
 
 class InsErrorModel:
@@ -187,12 +188,12 @@ class ModifiedPhiModel(InsErrorModel):
     def system_matrix(self, trajectory):
         n_samples = trajectory.shape[0]
 
-        V_skew = util.skew_matrix(trajectory[['VN', 'VE', 'VD']])
+        V_skew = util.skew_matrix(trajectory[VEL_COLS])
         R = earth.curvature_matrix(trajectory.lat, trajectory.alt)
         Omega_n = earth.rate_n(trajectory.lat)
-        rho_n = util.mv_prod(R, trajectory[['VN', 'VE', 'VD']])
+        rho_n = util.mv_prod(R, trajectory[VEL_COLS])
         g_n = earth.gravity_n(trajectory.lat, trajectory.alt)
-        Cnb = transform.mat_from_rph(trajectory[['roll', 'pitch', 'heading']])
+        Cnb = transform.mat_from_rph(trajectory[RPH_COLS])
 
         F = np.zeros((n_samples, self.N_STATES, self.N_STATES))
         samples = np.arange(n_samples)
@@ -231,20 +232,18 @@ class ModifiedPhiModel(InsErrorModel):
         T[np.ix_(samples, self.DR_OUT, self.DR)] = np.eye(3)
         T[np.ix_(samples, self.DV_OUT, self.DV)] = np.eye(3)
         T[np.ix_(samples, self.DV_OUT, self.PHI)] = util.skew_matrix(
-            trajectory[['VN', 'VE', 'VD']])
+            trajectory[VEL_COLS])
         T[np.ix_(samples, self.DRPH, self.PHI)] = transform.phi_to_delta_rph(
-            trajectory[['roll', 'pitch', 'heading']])
+            trajectory[RPH_COLS])
 
         return T[0] if series else T
 
     def correct_state(self, trajectory_point, error):
         Ctp = Rotation.from_rotvec(error[self.PHI]).as_matrix()
-        lla = transform.perturb_lla(trajectory_point[['lat', 'lon', 'alt']],
-                                    -error[self.DR])
-        velocity_n = Ctp @ (trajectory_point[['VN', 'VE', 'VD']]
-                            - error[self.DV])
+        lla = transform.perturb_lla(trajectory_point[LLA_COLS], -error[self.DR])
+        velocity_n = Ctp @ (trajectory_point[VEL_COLS] - error[self.DV])
         rph = transform.mat_to_rph(Ctp @ transform.mat_from_rph(
-            trajectory_point[['roll', 'pitch', 'heading']]))
+            trajectory_point[RPH_COLS]))
 
         return pd.Series(data=np.hstack((lla, velocity_n, rph)),
                          index=trajectory_point.index)
@@ -253,21 +252,18 @@ class ModifiedPhiModel(InsErrorModel):
         result = np.zeros((3, self.N_STATES))
         result[:, self.DR] = np.eye(3)
         if imu_to_antenna_b is not None:
-            mat_nb = transform.mat_from_rph(
-                trajectory_point[['roll', 'pitch', 'heading']])
+            mat_nb = transform.mat_from_rph(trajectory_point[RPH_COLS])
             result[:, self.PHI] = util.skew_matrix(mat_nb @ imu_to_antenna_b)
         return result
 
     def ned_velocity_error_jacobian(self, trajectory_point):
         result = np.zeros((3, self.N_STATES))
         result[:, self.DV] = np.eye(3)
-        result[:, self.PHI] = util.skew_matrix(
-            trajectory_point[['VN', 'VE', 'VD']])
+        result[:, self.PHI] = util.skew_matrix(trajectory_point[VEL_COLS])
         return result
 
     def body_velocity_error_jacobian(self, trajectory_point):
-        Cnb = transform.mat_from_rph(
-            trajectory_point[['roll', 'pitch', 'heading']])
+        Cnb = transform.mat_from_rph(trajectory_point[RPH_COLS])
         result = np.zeros((3, self.N_STATES))
         result[:, self.DV] = Cnb.transpose()
         return result
@@ -308,13 +304,13 @@ class ModifiedPsiModel(InsErrorModel):
     def system_matrix(self, trajectory):
         n_samples = trajectory.shape[0]
 
-        V_skew = util.skew_matrix(trajectory[['VN', 'VE', 'VD']])
+        V_skew = util.skew_matrix(trajectory[VEL_COLS])
         R = earth.curvature_matrix(trajectory.lat, trajectory.alt)
         Omega_n = earth.rate_n(trajectory.lat)
-        rho_n = util.mv_prod(R, trajectory[['VN', 'VE', 'VD']])
+        rho_n = util.mv_prod(R, trajectory[VEL_COLS])
         g_n_skew = util.skew_matrix(earth.gravity_n(trajectory.lat,
                                                     trajectory.alt))
-        Cnb = transform.mat_from_rph(trajectory[['roll', 'pitch', 'heading']])
+        Cnb = transform.mat_from_rph(trajectory[RPH_COLS])
 
         F = np.zeros((n_samples, self.N_STATES, self.N_STATES))
         samples = np.arange(n_samples)
@@ -351,10 +347,9 @@ class ModifiedPsiModel(InsErrorModel):
         T[np.ix_(samples, self.DR_OUT, self.DR)] = np.eye(3)
         T[np.ix_(samples, self.DV_OUT, self.DV)] = np.eye(3)
         T[np.ix_(samples, self.DV_OUT, self.PSI)] = util.skew_matrix(
-            trajectory[['VN', 'VE', 'VD']])
+            trajectory[VEL_COLS])
 
-        T_rph_phi = transform.phi_to_delta_rph(
-            trajectory[['roll', 'pitch', 'heading']])
+        T_rph_phi = transform.phi_to_delta_rph(trajectory[RPH_COLS])
         R = earth.curvature_matrix(trajectory.lat, trajectory.alt)
         T[np.ix_(samples, self.DRPH, self.PSI)] = T_rph_phi
         T[np.ix_(samples, self.DRPH, self.DR)] = util.mm_prod(T_rph_phi, R)
@@ -365,12 +360,10 @@ class ModifiedPsiModel(InsErrorModel):
         R = earth.curvature_matrix(trajectory_point.lat, trajectory_point.alt)
         Ctp = Rotation.from_rotvec(error[self.PSI] +
                                    R @ error[self.DR]).as_matrix()
-        lla = transform.perturb_lla(trajectory_point[['lat', 'lon', 'alt']],
-                                    -error[self.DR])
-        velocity_n = Ctp @ (trajectory_point[['VN', 'VE', 'VD']]
-                            - error[self.DV])
+        lla = transform.perturb_lla(trajectory_point[LLA_COLS], -error[self.DR])
+        velocity_n = Ctp @ (trajectory_point[VEL_COLS] - error[self.DV])
         rph = transform.mat_to_rph(Ctp @ transform.mat_from_rph(
-            trajectory_point[['roll', 'pitch', 'heading']]))
+            trajectory_point[RPH_COLS]))
 
         return pd.Series(data=np.hstack((lla, velocity_n, rph)),
                          index=trajectory_point.index)
@@ -380,8 +373,7 @@ class ModifiedPsiModel(InsErrorModel):
         result = np.zeros((3, self.N_STATES))
         result[:, self.DR] = np.eye(3)
         if imu_to_antenna_b is not None:
-            mat_nb = transform.mat_from_rph(
-                trajectory_point[['roll', 'pitch', 'heading']])
+            mat_nb = transform.mat_from_rph(trajectory_point[RPH_COLS])
             S = util.skew_matrix(mat_nb @ imu_to_antenna_b)
             F = earth.curvature_matrix(trajectory_point.lat,
                                        trajectory_point.alt)
@@ -393,13 +385,11 @@ class ModifiedPsiModel(InsErrorModel):
     def ned_velocity_error_jacobian(self, trajectory_point):
         result = np.zeros((3, self.N_STATES))
         result[:, self.DV] = np.eye(3)
-        result[:, self.PSI] = util.skew_matrix(
-            trajectory_point[['VN', 'VE', 'VD']])
+        result[:, self.PSI] = util.skew_matrix(trajectory_point[VEL_COLS])
         return result
 
     def body_velocity_error_jacobian(self, trajectory_point):
-        Cnb = transform.mat_from_rph(
-            trajectory_point[['roll', 'pitch', 'heading']])
+        Cnb = transform.mat_from_rph(trajectory_point[RPH_COLS])
         result = np.zeros((3, self.N_STATES))
         result[:, self.DV] = Cnb.transpose()
         return result

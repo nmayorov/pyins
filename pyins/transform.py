@@ -2,6 +2,7 @@
 import numpy as np
 from scipy.spatial.transform import Rotation
 from . import earth
+from .util import VEL_COLS, RPH_COLS
 
 #: Degrees to radians.
 DEG_TO_RAD = np.pi / 180
@@ -168,8 +169,8 @@ def correct_trajectory(trajectory, error):
     result['lat'] -= np.rad2deg(error.north / rn)
     result['lon'] -= np.rad2deg(error.east / rp)
     result['alt'] += error.down
-    result[['VN', 'VE', 'VD']] -= error[['VN', 'VE', 'VD']]
-    result[['roll', 'pitch', 'heading']] -= error[['roll', 'pitch', 'heading']]
+    result[VEL_COLS] -= error[VEL_COLS]
+    result[RPH_COLS] -= error[RPH_COLS]
     return result.dropna()
 
 

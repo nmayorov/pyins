@@ -165,11 +165,9 @@ class Integrator:
         index = pd.Index(self.trajectory.index[-1] + 1 + np.arange(n_readings),
                          name='stamp')
         trajectory = pd.DataFrame(index=index)
-        trajectory[['lat', 'lon', 'alt']] = self.lla[n_data:
-                                                     n_data + n_readings]
-        trajectory[['VN', 'VE', 'VD']] = self.velocity_n[n_data:
-                                                         n_data + n_readings]
-        trajectory[['roll', 'pitch', 'heading']] = rph
+        trajectory[LLA_COLS] = self.lla[n_data : n_data + n_readings]
+        trajectory[VEL_COLS] = self.velocity_n[n_data : n_data + n_readings]
+        trajectory[RPH_COLS] = rph
 
         self.trajectory = pd.concat([self.trajectory, trajectory])
 
@@ -194,8 +192,7 @@ class Integrator:
             Trajectory point.
         """
         i = len(self.trajectory) - 1
-        self.lla[i] = trajectory_point[['lat', 'lon', 'alt']]
-        self.velocity_n[i] = trajectory_point[['VN', 'VE', 'VD']]
-        self.Cnb[i] = transform.mat_from_rph(
-            trajectory_point[['roll', 'pitch', 'heading']])
+        self.lla[i] = trajectory_point[LLA_COLS]
+        self.velocity_n[i] = trajectory_point[VEL_COLS]
+        self.Cnb[i] = transform.mat_from_rph(trajectory_point[RPH_COLS])
         self.trajectory.iloc[-1] = trajectory_point

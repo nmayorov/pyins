@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from . import error_models, kalman, util, transform
 from .imu_model import InertialSensor
+from .util import LLA_COLS, VEL_COLS, RPH_COLS
 
 
 FIRST_ORDER_TIMESTEP_MAX = 0.1
@@ -92,12 +93,10 @@ class PositionObs(Observation):
         if stamp not in self.data.index:
             return None
 
-        z = transform.difference_lla(trajectory_point[['lat', 'lon', 'alt']],
-                                     self.data.loc[stamp,
-                                                   ['lat', 'lon', 'alt']])
+        z = transform.difference_lla(trajectory_point[LLA_COLS],
+                                     self.data.loc[stamp, LLA_COLS])
         if self.imu_to_antenna_b:
-            mat_nb = transform.mat_from_rph(
-                trajectory_point[['roll', 'pitch', 'heading']])
+            mat_nb = transform.mat_from_rph(trajectory_point[RPH_COLS])
             z += mat_nb @ self.imu_to_antenna_b
 
         H = error_model.position_error_jacobian(trajectory_point,
@@ -130,8 +129,7 @@ class NedVelocityObs(Observation):
         if stamp not in self.data.index:
             return None
 
-        z = trajectory_point[['VN', 'VE', 'VD']] - \
-            self.data.loc[stamp,  ['VN', 'VE', 'VD']]
+        z = trajectory_point[VEL_COLS] - self.data.loc[stamp, VEL_COLS]
         H = error_model.ned_velocity_error_jacobian(trajectory_point)
 
         return z, H, self.R
@@ -161,10 +159,9 @@ class BodyVelocityObs(Observation):
         if stamp not in self.data.index:
             return None
 
-        Cnb = transform.mat_from_rph(
-            trajectory_point[['roll', 'pitch', 'heading']])
-        z = Cnb.transpose() @ trajectory_point[['VN', 'VE', 'VD']] - \
-            self.data.loc[stamp, ['VX', 'VY', 'VZ']]
+        Cnb = transform.mat_from_rph(trajectory_point[RPH_COLS])
+        z = (Cnb.transpose() @ trajectory_point[VEL_COLS] -
+             self.data.loc[stamp, ['VX', 'VY', 'VZ']])
         H = error_model.body_velocity_error_jacobian(trajectory_point)
         return z, H, self.R
 

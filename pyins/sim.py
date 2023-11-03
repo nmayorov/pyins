@@ -174,9 +174,9 @@ def generate_imu(dt, lla, rph, velocity_n=None, sensor_type='rate'):
         assert False
 
     trajectory = pd.DataFrame(index=np.arange(time.shape[0]))
-    trajectory[['lat', 'lon', 'alt']] = lla
-    trajectory[['VN', 'VE', 'VD']] = velocity_n
-    trajectory[['roll', 'pitch', 'heading']] = rph
+    trajectory[LLA_COLS] = lla
+    trajectory[VEL_COLS] = velocity_n
+    trajectory[RPH_COLS] = rph
     return trajectory, gyros, accels
 
 
@@ -242,26 +242,22 @@ def sinusoid_velocity_motion(dt, total_time, lla0, velocity_mean,
 def generate_position_observations(trajectory, error_sd, rng=None):
     rng = check_random_state(rng)
     error = error_sd * rng.randn(len(trajectory), 3)
-    lla = transform.perturb_lla(trajectory[['lat', 'lon', 'alt']],
-                                error)
-    return pd.DataFrame(data=lla, index=trajectory.index,
-                        columns=['lat', 'lon', 'alt'])
+    lla = transform.perturb_lla(trajectory[LLA_COLS], error)
+    return pd.DataFrame(data=lla, index=trajectory.index, columns=LLA_COLS)
 
 
 def generate_ned_velocity_observations(trajectory, error_sd, rng=None):
     rng = check_random_state(rng)
     error = error_sd * rng.randn(len(trajectory), 3)
-    velocity_n = trajectory[['VN', 'VE', 'VD']] + error
-    return pd.DataFrame(data=velocity_n, index=trajectory.index,
-                        columns=['VN', 'VE', 'VD'])
+    velocity_n = trajectory[VEL_COLS] + error
+    return pd.DataFrame(data=velocity_n, index=trajectory.index, columns=VEL_COLS)
 
 
 def generate_body_velocity_observations(trajectory, error_sd, rng=None):
     rng = check_random_state(rng)
     error = error_sd * rng.randn(len(trajectory), 3)
-    Cnb = transform.mat_from_rph(trajectory[['roll', 'pitch', 'heading']])
-    velocity_b = (util.mv_prod(Cnb, trajectory[['VN', 'VE', 'VD']], at=True)
-                  + error)
+    Cnb = transform.mat_from_rph(trajectory[RPH_COLS])
+    velocity_b = util.mv_prod(Cnb, trajectory[VEL_COLS], at=True) + error
     return pd.DataFrame(data=velocity_b, index=trajectory.index,
                         columns=['VX', 'VY', 'VZ'])
 
