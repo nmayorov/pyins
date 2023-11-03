@@ -73,7 +73,7 @@ cdef double gravity(double lat, double alt):
     return GE * (1 + F * s2) / (1 - E2 * s2) ** 0.5 * (1 - 2 * alt / R0)
 
 
-def integrate_fast(double dt, double[:, :] lla, double[:, :] velocity_n,
+def integrate_fast(double[:] dt_array, double[:, :] lla, double[:, :] velocity_n,
                    double[:, :, :] Cnb, double[:, ::1] theta, double[:, ::1] dv,
                    int offset, bint with_altitude):
     cdef int i, j
@@ -96,8 +96,12 @@ def integrate_fast(double dt, double[:, :] lla, double[:, :] velocity_n,
     cdef double rho1, rho2, rho3
     cdef double chi1, chi2, chi3
 
+    cdef double dt
+
     for i in range(theta.shape[0]):
         j = i + offset
+
+        dt = dt_array[i]
 
         lat = lla[j, 0]
         alt = lla[j, 2]

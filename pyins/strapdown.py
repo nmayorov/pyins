@@ -6,7 +6,7 @@ from .util import LLA_COLS, RPH_COLS, VEL_COLS, GYRO_COLS, ACCEL_COLS
 from ._integrate import integrate_fast
 
 
-def compute_theta_and_dv(imu, dt=None):
+def compute_theta_and_dv(imu, sensor_type):
     """Compute attitude and velocity increments from IMU readings.
 
     This function transforms raw gyro and accelerometer readings into
@@ -20,9 +20,7 @@ def compute_theta_and_dv(imu, dt=None):
     ----------
     imu : pd.DataFrame
         IMU data.
-    dt : float or None, optional
-        If None (default), `gyro` and `accel` are assumed to contain integral
-        increments. Float is interpreted as the sampling rate of rate sensors.
+    sensor_type : 'rate' or 'increment'
 
     Returns
     -------
@@ -38,16 +36,20 @@ def compute_theta_and_dv(imu, dt=None):
            Design Part 2: Velocity and Position Algorithms", Journal of
            Guidance, Control, and Dynamics 1998, Vol. 21, no. 2.
     """
+    if sensor_type not in ['rate', 'increment']:
+        raise ValueError("`sensor_type` must be either 'rate' or 'increment'")
+
     gyro = imu[GYRO_COLS].values
     accel = imu[ACCEL_COLS].values
 
-    if dt is None:
+    if sensor_type == 'increment':
         gyro_increment = gyro[1:]
         accel_increment = accel[1:]
         coning = np.cross(gyro[:-1], gyro[1:]) / 12
         sculling = (np.cross(gyro[:-1], accel[1:]) +
                     np.cross(accel[:-1], gyro[1:])) / 12
-    else:
+    elif sensor_type == 'rate':
+        dt = np.diff(imu.index).reshape(-1, 1)
         a_gyro = gyro[:-1]
         b_gyro = gyro[1:] - gyro[:-1]
         a_accel = accel[:-1]
@@ -57,6 +59,8 @@ def compute_theta_and_dv(imu, dt=None):
         coning = np.cross(a_gyro, b_gyro) * dt ** 2 / 12
         sculling = (np.cross(a_gyro, b_accel) +
                     np.cross(a_accel, b_gyro)) * dt ** 2 / 12
+    else:
+        assert False
 
     theta = gyro_increment + coning
     dv = accel_increment + sculling + 0.5 * np.cross(gyro_increment, accel_increment)
@@ -103,8 +107,7 @@ class Integrator:
     """
     INITIAL_SIZE = 10000
 
-    def __init__(self, dt, trajectory_point, with_altitude=True):
-        self.dt = dt
+    def __init__(self, trajectory_point, with_altitude=True):
         self.with_altitude = with_altitude
         if not with_altitude:
             trajectory_point.VD = 0.0
@@ -146,6 +149,8 @@ class Integrator:
         """
         theta = increments[['theta_x', 'theta_y', 'theta_z']].values
         dv = increments[['dv_x', 'dv_y', 'dv_z']].values
+        dt = np.diff(np.hstack([self.trajectory.index[-1], increments.index])
+                     ).astype(float)
 
         n_data = self.trajectory.shape[0]
         n_readings = theta.shape[0]
@@ -158,16 +163,15 @@ class Integrator:
             self.velocity_n.resize((new_size, 3), refcheck=False)
             self.Cnb.resize((new_size, 3, 3), refcheck=False)
 
-        integrate_fast(self.dt, self.lla, self.velocity_n, self.Cnb,
-                       theta, dv, n_data-1, self.with_altitude)
+        integrate_fast(dt, self.lla, self.velocity_n, self.Cnb,
+                       theta, dv, n_data - 1, self.with_altitude)
         rph = transform.mat_to_rph(self.Cnb[n_data:n_data + n_readings])
-        index = pd.Index(self.trajectory.index[-1] + 1 + np.arange(n_readings),
-                         name='stamp')
-        trajectory = pd.DataFrame(index=index)
-        trajectory[LLA_COLS] = self.lla[n_data : n_data + n_readings]
-        trajectory[VEL_COLS] = self.velocity_n[n_data : n_data + n_readings]
-        trajectory[RPH_COLS] = rph
-
+        trajectory = pd.DataFrame(
+            np.hstack([self.lla[n_data : n_data + n_readings],
+                       self.velocity_n[n_data : n_data + n_readings],
+                       rph]),
+            index=increments.index, columns=LLA_COLS + VEL_COLS + RPH_COLS
+        )
         self.trajectory = pd.concat([self.trajectory, trajectory])
 
         return self.trajectory.iloc[-n_readings - 1:]
