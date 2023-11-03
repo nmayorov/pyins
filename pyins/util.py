@@ -1,6 +1,11 @@
-"""Utility functions."""
+"""Utility functions and definitions."""
 from collections import OrderedDict
 import numpy as np
+
+
+LLA_COLS = ['lat', 'lon', 'alt']
+VEL_COLS = ['VN', 'VE', 'VD']
+RPH_COLS = ['roll', 'pitch', 'heading']
 
 
 def mm_prod(a, b, at=False, bt=False):

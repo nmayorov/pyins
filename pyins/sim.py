@@ -5,6 +5,7 @@ from scipy.interpolate import CubicSpline, CubicHermiteSpline
 from scipy.spatial.transform import Rotation, RotationSpline
 from scipy._lib._util import check_random_state
 from . import earth, transform, util
+from .util import LLA_COLS, VEL_COLS, RPH_COLS
 
 
 def _compute_increment_readings(dt, a, b, c, d, e):
@@ -265,12 +266,15 @@ def generate_body_velocity_observations(trajectory, error_sd, rng=None):
                         columns=['VX', 'VY', 'VZ'])
 
 
-def perturb_navigation_state(lla, velocity_n, rph, position_sd, velocity_sd,
+def perturb_trajectory_point(trajectory_point, position_sd, velocity_sd,
                              level_sd, azimuth_sd, rng=None):
     rng = check_random_state(rng)
-    return (transform.perturb_lla(lla, position_sd * rng.randn(3)),
-            velocity_n + velocity_sd * rng.randn(3),
-            rph + [level_sd, level_sd, azimuth_sd] * rng.randn(3))
+    result = trajectory_point.copy()
+    result[LLA_COLS] = transform.perturb_lla(result[LLA_COLS],
+                                             position_sd * rng.randn(3))
+    result[VEL_COLS] += velocity_sd * rng.randn(3)
+    result[RPH_COLS] += [level_sd, level_sd, azimuth_sd] * rng.randn(3)
+    return result
 
 
 class ImuErrors:

@@ -2,6 +2,7 @@
 import numpy as np
 import pandas as pd
 from . import transform
+from .util import LLA_COLS, RPH_COLS, VEL_COLS
 from ._integrate import integrate_fast
 
 
@@ -76,12 +77,8 @@ class Integrator:
     ----------
     dt : float
         Sensors sampling period.
-    lla : array_like, shape (3,)
-        Initial latitude, longitude and altitude.
-    velocity_n: array_like, shape (3,)
-        Initial velocity in NED frame.
-    rph : array_like, shape (3,)
-        Initial heading, pitch and roll.
+    trajectory_point : pd.Series
+        Initial trajectory point.
     with_altitude : bool, optional
         Whether to compute altitude and vertical velocity. Default is True.
         If False, then vertical velocity is set to zero and altitude is kept
@@ -105,15 +102,13 @@ class Integrator:
            Design Part 2: Velocity and Position Algorithms", Journal of
            Guidance, Control, and Dynamics 1998, Vol. 21, no. 2.
     """
-    TRAJECTORY_COLUMNS = ['lat', 'lon', 'alt', 'VN', 'VE', 'VD',
-                          'roll', 'pitch', 'heading']
     INITIAL_SIZE = 10000
 
-    def __init__(self, dt, lla, velocity_n, rph, with_altitude=True):
+    def __init__(self, dt, trajectory_point, with_altitude=True):
         self.dt = dt
         self.with_altitude = with_altitude
         if not with_altitude:
-            velocity_n[2] = 0.0
+            trajectory_point.VD = 0.0
 
         self.lla = np.empty((self.INITIAL_SIZE, 3))
         self.velocity_n = np.empty((self.INITIAL_SIZE, 3))
@@ -121,19 +116,16 @@ class Integrator:
 
         self.trajectory = None
 
-        self._init_values = [lla, velocity_n, rph]
+        self._init_values = trajectory_point
         self.reset()
 
     def reset(self):
         """Clear computed trajectory except the initial point."""
-        lla, velocity_n, rph = self._init_values
-        self.lla[0] = lla
-        self.velocity_n[0] = velocity_n
-        self.Cnb[0] = transform.mat_from_rph(rph)
-        self.trajectory = pd.DataFrame(
-            data=np.atleast_2d(np.hstack((lla, velocity_n, rph))),
-            columns=self.TRAJECTORY_COLUMNS,
-            index=pd.Index([0], name='stamp'))
+        self.lla[0] = self._init_values[LLA_COLS]
+        self.velocity_n[0] = self._init_values[VEL_COLS]
+        self.Cnb[0] = transform.mat_from_rph(self._init_values[RPH_COLS])
+        self.trajectory = self._init_values.to_frame().transpose(copy=True)
+        self.trajectory.index.name = 'stamp'
 
     def integrate(self, theta, dv):
         """Integrate inertial readings.

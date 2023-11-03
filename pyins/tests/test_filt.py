@@ -44,17 +44,12 @@ def test_FeedbackFilter():
     level_sd = 1.0
     azimuth_sd = 5.0
 
-    lla, velocity_n, rph = sim.perturb_navigation_state(
-        trajectory.loc[0, ['lat', 'lon', 'alt']],
-        trajectory.loc[0, ['VN', 'VE', 'VD']],
-        trajectory.loc[0, ['roll', 'pitch', 'heading']],
-        pos_sd, vel_sd, level_sd, azimuth_sd,
-        rng=rng)
-
+    initial = sim.perturb_trajectory_point(trajectory.iloc[0], pos_sd, vel_sd, level_sd,
+                                           azimuth_sd, rng=rng)
     f = filt.FeedbackFilter(dt, pos_sd=pos_sd, vel_sd=vel_sd,
                             azimuth_sd=azimuth_sd, level_sd=level_sd,
                             gyro_model=gyro_model, accel_model=accel_model)
-    integrator = strapdown.Integrator(dt, lla, velocity_n, rph)
+    integrator = strapdown.Integrator(dt, initial)
 
     result = f.run(integrator, theta, dv,
                    observations=[position_obs, ned_velocity_obs,
@@ -112,14 +107,9 @@ def test_FeedforwardFilter():
     level_sd = 0.05
     azimuth_sd = 0.2
 
-    lla, velocity_n, rph = sim.perturb_navigation_state(
-        trajectory.loc[0, ['lat', 'lon', 'alt']],
-        trajectory.loc[0, ['VN', 'VE', 'VD']],
-        trajectory.loc[0, ['roll', 'pitch', 'heading']],
-        pos_sd, vel_sd, level_sd, azimuth_sd,
-        rng=rng)
-
-    integrator = strapdown.Integrator(dt, lla, velocity_n, rph)
+    initial = sim.perturb_trajectory_point(trajectory.iloc[0], pos_sd, vel_sd, level_sd,
+                                           azimuth_sd, rng=rng)
+    integrator = strapdown.Integrator(dt, initial)
     trajectory_computed = integrator.integrate(theta, dv)
 
     f = filt.FeedforwardFilter(dt, trajectory, pos_sd=pos_sd, vel_sd=vel_sd,
