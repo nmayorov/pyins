@@ -395,7 +395,7 @@ class ModifiedPsiModel(InsErrorModel):
         return result
 
 
-def propagate_errors(dt, trajectory,
+def propagate_errors(trajectory,
                      delta_position_n=np.zeros(3),
                      delta_velocity_n=np.zeros(3),
                      delta_rph=np.zeros(3),
@@ -406,8 +406,6 @@ def propagate_errors(dt, trajectory,
 
     Parameters
     ----------
-    dt : float
-        Time step per stamp.
     trajectory : DataFrame
         Trajectory.
     delta_position_n : array_like, shape (3,)
@@ -427,8 +425,9 @@ def propagate_errors(dt, trajectory,
     traj_err : DataFrame
         Trajectory errors.
     """
+    dt = np.diff(trajectory.index)
     Fi, Fig, Fia = error_model.system_matrix(trajectory)
-    Phi = 0.5 * (Fi[1:] + Fi[:-1]) * dt
+    Phi = 0.5 * (Fi[1:] + Fi[:-1]) * dt.reshape(-1, 1, 1)
     Phi[:] += np.identity(Phi.shape[-1])
 
     delta_gyro = util.mv_prod(Fig, delta_gyro)
@@ -444,7 +443,7 @@ def propagate_errors(dt, trajectory,
     x = np.empty((n_samples, error_model.N_STATES))
     x[0] = x0
     for i in range(n_samples - 1):
-        x[i + 1] = Phi[i].dot(x[i]) + delta_sensor[i] * dt
+        x[i + 1] = Phi[i].dot(x[i]) + delta_sensor[i] * dt[i]
 
     state = pd.DataFrame(data=x, index=trajectory.index,
                          columns=list(error_model.STATES.keys()))

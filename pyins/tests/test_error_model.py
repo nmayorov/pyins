@@ -23,7 +23,7 @@ def test_propagate_errors(error_model):
     imu[GYRO_COLS] += gyro_bias * dt
     imu[ACCEL_COLS] += accel_bias * dt
 
-    increments = compute_theta_and_dv(imu)
+    increments = compute_theta_and_dv(imu, 'increment')
 
     delta_position_n = [-200, 100, 20]
     delta_velocity_n = [0.1, -0.2, -0.05]
@@ -34,11 +34,11 @@ def test_propagate_errors(error_model):
     initial[VEL_COLS] += delta_velocity_n
     initial[RPH_COLS] += delta_rph
 
-    integrator = Integrator(dt, initial)
+    integrator = Integrator(initial)
     traj_c = integrator.integrate(increments)
     error_true = difference_trajectories(traj_c, trajectory)
 
-    error_linear, _ = error_models.propagate_errors(dt, trajectory,
+    error_linear, _ = error_models.propagate_errors(trajectory,
                                                     delta_position_n,
                                                     delta_velocity_n, delta_rph,
                                                     gyro_bias, accel_bias,
