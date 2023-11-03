@@ -5,7 +5,7 @@ from scipy.interpolate import CubicSpline, CubicHermiteSpline
 from scipy.spatial.transform import Rotation, RotationSpline
 from scipy._lib._util import check_random_state
 from . import earth, transform, util
-from .util import LLA_COLS, VEL_COLS, RPH_COLS
+from .util import LLA_COLS, VEL_COLS, RPH_COLS, GYRO_COLS, ACCEL_COLS
 
 
 def _compute_increment_readings(dt, a, b, c, d, e):
@@ -85,10 +85,9 @@ def generate_imu(dt, lla, rph, velocity_n=None, sensor_type='rate'):
     -------
     trajectory : DataFrame
         Trajectory with n_points rows.
-    gyro : ndarray, shape (n_points - 1, 3) or (n_points, 3)
-        Gyro readings.
-    accel : ndarray, shape (n_points - 1, 3) or (n_points, 3)
-        Accelerometer readings.
+    imu : DataFrame
+        IMU data. When `sensor_type` is 'increment' the first sample is duplicated
+        for more convenient future processing.
     """
     MAX_ITER = 3
     ACCURACY = 0.01
@@ -170,6 +169,8 @@ def generate_imu(dt, lla, rph, velocity_n=None, sensor_type='rate'):
         e = util.mv_prod(Cib[:-1], e, at=True)
 
         gyros, accels = _compute_increment_readings(dt, a, b, c, d, e)
+        gyros = np.insert(gyros, 0, gyros[0], axis=0)
+        accels = np.insert(accels, 0, accels[0], axis=0)
     else:
         assert False
 
@@ -177,7 +178,8 @@ def generate_imu(dt, lla, rph, velocity_n=None, sensor_type='rate'):
     trajectory[LLA_COLS] = lla
     trajectory[VEL_COLS] = velocity_n
     trajectory[RPH_COLS] = rph
-    return trajectory, gyros, accels
+    imu = pd.DataFrame(data=np.hstack((gyros, accels)), columns=GYRO_COLS + ACCEL_COLS)
+    return trajectory, imu
 
 
 def sinusoid_velocity_motion(dt, total_time, lla0, velocity_mean,
@@ -222,10 +224,8 @@ def sinusoid_velocity_motion(dt, total_time, lla0, velocity_mean,
     -------
     trajectory : DataFrame
         Trajectory. Contains n_points rows.
-    gyro : ndarray, shape (n_points - 1, 3)
-        Gyro readings.
-    accel : ndarray, shape (n_points - 1, 3)
-        Accelerometer readings.
+    imu : DataFrame
+        IMU data.
     """
     time = np.arange(0, total_time, dt)
     phase = 2 * np.pi * time[:, None] / velocity_change_period + \
@@ -321,3 +321,30 @@ class ImuErrors:
             raise ValueError(
                 "`sensor_type` must be either 'rate' or 'increment ")
         return result
+
+
+def apply_imu_errors(imu, dt, sensor_type, gyro_errors, accel_errors):
+    """Apply IMU errors.
+
+    Parameters
+    ----------
+    imu : DataFrame
+        IMU data.
+    dt : float
+        IMU period.
+    sensor_type : 'rate' or 'increment'
+        IMU type.
+    gyro_errors : ImuErrors
+        Errors for gyros.
+    accel_errors
+        Errors for accelerometers.
+
+    Returns
+    -------
+    DataFrame
+        IMU data after application of errors.
+    """
+    return pd.DataFrame(
+        np.hstack([gyro_errors.apply(imu[GYRO_COLS], dt, sensor_type),
+                   accel_errors.apply(imu[ACCEL_COLS], dt, sensor_type)]),
+        index=imu.index, columns=GYRO_COLS + ACCEL_COLS)

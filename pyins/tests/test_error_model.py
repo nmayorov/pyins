@@ -4,7 +4,7 @@ from numpy.testing import assert_allclose
 from pyins import earth, error_models, sim, transform
 from pyins.strapdown import compute_theta_and_dv, Integrator
 from pyins.transform import perturb_lla, difference_trajectories
-from pyins.util import LLA_COLS, VEL_COLS, RPH_COLS
+from pyins.util import LLA_COLS, VEL_COLS, RPH_COLS, GYRO_COLS, ACCEL_COLS
 
 
 @pytest.mark.parametrize("error_model", [error_models.ModifiedPhiModel,
@@ -13,16 +13,17 @@ def test_propagate_errors(error_model):
     dt = 0.5
     t = 0.5 * 3600
 
-    trajectory, gyro, accel = sim.sinusoid_velocity_motion(
-        dt, t, [50, 60, 0], [-5, 10, 0.5], [1, 1, 0.5])
+    trajectory, imu = sim.sinusoid_velocity_motion(dt, t, [50, 60, 0], [-5, 10, 0.5],
+                                                   [1, 1, 0.5])
 
     b = 1e-2
     gyro_bias = np.array([1, -2, 0.5]) * transform.DH_TO_RS
     accel_bias = np.array([b, -b, 2 * b])
 
-    gyro += gyro_bias * dt
-    accel += accel_bias * dt
-    theta, dv = compute_theta_and_dv(gyro, accel)
+    imu[GYRO_COLS] += gyro_bias * dt
+    imu[ACCEL_COLS] += accel_bias * dt
+
+    increments = compute_theta_and_dv(imu)
 
     delta_position_n = [-200, 100, 20]
     delta_velocity_n = [0.1, -0.2, -0.05]
@@ -34,7 +35,7 @@ def test_propagate_errors(error_model):
     initial[RPH_COLS] += delta_rph
 
     integrator = Integrator(dt, initial)
-    traj_c = integrator.integrate(theta, dv)
+    traj_c = integrator.integrate(increments)
     error_true = difference_trajectories(traj_c, trajectory)
 
     error_linear, _ = error_models.propagate_errors(dt, trajectory,

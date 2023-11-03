@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from . import error_models, kalman, util, transform
 from .imu_model import InertialSensor
-from .util import LLA_COLS, VEL_COLS, RPH_COLS
+from .util import LLA_COLS, VEL_COLS, RPH_COLS, THETA_COLS, DV_COLS
 
 
 FIRST_ORDER_TIMESTEP_MAX = 0.1
@@ -604,7 +604,7 @@ class FeedbackFilter:
         self.gyro_model = gyro_model
         self.accel_model = accel_model
 
-    def _validate_parameters(self, integrator, theta, dv, observations,
+    def _validate_parameters(self, integrator, increments, observations,
                              max_step, record_stamps, feedback_period):
         stamps = pd.Index([])
         for obs in observations:
@@ -612,7 +612,7 @@ class FeedbackFilter:
 
         integrator.reset()
 
-        n_readings = theta.shape[0]
+        n_readings = len(increments)
         initial_stamp = integrator.trajectory.index[-1]
 
         start = initial_stamp
@@ -622,8 +622,7 @@ class FeedbackFilter:
             n_readings = end - start
             record_stamps = record_stamps[(record_stamps >= start) &
                                           (record_stamps <= end)]
-            theta = theta[:n_readings]
-            dv = dv[:n_readings]
+            increments = increments[:n_readings]
 
         stamps = stamps.union(pd.Index([start, end]))
 
@@ -643,9 +642,9 @@ class FeedbackFilter:
         if record_stamps is None:
             record_stamps = stamps
 
-        return theta, dv, observations, stamps, record_stamps, feedback_period
+        return increments, observations, stamps, record_stamps, feedback_period
 
-    def _forward_pass(self, integrator, theta, dv, observations, stamps,
+    def _forward_pass(self, integrator, increments, observations, stamps,
                       record_stamps, feedback_period):
         start = integrator.trajectory.index[0]
 
@@ -672,13 +671,13 @@ class FeedbackFilter:
         n2 = self.accel_model.n_states
 
         if self.gyro_model.readings_required is not None:
-            gyro = theta / self.dt
+            gyro = increments[THETA_COLS].values / self.dt
             gyro = np.vstack((gyro, 2 * gyro[-1] - gyro[-2]))
         else:
             gyro = None
 
         if self.accel_model.readings_required is not None:
-            accel = dv / self.dt
+            accel = increments[DV_COLS].values / self.dt
             accel = np.vstack((accel, 2 * accel[-1] - accel[-2]))
         else:
             accel = None
@@ -705,16 +704,15 @@ class FeedbackFilter:
         obs_stamps = [[] for _ in range(len(observations))]
         obs_residuals = [[] for _ in range(len(observations))]
 
-        n_readings = theta.shape[0]
+        n_readings = len(increments)
         while i_reading < n_readings:
-            theta_b = theta[i_reading: i_reading + feedback_period]
-            dv_b = dv[i_reading: i_reading + feedback_period]
+            increments_b = increments.iloc[i_reading : i_reading + feedback_period]
 
-            traj_b = integrator.integrate(theta_b, dv_b)
+            traj_b = integrator.integrate(increments_b)
             Fi, Fig, Fia = self.error_model.system_matrix(traj_b)
             i = 0
 
-            while i < theta_b.shape[0]:
+            while i < len(increments_b):
                 stamp = stamps[i_stamp]
                 stamp_next = stamps[i_stamp + 1]
                 delta_i = stamp_next - stamp
@@ -800,7 +798,7 @@ class FeedbackFilter:
 
         return x, P, residuals
 
-    def run(self, integrator, theta, dv, observations=[], max_step=1,
+    def run(self, integrator, increments, observations=[], max_step=1,
             feedback_period=500, record_stamps=None):
         """Run the filter.
 
@@ -809,10 +807,9 @@ class FeedbackFilter:
         integrator : `strapdown.Integrator` instance
             Integrator to use for INS state propagation. It will be reset
             before the filter start.
-        theta, dv : ndarray, shape (n_readings, 3)
-            Rotation vectors and velocity increments computed from gyro and
-            accelerometer readings after applying coning and sculling
-            corrections.
+        increments : DataFrame
+            Angle and velocity increments computed from gyro and accelerometer
+            readings after applying coning and sculling corrections.
         observations : list of `Observation`
             Measurements which will be processed. Empty by default.
         max_step : float, optional
@@ -852,11 +849,11 @@ class FeedbackFilter:
         returned because they are computed relative to partially corrected
         trajectory and are not useful for interpretation.
         """
-        theta, dv, observations, stamps, record_stamps, feedback_period = \
-            self._validate_parameters(integrator, theta, dv, observations,
+        increments, observations, stamps, record_stamps, feedback_period = \
+            self._validate_parameters(integrator, increments, observations,
                                       max_step, record_stamps, feedback_period)
 
-        x, P, residuals = self._forward_pass(integrator, theta, dv,
+        x, P, residuals = self._forward_pass(integrator, increments,
                                              observations, stamps,
                                              record_stamps,
                                              feedback_period)

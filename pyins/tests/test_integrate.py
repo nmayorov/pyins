@@ -4,34 +4,32 @@ import numpy as np
 from pyins import sim
 from pyins.transform import difference_trajectories
 from pyins.strapdown import compute_theta_and_dv, Integrator
+from pyins.util import GYRO_COLS, ACCEL_COLS, THETA_COLS, DV_COLS
 
 
 def test_coning_sculling():
     # Basically a smoke test, because the function is quite simple.
-    gyro = np.zeros((10, 3))
-    gyro[:, 0] = 0.01
-    gyro[:, 2] = -0.01
+    imu = pd.DataFrame(data=np.zeros((10, 6)), columns=GYRO_COLS + ACCEL_COLS)
 
-    accel = np.zeros((10, 3))
-    accel[:, 2] = 0.1
+    imu.gyro_x = 0.01
+    imu.gyro_z = -0.01
+    imu.accel_z = 0.1
 
-    dv_true = np.empty_like(accel)
+    dv_true = np.empty((9, 3))
     dv_true[:, 0] = 0
     dv_true[:, 1] = -0.5e-3
     dv_true[:, 2] = 0.1
-    theta, dv = compute_theta_and_dv(gyro, accel)
-    assert_allclose(theta, gyro, rtol=1e-10)
-    assert_allclose(dv, dv_true, rtol=1e-10)
+    increments = compute_theta_and_dv(imu)
+    assert_allclose(increments[THETA_COLS], imu[GYRO_COLS].iloc[1:], rtol=1e-10)
+    assert_allclose(increments[DV_COLS], dv_true, rtol=1e-10)
 
 
-def run_integration_test(reference_trajectory, gyro, accel, dt, sensor_type,
+def run_integration_test(reference_trajectory, imu, dt, sensor_type,
                          thresholds):
-    theta, dv = compute_theta_and_dv(gyro, accel,
-                                     dt=dt if sensor_type == 'rate' else None)
+    increments = compute_theta_and_dv(imu, dt=dt if sensor_type == 'rate' else None)
     integrator = Integrator(dt, reference_trajectory.iloc[0])
-    result = integrator.integrate(theta, dv)
-    diff = difference_trajectories(
-        result, reference_trajectory).abs().max(axis=0)
+    result = integrator.integrate(increments)
+    diff = difference_trajectories(result, reference_trajectory).abs().max(axis=0)
     assert (diff < thresholds).all()
 
 
@@ -56,11 +54,11 @@ def test_integrate_stationary():
         'roll': 1e-8, 'pitch': 1e-8, 'heading': 1e-8
     })
 
-    ref, gyro, accel = sim.generate_imu(dt, lla, rph, sensor_type='increment')
-    run_integration_test(ref, gyro, accel, dt, 'increment', thresholds)
+    ref, imu = sim.generate_imu(dt, lla, rph, sensor_type='increment')
+    run_integration_test(ref, imu, dt, 'increment', thresholds)
 
-    ref, gyro, accel = sim.generate_imu(dt, lla, rph, sensor_type='rate')
-    run_integration_test(ref, gyro, accel, dt, 'rate', thresholds)
+    ref, imu = sim.generate_imu(dt, lla, rph, sensor_type='rate')
+    run_integration_test(ref, imu, dt, 'rate', thresholds)
 
 
 def test_integrate_constant_velocity():
@@ -76,12 +74,10 @@ def test_integrate_constant_velocity():
         'roll': 1e-4, 'pitch': 1e-4, 'heading': 1e-4
     })
 
-    ref, gyro, accel = sim.sinusoid_velocity_motion(dt, total_time,
-                                                    lla0, velocity_n,
-                                                    sensor_type='increment')
-    run_integration_test(ref, gyro, accel, dt, 'increment', thresholds)
+    ref, imu = sim.sinusoid_velocity_motion(dt, total_time, lla0, velocity_n,
+                                            sensor_type='increment')
+    run_integration_test(ref, imu, dt, 'increment', thresholds)
 
-    ref, gyro, accel = sim.sinusoid_velocity_motion(dt, total_time,
-                                                    lla0, velocity_n,
-                                                    sensor_type='rate')
-    run_integration_test(ref, gyro, accel, dt, 'rate', thresholds)
+    ref, imu = sim.sinusoid_velocity_motion(dt, total_time, lla0, velocity_n,
+                                            sensor_type='rate')
+    run_integration_test(ref, imu, dt, 'rate', thresholds)

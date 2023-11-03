@@ -2,11 +2,11 @@
 import numpy as np
 import pandas as pd
 from . import transform
-from .util import LLA_COLS, RPH_COLS, VEL_COLS
+from .util import LLA_COLS, RPH_COLS, VEL_COLS, GYRO_COLS, ACCEL_COLS
 from ._integrate import integrate_fast
 
 
-def compute_theta_and_dv(gyro, accel, dt=None):
+def compute_theta_and_dv(imu, dt=None):
     """Compute attitude and velocity increments from IMU readings.
 
     This function transforms raw gyro and accelerometer readings into
@@ -18,20 +18,16 @@ def compute_theta_and_dv(gyro, accel, dt=None):
 
     Parameters
     ----------
-    gyro : array_like, shape (n_readings, 3)
-        Gyro readings.
-    accel : array_like, shape (n_readings, 3)
-        Accelerometer readings.
+    imu : pd.DataFrame
+        IMU data.
     dt : float or None, optional
         If None (default), `gyro` and `accel` are assumed to contain integral
         increments. Float is interpreted as the sampling rate of rate sensors.
 
     Returns
     -------
-    theta : ndarray, shape (n_readings, 3)
-        Estimated rotation vectors.
-    dv : ndarray, shape (n_readings, 3)
-        Estimated velocity increments.
+    increments : pd.DataFrame
+        Angle and velocity increments.
 
     References
     ----------
@@ -42,29 +38,32 @@ def compute_theta_and_dv(gyro, accel, dt=None):
            Design Part 2: Velocity and Position Algorithms", Journal of
            Guidance, Control, and Dynamics 1998, Vol. 21, no. 2.
     """
-    gyro = np.asarray(gyro)
-    accel = np.asarray(accel)
+    gyro = imu[GYRO_COLS].values
+    accel = imu[ACCEL_COLS].values
 
-    if dt is not None:
+    if dt is None:
+        gyro_increment = gyro[1:]
+        accel_increment = accel[1:]
+        coning = np.cross(gyro[:-1], gyro[1:]) / 12
+        sculling = (np.cross(gyro[:-1], accel[1:]) +
+                    np.cross(accel[:-1], gyro[1:])) / 12
+    else:
         a_gyro = gyro[:-1]
         b_gyro = gyro[1:] - gyro[:-1]
         a_accel = accel[:-1]
         b_accel = accel[1:] - accel[:-1]
-        alpha = (a_gyro + 0.5 * b_gyro) * dt
-        dv = (a_accel + 0.5 * b_accel) * dt
-
-        coning = np.cross(a_gyro, b_gyro) * dt**2 / 12
+        gyro_increment = (a_gyro + 0.5 * b_gyro) * dt
+        accel_increment = (a_accel + 0.5 * b_accel) * dt
+        coning = np.cross(a_gyro, b_gyro) * dt ** 2 / 12
         sculling = (np.cross(a_gyro, b_accel) +
-                    np.cross(a_accel, b_gyro)) * dt**2/12
+                    np.cross(a_accel, b_gyro)) * dt ** 2 / 12
 
-        return alpha + coning, dv + sculling + 0.5 * np.cross(alpha, dv)
+    theta = gyro_increment + coning
+    dv = accel_increment + sculling + 0.5 * np.cross(gyro_increment, accel_increment)
 
-    coning = np.vstack((np.zeros(3), np.cross(gyro[:-1], gyro[1:]) / 12))
-    sculling = np.vstack((np.zeros(3),
-                          (np.cross(gyro[:-1], accel[1:]) +
-                           np.cross(accel[:-1], gyro[1:])) / 12))
-
-    return gyro + coning, accel + sculling + 0.5 * np.cross(gyro, accel)
+    return pd.DataFrame(data=np.hstack((theta, dv)), index=imu.index[1:],
+                        columns=['theta_x', 'theta_y', 'theta_z',
+                                 'dv_x', 'dv_y', 'dv_z'])
 
 
 class Integrator:
@@ -127,14 +126,14 @@ class Integrator:
         self.trajectory = self._init_values.to_frame().transpose(copy=True)
         self.trajectory.index.name = 'stamp'
 
-    def integrate(self, theta, dv):
+    def integrate(self, increments):
         """Integrate inertial readings.
 
         The integration continues from the last computed value.
 
         Parameters
         ----------
-        theta, dv : array_like, shape (n_readings, 3)
+        increments : pd.DataFrame
             Rotation vectors and velocity increments computed from gyro and
             accelerometer readings after applying coning and sculling
             corrections.
@@ -145,8 +144,8 @@ class Integrator:
             Added chunk of the trajectory. It contains n_readings + 1 rows
             including the last point before `theta` and `dv` where integrated.
         """
-        theta = np.asarray(theta)
-        dv = np.asarray(dv)
+        theta = increments[['theta_x', 'theta_y', 'theta_z']].values
+        dv = increments[['dv_x', 'dv_y', 'dv_z']].values
 
         n_data = self.trajectory.shape[0]
         n_readings = theta.shape[0]

@@ -14,8 +14,8 @@ def test_FeedbackFilter():
     dt = 0.01
     rng = np.random.RandomState(123456789)
 
-    trajectory, gyro_true, accel_true = sim.sinusoid_velocity_motion(
-        dt, 300, [50, 60, 100], [1, -1, 0.5], [3, 3, 0.5])
+    trajectory, imu_true = sim.sinusoid_velocity_motion(dt, 300, [50, 60, 100],
+                                                        [1, -1, 0.5], [3, 3, 0.5])
 
     position_obs = filt.PositionObs(
         sim.generate_position_observations(trajectory.iloc[::100], 1, rng), 1)
@@ -35,9 +35,8 @@ def test_FeedbackFilter():
                                      noise=1 * transform.DRH_TO_RRS)
     accel_model = filt.InertialSensor(bias=0.1, noise=1.0 / 60)
 
-    gyro = gyro_errors.apply(gyro_true, dt, 'increment')
-    accel = accel_errors.apply(accel_true, dt, 'increment')
-    theta, dv = strapdown.compute_theta_and_dv(gyro, accel)
+    imu = sim.apply_imu_errors(imu_true, dt, 'increment', gyro_errors, accel_errors)
+    increments = strapdown.compute_theta_and_dv(imu)
 
     pos_sd = 10
     vel_sd = 2
@@ -51,9 +50,8 @@ def test_FeedbackFilter():
                             gyro_model=gyro_model, accel_model=accel_model)
     integrator = strapdown.Integrator(dt, initial)
 
-    result = f.run(integrator, theta, dv,
-                   observations=[position_obs, ned_velocity_obs,
-                                 body_velocity_obs],
+    result = f.run(integrator, increments,
+                   observations=[position_obs, ned_velocity_obs, body_velocity_obs],
                    feedback_period=5)
 
     error = transform.difference_trajectories(result.trajectory, trajectory)
@@ -76,8 +74,8 @@ def test_FeedforwardFilter():
     dt = 0.01
     rng = np.random.RandomState(123456789)
 
-    trajectory, gyro_true, accel_true = sim.sinusoid_velocity_motion(
-        dt, 300, [50, 60, 100], [1, -1, 0.5], [3, 3, 0.5])
+    trajectory, imu_true = sim.sinusoid_velocity_motion(dt, 300, [50, 60, 100],
+                                                        [1, -1, 0.5], [3, 3, 0.5])
 
     position_obs = filt.PositionObs(
         sim.generate_position_observations(trajectory.iloc[::100], 1, rng), 1)
@@ -98,9 +96,8 @@ def test_FeedforwardFilter():
                                      noise=0.001 * transform.DRH_TO_RRS)
     accel_model = filt.InertialSensor(bias=0.01, noise=0.01 / 60)
 
-    gyro = gyro_errors.apply(gyro_true, dt, 'increment')
-    accel = accel_errors.apply(accel_true, dt, 'increment')
-    theta, dv = strapdown.compute_theta_and_dv(gyro, accel)
+    imu = sim.apply_imu_errors(imu_true, dt, 'increment', gyro_errors, accel_errors)
+    increments = strapdown.compute_theta_and_dv(imu)
 
     pos_sd = 10
     vel_sd = 0.1
@@ -110,7 +107,7 @@ def test_FeedforwardFilter():
     initial = sim.perturb_trajectory_point(trajectory.iloc[0], pos_sd, vel_sd, level_sd,
                                            azimuth_sd, rng=rng)
     integrator = strapdown.Integrator(dt, initial)
-    trajectory_computed = integrator.integrate(theta, dv)
+    trajectory_computed = integrator.integrate(increments)
 
     f = filt.FeedforwardFilter(dt, trajectory, pos_sd=pos_sd, vel_sd=vel_sd,
                                azimuth_sd=azimuth_sd, level_sd=level_sd,

@@ -3,6 +3,7 @@ from numpy.testing import assert_allclose, assert_equal
 from pyins import sim
 from pyins import earth
 from pyins.imu_model import InertialSensor
+from pyins.util import GYRO_COLS, ACCEL_COLS
 
 
 def test_sim_on_stationary():
@@ -24,21 +25,26 @@ def test_sim_on_stationary():
 
     for lla_arg, velocity_n_arg in [(lla[0], V_n), (lla, V_n), (lla, None)]:
         for sensor_type in ['rate', 'increment']:
-            trajectory, gyro_g, accel_g = sim.generate_imu(
-                dt, lla_arg, hpr,  velocity_n_arg, sensor_type='increment')
-        assert_allclose(trajectory.lat, 50, rtol=1e-12)
-        assert_allclose(trajectory.lon, 45, rtol=1e-12)
-        assert_allclose(trajectory.VE, 0, atol=1e-7)
-        assert_allclose(trajectory.VN, 0, atol=1e-7)
-        assert_allclose(trajectory.roll, 0, atol=1e-8)
-        assert_allclose(trajectory.pitch, 0, atol=1e-8)
-        assert_allclose(trajectory.heading, 0, atol=1e-8)
+            trajectory, imu = sim.generate_imu(dt, lla_arg, hpr, velocity_n_arg,
+                                               sensor_type=sensor_type)
 
-        accel_atol = 1e-7 if sensor_type == 'increment' else 1e-6
-        factor = dt if sensor_type == 'increment' else 1
-        for i in range(3):
-            assert_allclose(gyro_g[:, i], gyro[i] * factor, atol=1e-14)
-            assert_allclose(accel_g[:, i], accel[i] * factor, atol=accel_atol)
+            assert_allclose(trajectory.lat, 50, rtol=1e-12)
+            assert_allclose(trajectory.lon, 45, rtol=1e-12)
+            assert_allclose(trajectory.VE, 0, atol=1e-7)
+            assert_allclose(trajectory.VN, 0, atol=1e-7)
+            assert_allclose(trajectory.roll, 0, atol=1e-8)
+            assert_allclose(trajectory.pitch, 0, atol=1e-8)
+            assert_allclose(trajectory.heading, 0, atol=1e-8)
+
+            accel_atol = 1e-7 if sensor_type == 'increment' else 1e-6
+            factor = dt if sensor_type == 'increment' else 1
+
+            gyro_g = imu[GYRO_COLS].values
+            accel_g = imu[ACCEL_COLS].values
+
+            for i in range(3):
+                assert_allclose(gyro_g[:, i], gyro[i] * factor, atol=1e-14)
+                assert_allclose(accel_g[:, i], accel[i] * factor, atol=accel_atol)
 
 
 def test_ImuErrors():

@@ -6,6 +6,10 @@ import numpy as np
 LLA_COLS = ['lat', 'lon', 'alt']
 VEL_COLS = ['VN', 'VE', 'VD']
 RPH_COLS = ['roll', 'pitch', 'heading']
+GYRO_COLS = ['gyro_x', 'gyro_y', 'gyro_z']
+ACCEL_COLS = ['accel_x', 'accel_y', 'accel_z']
+THETA_COLS = ['theta_x', 'theta_y', 'theta_z']
+DV_COLS = ['dv_x', 'dv_y', 'dv_z']
 
 
 def mm_prod(a, b, at=False, bt=False):
