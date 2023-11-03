@@ -55,7 +55,7 @@ def _compute_increment_readings(dt, a, b, c, d, e):
     return gyros, accels
 
 
-def generate_imu(dt, lla, rph, velocity_n=None, sensor_type='rate'):
+def generate_imu(time, lla, rph, velocity_n=None, sensor_type='rate'):
     """Generate IMU readings from the trajectory.
 
     Attitude angles (`rph`) must be always given and there are 3 options with
@@ -67,8 +67,8 @@ def generate_imu(dt, lla, rph, velocity_n=None, sensor_type='rate'):
 
     Parameters
     ----------
-    dt : float
-        Time step.
+    time : array_like, shape (n_points,)
+        Time points for which the trajectory is provided.
     lla : array_like, shape (n_points, 3) or (3,)
         Either time series of latitude, longitude and altitude or initial
         values of those.
@@ -101,10 +101,7 @@ def generate_imu(dt, lla, rph, velocity_n=None, sensor_type='rate'):
         raise ValueError("`velocity_n` must be provided when `lla` contains only "
                          "initial values")
 
-    rph = np.asarray(rph, dtype=float)
-    n_points = len(rph)
-    time = np.arange(n_points) * dt
-
+    n_points = len(time)
     if lla.ndim == 1:
         lat0, lon0, alt0 = lla
         velocity_n = np.asarray(velocity_n, dtype=float)
@@ -141,8 +138,7 @@ def generate_imu(dt, lla, rph, velocity_n=None, sensor_type='rate'):
     earth_rate_i = [0, 0, earth.RATE]
     if velocity_n is None:
         v_s = CubicSpline(time, r_i).derivative()
-        velocity_n = util.mv_prod(Cin, v_s(time) - np.cross(earth_rate_i, r_i),
-                                  True)
+        velocity_n = util.mv_prod(Cin, v_s(time) - np.cross(earth_rate_i, r_i), True)
     else:
         v_i = util.mv_prod(Cin, velocity_n) + np.cross(earth_rate_i, r_i)
         v_s = CubicHermiteSpline(time, r_i, v_i).derivative()
@@ -157,6 +153,8 @@ def generate_imu(dt, lla, rph, velocity_n=None, sensor_type='rate'):
         gyros = Cib_spline(time, 1)
         accels = util.mv_prod(Cib, v_s(time, 1) - g, at=True)
     elif sensor_type == 'increment':
+        dt = np.diff(time)[:, None]
+
         a = Cib_spline.interpolator.c[2]
         b = Cib_spline.interpolator.c[1]
         c = Cib_spline.interpolator.c[0]
@@ -174,11 +172,12 @@ def generate_imu(dt, lla, rph, velocity_n=None, sensor_type='rate'):
     else:
         assert False
 
-    trajectory = pd.DataFrame(index=np.arange(time.shape[0]))
-    trajectory[LLA_COLS] = lla
-    trajectory[VEL_COLS] = velocity_n
-    trajectory[RPH_COLS] = rph
-    imu = pd.DataFrame(data=np.hstack((gyros, accels)), columns=GYRO_COLS + ACCEL_COLS)
+    index = pd.Index(time, name='time')
+    trajectory = pd.DataFrame(np.hstack([lla, velocity_n, rph]),
+                              index=index,
+                              columns=LLA_COLS + VEL_COLS + RPH_COLS)
+    imu = pd.DataFrame(data=np.hstack((gyros, accels)), index=index,
+                       columns=GYRO_COLS + ACCEL_COLS)
     return trajectory, imu
 
 
@@ -236,7 +235,7 @@ def sinusoid_velocity_motion(dt, total_time, lla0, velocity_mean,
     rph[:, 1] = np.rad2deg(np.arctan2(
         velocity_n[:, 2], np.hypot(velocity_n[:, 0], velocity_n[:, 1])))
     rph[:, 2] = np.rad2deg(np.arctan2(velocity_n[:, 1], velocity_n[:, 0]))
-    return generate_imu(dt, lla0, rph, velocity_n, sensor_type)
+    return generate_imu(time, lla0, rph, velocity_n, sensor_type)
 
 
 def generate_position_observations(trajectory, error_sd, rng=None):
@@ -303,13 +302,12 @@ class ImuErrors:
         return cls(transform, bias, inertial_sensor_model.noise,
                    inertial_sensor_model.bias_walk, rng)
 
-    def apply(self, readings, dt, sensor_type):
-        readings = np.asarray(readings)
-        if readings.ndim != 2 or readings.shape[1] != 3:
-            raise ValueError("`readings` must be a (n, 3) array")
-
+    def apply(self, readings, sensor_type):
+        dt = np.hstack([0, np.diff(readings.index)])[:, None]
         bias = self.bias + self.bias_walk * np.cumsum(
-            self.rng.randn(*readings.shape), axis=0) * dt**0.5
+            self.rng.randn(*readings.shape) * dt ** 0.5, axis=0)
+
+        dt[0, 0] = dt[1, 0]
         result = util.mv_prod(self.transform, readings)
         if sensor_type == 'rate':
             result += bias
@@ -318,20 +316,17 @@ class ImuErrors:
             result += bias * dt
             result += self.noise * dt**0.5 * self.rng.randn(*readings.shape)
         else:
-            raise ValueError(
-                "`sensor_type` must be either 'rate' or 'increment ")
-        return result
+            raise ValueError("`sensor_type` must be either 'rate' or 'increment ")
+        return pd.DataFrame(data=result, index=readings.index, columns=readings.columns)
 
 
-def apply_imu_errors(imu, dt, sensor_type, gyro_errors, accel_errors):
+def apply_imu_errors(imu, sensor_type, gyro_errors, accel_errors):
     """Apply IMU errors.
 
     Parameters
     ----------
     imu : DataFrame
         IMU data.
-    dt : float
-        IMU period.
     sensor_type : 'rate' or 'increment'
         IMU type.
     gyro_errors : ImuErrors
@@ -344,7 +339,6 @@ def apply_imu_errors(imu, dt, sensor_type, gyro_errors, accel_errors):
     DataFrame
         IMU data after application of errors.
     """
-    return pd.DataFrame(
-        np.hstack([gyro_errors.apply(imu[GYRO_COLS], dt, sensor_type),
-                   accel_errors.apply(imu[ACCEL_COLS], dt, sensor_type)]),
-        index=imu.index, columns=GYRO_COLS + ACCEL_COLS)
+    return pd.DataFrame(np.hstack([gyro_errors.apply(imu[GYRO_COLS], sensor_type),
+                                   accel_errors.apply(imu[ACCEL_COLS], sensor_type)]),
+                        index=imu.index, columns=GYRO_COLS + ACCEL_COLS)

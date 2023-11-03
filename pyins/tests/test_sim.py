@@ -1,5 +1,6 @@
 import numpy as np
-from numpy.testing import assert_allclose, assert_equal
+import pandas as pd
+from numpy.testing import assert_allclose
 from pyins import sim
 from pyins import earth
 from pyins.imu_model import InertialSensor
@@ -9,6 +10,8 @@ from pyins.util import GYRO_COLS, ACCEL_COLS
 def test_sim_on_stationary():
     dt = 1e-1
     n_points = 1000
+
+    time = dt * np.arange(n_points)
 
     lla = np.empty((n_points, 3))
     lla[:, 0] = 50.0
@@ -25,7 +28,7 @@ def test_sim_on_stationary():
 
     for lla_arg, velocity_n_arg in [(lla[0], V_n), (lla, V_n), (lla, None)]:
         for sensor_type in ['rate', 'increment']:
-            trajectory, imu = sim.generate_imu(dt, lla_arg, hpr, velocity_n_arg,
+            trajectory, imu = sim.generate_imu(time, lla_arg, hpr, velocity_n_arg,
                                                sensor_type=sensor_type)
 
             assert_allclose(trajectory.lat, 50, rtol=1e-12)
@@ -49,34 +52,33 @@ def test_sim_on_stationary():
 
 def test_ImuErrors():
     rng = np.random.RandomState(0)
-    readings = rng.randn(100, 3)
-
+    readings = pd.DataFrame(data=rng.randn(100, 3), index=0.1 * np.arange(100))
     imu_errors = sim.ImuErrors(bias=[0.0, 0.2, 0.0])
-    assert_equal(imu_errors.apply(readings, 0.1, 'increment'),
-                 readings + [0.0, 0.2 * 0.1, 0.0])
-    assert_equal(imu_errors.apply(readings, 0.1, 'rate'),
-                 readings + [0.0, 0.2, 0.0])
+    assert_allclose(imu_errors.apply(readings, 'increment'),
+                    readings + [0.0, 0.2 * 0.1, 0.0], rtol=1e-14)
+    assert_allclose(imu_errors.apply(readings, 'rate'), readings + [0.0, 0.2, 0.0],
+                    rtol=1e-15)
 
     for sensor_type in ['rate', 'increment']:
         imu_errors = sim.ImuErrors()
-        assert_equal(imu_errors.apply(readings, 0.1, sensor_type), readings)
+        assert (imu_errors.apply(readings, sensor_type) == readings).all(None)
 
         imu_errors = sim.ImuErrors(bias_walk=0.1, rng=0)
-        readings_with_error = imu_errors.apply(readings, 0.1, sensor_type)
+        readings_with_error = imu_errors.apply(readings, sensor_type)
         diff = readings - readings_with_error
         n_readings = len(readings)
-        assert np.all(np.mean(np.abs(diff[:n_readings // 2]), axis=0) <
-                      np.mean(np.abs(diff[n_readings // 2:]), axis=0))
+        assert (diff.iloc[:n_readings // 2].abs().mean() <
+                diff.iloc[n_readings // 2:].abs().mean()).all()
 
         imu_errors = sim.ImuErrors(transform=np.diag([1.1, 1.0, 1.0]))
-        readings_with_error = imu_errors.apply(readings, 0.1, sensor_type)
-        assert_equal(readings_with_error[:, 0], 1.1 * readings[:, 0])
-        assert_equal(readings_with_error[:, 1:], readings[:, 1:])
+        readings_with_error = imu_errors.apply(readings, sensor_type)
+        assert (readings_with_error[0] == 1.1 * readings[0]).all(None)
+        assert (readings_with_error[[1, 2]] == readings[[1, 2]]).all(None)
 
         imu_errors = sim.ImuErrors(noise=[0.0, 0.0, 0.1])
-        readings_with_error = imu_errors.apply(readings, 0.1, sensor_type)
-        assert_equal(readings[:, :2], readings_with_error[:, :2])
-        assert np.all(readings[:, 2] != readings_with_error[:, 2])
+        readings_with_error = imu_errors.apply(readings, sensor_type)
+        assert (readings_with_error[[0, 1]] == readings[[0, 1]]).all(None)
+        assert (readings_with_error[2] != readings[2]).all(None)
 
 
 def test_ImuErrors_from_inertial_sensor_model():
