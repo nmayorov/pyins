@@ -6,7 +6,7 @@ from scipy.spatial.transform import Rotation
 from . import error_models, kalman, util, transform, strapdown
 from .imu_model import InertialSensor
 from .util import (LLA_COLS, VEL_COLS, RPH_COLS, THETA_COLS, DV_COLS,
-                   TRAJECTORY_ERROR_COLS)
+                   TRAJECTORY_ERROR_COLS, XYZ_TO_INDEX)
 
 
 FIRST_ORDER_TIMESTEP_MAX = 0.1
@@ -1020,11 +1020,11 @@ class InertialEstimates:
             items = state.split("_")
             if items[0] == self.kind:
                 if items[1] == 'bias':
-                    axis = int(items[2]) - 1
+                    axis = XYZ_TO_INDEX[items[2]]
                     self.bias[axis] += xi
                 elif items[1] == 'sm':
-                    axis_out = int(items[2][0]) - 1
-                    axis_in = int(items[2][1]) - 1
+                    axis_out = XYZ_TO_INDEX(items[2][0])
+                    axis_in = XYZ_TO_INDEX(items[2][1])
                     self.transform[axis_out, axis_in] += xi
 
     def correct_increments(self, dt, increments):
@@ -1043,12 +1043,12 @@ class InertialEstimates:
             if items[0] != self.kind:
                 continue
             if items[1] == 'bias':
-                axis = int(items[2]) - 1
+                axis = XYZ_TO_INDEX[items[2]]
                 states.append(state)
                 estimates.append(self.bias[axis])
             elif items[1] == 'sm':
-                axis_out = int(items[2][0]) - 1
-                axis_in = int(items[2][1]) - 1
+                axis_out = XYZ_TO_INDEX[items[2][0]]
+                axis_in = XYZ_TO_INDEX[items[2][1]]
                 states.append(state)
                 estimates.append(self.transform[axis_out, axis_in])
         return pd.Series(estimates, index=states)

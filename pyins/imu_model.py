@@ -1,6 +1,7 @@
 """Statistical model for IMU."""
 from collections import OrderedDict
 import numpy as np
+from .util import INDEX_TO_XYZ
 
 
 class InertialSensor:
@@ -65,7 +66,7 @@ class InertialSensor:
             if bias[axis] > 0:
                 P[n_states, n_states] = bias[axis] ** 2
                 H[axis, n_states] = 1
-                states[f"bias_{axis + 1}"] = n_states
+                states[f"bias_{INDEX_TO_XYZ[axis]}"] = n_states
 
                 if bias_walk[axis] > 0:
                     G[n_states, n_noises] = 1
@@ -86,8 +87,8 @@ class InertialSensor:
                         scale_misal_states.append(n_states)
                         P[n_states, n_states] = scale_misal[
                             output_axis, input_axis] ** 2
-                        states[
-                            f"sm_{output_axis + 1}{input_axis + 1}"] = n_states
+                        states[(f"sm_{INDEX_TO_XYZ[output_axis]}"
+                                f"{INDEX_TO_XYZ[input_axis]}")] = n_states
                         n_states += 1
 
         n_output_noises = 0
