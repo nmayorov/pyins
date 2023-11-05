@@ -2,7 +2,8 @@
 from collections import OrderedDict
 import numpy as np
 import pandas as pd
-from . import error_models, kalman, util, transform
+from scipy.spatial.transform import Rotation
+from . import error_models, kalman, util, transform, strapdown
 from .imu_model import InertialSensor
 from .util import LLA_COLS, VEL_COLS, RPH_COLS, THETA_COLS, DV_COLS
 
@@ -870,3 +871,204 @@ class FeedbackFilter:
                           gyro_estimates=gyro_estimates, gyro_sd=gyro_sd,
                           accel_estimates=accel_estimates, accel_sd=accel_sd,
                           P=P, residuals=residuals)
+
+
+def compute_average_pva(pva_1, pva_2):
+    rot_1 = Rotation.from_euler('xyz', pva_1[RPH_COLS], True)
+    rot_2 = Rotation.from_euler('xyz', pva_2[RPH_COLS], True)
+    rph_average = pd.Series(
+        Rotation.concatenate([rot_1, rot_2]).mean().as_euler('xyz', True), RPH_COLS)
+    return pd.concat([
+        0.5 * (pva_1[LLA_COLS] + pva_1[LLA_COLS]),
+        0.5 * (pva_1[VEL_COLS] + pva_2[VEL_COLS]),
+        rph_average
+    ])
+
+
+def compute_initial_x_and_P(pva,
+                            pos_sd, vel_sd, level_sd, azimuth_sd,
+                            error_model : error_models.InsErrorModel,
+                            gyro_model : InertialSensor,
+                            accel_model : InertialSensor):
+    level_sd = np.deg2rad(level_sd)
+    azimuth_sd = np.deg2rad(azimuth_sd)
+
+    P_nav = np.zeros((error_model.N_STATES, error_model.N_STATES))
+    P_nav[error_model.DRN, error_model.DRN] = pos_sd ** 2
+    P_nav[error_model.DRE, error_model.DRE] = pos_sd ** 2
+    P_nav[error_model.DRD, error_model.DRD] = pos_sd ** 2
+    P_nav[error_model.DVN, error_model.DVN] = vel_sd ** 2
+    P_nav[error_model.DVE, error_model.DVE] = vel_sd ** 2
+    P_nav[error_model.DVD, error_model.DVD] = vel_sd ** 2
+    P_nav[error_model.DROLL, error_model.DROLL] = level_sd ** 2
+    P_nav[error_model.DPITCH, error_model.DPITCH] = level_sd ** 2
+    P_nav[error_model.DHEADING, error_model.DHEADING] = azimuth_sd ** 2
+
+    n_states = error_model.N_STATES + gyro_model.n_states + accel_model.n_states
+    P = np.zeros((n_states, n_states))
+    T = error_model.transform_to_output(pva)
+
+    inertial_block = slice(error_model.N_STATES)
+    gyro_block = slice(error_model.N_STATES, error_model.N_STATES + gyro_model.n_states)
+    accel_block = slice(error_model.N_STATES + gyro_model.n_states, n_states)
+
+    P[inertial_block, inertial_block] = T @ P_nav @ T.transpose()
+    P[gyro_block, gyro_block] = gyro_model.P
+    P[accel_block, accel_block] = accel_model.P
+
+    return np.zeros(n_states), P
+
+
+def compute_error_propagation_matrices(pva, gyro, accel, time_delta,
+                                       error_model : error_models.InsErrorModel,
+                                       gyro_model : InertialSensor,
+                                       accel_model : InertialSensor):
+    n_states = error_model.N_STATES + gyro_model.n_states + accel_model.n_states
+    n_noises = (gyro_model.n_output_noises + gyro_model.n_noises +
+                accel_model.n_output_noises + accel_model.n_noises)
+
+    Fii, Fig, Fia = error_model.system_matrix(pva)
+
+    Hg = gyro_model.output_matrix(gyro)
+    Ha = accel_model.output_matrix(accel)
+
+    inertial_block = slice(error_model.N_STATES)
+    gyro_block = slice(error_model.N_STATES, error_model.N_STATES + gyro_model.n_states)
+    accel_block = slice(error_model.N_STATES + gyro_model.n_states, n_states)
+
+    gyro_out_noise_block = slice(gyro_model.n_output_noises)
+    accel_out_noise_block = slice(
+        gyro_model.n_output_noises,
+        gyro_model.n_output_noises + accel_model.n_output_noises)
+    gyro_noise_block = slice(
+        gyro_model.n_output_noises + accel_model.n_output_noises,
+        gyro_model.n_output_noises + accel_model.n_output_noises + gyro_model.n_noises)
+    accel_noise_block = slice(
+        gyro_model.n_output_noises + accel_model.n_output_noises + gyro_model.n_noises,
+        n_noises)
+
+    F = np.zeros((n_states, n_states))
+    F[inertial_block, inertial_block] = Fii
+    F[inertial_block, gyro_block] = Fig @ Hg
+    F[inertial_block, accel_block] = Fia @ Ha
+    F[gyro_block, gyro_block] = gyro_model.F
+    F[accel_block, accel_block] = accel_model.F
+
+    G = np.zeros((n_states, n_noises))
+    G[inertial_block, gyro_out_noise_block] = Fig @ gyro_model.J
+    G[inertial_block, accel_out_noise_block] = Fia @ accel_model.J
+    G[gyro_block, gyro_noise_block] = gyro_model.G
+    G[accel_block, accel_noise_block] = accel_model.G
+
+    q = np.hstack((gyro_model.v, accel_model.v, gyro_model.q, accel_model.q))
+
+    return kalman.compute_process_matrices(F, G @ np.diag(q**2) @ G.transpose(),
+                                           time_delta, 'expm')
+
+
+def run_feedback_filter(initial_pva,
+                        pos_sd, vel_sd, level_sd, azimuth_sd,
+                        increments, gyro_model=None, accel_model=None,
+                        observations=None, time_step=0.1):
+    if gyro_model is None:
+        gyro_model = InertialSensor()
+    if accel_model is None:
+        accel_model = InertialSensor()
+    if observations is None:
+        observations = []
+
+    observation_times = np.hstack([
+        np.asarray(observation.data.index) for observation in observations])
+    observation_times = np.sort(np.unique(observation_times))
+
+    start_time = initial_pva.name
+    end_time = increments.index[-1]
+    observation_times = observation_times[(observation_times >= start_time) &
+                                          (observation_times <= end_time)]
+    observation_times = np.append(observation_times, np.inf)
+    observation_times_index = 0
+
+    error_model = error_models.ModifiedPhiModel()
+
+    x, P = compute_initial_x_and_P(initial_pva, pos_sd, vel_sd, level_sd, azimuth_sd,
+                                   error_model, gyro_model, accel_model)
+    n_states = len(x)
+
+    times_all = []
+    x_all = []
+    P_all = []
+
+    integrator = strapdown.Integrator(initial_pva, True)
+    while integrator.get_time() < end_time:
+        time = integrator.get_time()
+        if observation_times[observation_times_index] == time:
+            ins_state = integrator.get_state()
+            for observation in observations:
+                ret = observation.compute_obs(time, ins_state, error_model)
+                if ret is not None:
+                    z, H, R = ret
+                    H_full = np.zeros((len(z), n_states))
+                    H_full[:, :error_model.N_STATES] = H
+                    kalman.correct(x, P, z, H_full, R)
+
+            integrator.set_state(error_model.correct_state(ins_state, x))
+            x[:error_model.N_STATES] = 0
+            observation_times_index += 1
+
+        times_all.append(time)
+        x_all.append(x)
+        P_all.append(P)
+
+        next_time = min(time + time_step,
+                        observation_times[observation_times_index])
+        time_delta = next_time - time
+        increments_batch = increments.loc[np.nextafter(time, next_time) : next_time]
+
+        pva_old = integrator.get_state()
+        integrator.integrate(increments_batch)
+        pva_new = integrator.get_state()
+        pva_average = compute_average_pva(pva_old, pva_new)
+        gyro_average = increments_batch[THETA_COLS].sum(axis=0) / time_delta
+        accel_average = increments_batch[DV_COLS].sum(axis=0) / time_delta
+
+        Phi, Qd = compute_error_propagation_matrices(pva_average, gyro_average,
+                                                     accel_average, time_delta,
+                                                     error_model, gyro_model,
+                                                     accel_model)
+        x = Phi @ x
+        P = Phi @ P @ Phi.transpose() + Qd
+
+    times_all = np.asarray(times_all)
+    x_all = np.asarray(x_all)
+    P_all = np.asarray(P_all)
+
+    trajectory = integrator.trajectory.loc[times_all]
+    T = error_model.transform_to_output(trajectory)
+    y = util.mv_prod(T, x_all[:, :error_model.N_STATES])
+    Py = util.mm_prod(T, P_all[:, :error_model.N_STATES, :error_model.N_STATES])
+    Py = util.mm_prod(Py, T, bt=True)
+    sd_y = np.diagonal(Py, axis1=1, axis2=2) ** 0.5
+
+    error = pd.DataFrame(index=trajectory.index)
+    error['north'] = y[:, error_model.DRN]
+    error['east'] = y[:, error_model.DRE]
+    error['down'] = y[:, error_model.DRD]
+    error['VN'] = y[:, error_model.DVN]
+    error['VE'] = y[:, error_model.DVE]
+    error['VD'] = y[:, error_model.DVD]
+    error['roll'] = np.rad2deg(y[:, error_model.DROLL])
+    error['pitch'] = np.rad2deg(y[:, error_model.DPITCH])
+    error['heading'] = np.rad2deg(y[:, error_model.DHEADING])
+
+    sd = pd.DataFrame(index=trajectory.index)
+    sd['north'] = sd_y[:, error_model.DRN]
+    sd['east'] = sd_y[:, error_model.DRE]
+    sd['down'] = sd_y[:, error_model.DRD]
+    sd['VN'] = sd_y[:, error_model.DVN]
+    sd['VE'] = sd_y[:, error_model.DVE]
+    sd['VD'] = sd_y[:, error_model.DVD]
+    sd['roll'] = np.rad2deg(sd_y[:, error_model.DROLL])
+    sd['pitch'] = np.rad2deg(sd_y[:, error_model.DPITCH])
+    sd['heading'] = np.rad2deg(sd_y[:, error_model.DHEADING])
+
+    return trajectory, sd

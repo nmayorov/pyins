@@ -70,6 +70,53 @@ def test_FeedbackFilter():
     assert (accel_bias_relative_error < 2.0).all()
 
 
+def test_run_feedback_filter():
+    dt = 0.01
+    rng = np.random.RandomState(123456789)
+
+    trajectory_true, imu_true = sim.sinusoid_velocity_motion(
+        dt, 300, [50, 60, 100], [1, -1, 0.5], [3, 3, 0.5])
+
+    position_obs = filt.PositionObs(
+        sim.generate_position_observations(trajectory_true.iloc[::100], 1, rng), 1)
+    ned_velocity_obs = filt.NedVelocityObs(
+        sim.generate_ned_velocity_observations(trajectory_true.iloc[30::100], 0.5,
+                                               rng), 0.5)
+    body_velocity_obs = filt.BodyVelocityObs(
+        sim.generate_body_velocity_observations(trajectory_true.iloc[60::100], 0.2,
+                                                rng), 0.2)
+
+    gyro_errors = sim.ImuErrors(
+        bias=np.array([-100, 50, 40]) * transform.DH_TO_RS,
+        noise=1 * transform.DRH_TO_RRS, rng=rng)
+    accel_errors = sim.ImuErrors(bias=[0.1, -0.1, 0.2], noise=1.0 / 60, rng=rng)
+
+    gyro_model = filt.InertialSensor(bias=100 * transform.DH_TO_RS,
+                                     noise=1 * transform.DRH_TO_RRS)
+    accel_model = filt.InertialSensor(bias=0.1, noise=1.0 / 60)
+
+    imu = sim.apply_imu_errors(imu_true, 'increment', gyro_errors, accel_errors)
+    increments = strapdown.compute_theta_and_dv(imu, 'increment')
+
+    pos_sd = 10
+    vel_sd = 2
+    level_sd = 1.0
+    azimuth_sd = 5.0
+
+    initial = sim.perturb_trajectory_point(trajectory_true.iloc[0], pos_sd, vel_sd,
+                                           level_sd, azimuth_sd, rng=rng)
+
+    trajectory, sd = filt.run_feedback_filter(
+        initial, pos_sd, vel_sd, level_sd, azimuth_sd, increments, gyro_model,
+        accel_model, observations=[position_obs, ned_velocity_obs, body_velocity_obs],
+        time_step=1)
+
+    error = transform.difference_trajectories(trajectory, trajectory_true)
+
+    relative_error = error / sd
+    assert (util.compute_rms(relative_error) < 1.5).all()
+
+
 def test_FeedforwardFilter():
     dt = 0.01
     rng = np.random.RandomState(123456789)

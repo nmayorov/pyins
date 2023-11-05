@@ -186,7 +186,8 @@ class ModifiedPhiModel(InsErrorModel):
                          PHI1=PHI1, PHI2=PHI2, PHI3=PHI3)
 
     def system_matrix(self, trajectory):
-        n_samples = trajectory.shape[0]
+        is_series = isinstance(trajectory, pd.Series)
+        n_samples = 1 if is_series else len(trajectory)
 
         V_skew = util.skew_matrix(trajectory[VEL_COLS])
         R = earth.curvature_matrix(trajectory.lat, trajectory.alt)
@@ -219,6 +220,11 @@ class ModifiedPhiModel(InsErrorModel):
 
         B_accel = np.zeros((n_samples, self.N_STATES, 3))
         B_accel[np.ix_(samples, self.DV, [0, 1, 2])] = Cnb
+
+        if is_series:
+            F = F[0]
+            B_gyro = B_gyro[0]
+            B_accel = B_accel[0]
 
         return F, B_gyro, B_accel
 
@@ -302,7 +308,8 @@ class ModifiedPsiModel(InsErrorModel):
                          PSI1=PSI1, PSI2=PSI1, PSI3=PSI1)
 
     def system_matrix(self, trajectory):
-        n_samples = trajectory.shape[0]
+        is_series = isinstance(trajectory, pd.Series)
+        n_samples = 1 if is_series else len(trajectory)
 
         V_skew = util.skew_matrix(trajectory[VEL_COLS])
         R = earth.curvature_matrix(trajectory.lat, trajectory.alt)
@@ -334,6 +341,11 @@ class ModifiedPsiModel(InsErrorModel):
 
         B_accel = np.zeros((n_samples, self.N_STATES, 3))
         B_accel[np.ix_(samples, self.DV, [0, 1, 2])] = Cnb
+
+        if is_series:
+            F = F[0]
+            B_gyro = B_gyro[0]
+            B_accel = B_accel[0]
 
         return F, B_gyro, B_accel
 

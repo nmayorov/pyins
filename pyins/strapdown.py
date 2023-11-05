@@ -176,6 +176,9 @@ class Integrator:
 
         return self.trajectory.iloc[-n_readings - 1:]
 
+    def get_time(self):
+        return self.trajectory.index[-1]
+
     def get_state(self):
         """Get current integrator state.
 
