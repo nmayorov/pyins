@@ -40,8 +40,8 @@ def compute_theta_and_dv(imu, sensor_type):
         raise ValueError("`sensor_type` must be either 'rate' or 'increment'")
 
     gyro = imu[GYRO_COLS].values
-    accel = imu[ACCEL_COLS].values
-
+    accel = imu[ACCEL_COLS].values    
+    dt = np.diff(imu.index).reshape(-1, 1)
     if sensor_type == 'increment':
         gyro_increment = gyro[1:]
         accel_increment = accel[1:]
@@ -65,8 +65,8 @@ def compute_theta_and_dv(imu, sensor_type):
     theta = gyro_increment + coning
     dv = accel_increment + sculling + 0.5 * np.cross(gyro_increment, accel_increment)
 
-    return pd.DataFrame(data=np.hstack((theta, dv)), index=imu.index[1:],
-                        columns=['theta_x', 'theta_y', 'theta_z',
+    return pd.DataFrame(data=np.hstack((dt, theta, dv)), index=imu.index[1:],
+                        columns=['dt', 'theta_x', 'theta_y', 'theta_z',
                                  'dv_x', 'dv_y', 'dv_z'])
 
 
@@ -147,10 +147,8 @@ class Integrator:
             Added chunk of the trajectory. It contains n_readings + 1 rows
             including the last point before `theta` and `dv` where integrated.
         """
-        theta = increments[['theta_x', 'theta_y', 'theta_z']].values
-        dv = increments[['dv_x', 'dv_y', 'dv_z']].values
-        dt = np.diff(np.hstack([self.trajectory.index[-1], increments.index])
-                     ).astype(float)
+        theta = np.ascontiguousarray(increments[['theta_x', 'theta_y', 'theta_z']])
+        dv = np.ascontiguousarray(increments[['dv_x', 'dv_y', 'dv_z']])
 
         n_data = self.trajectory.shape[0]
         n_readings = theta.shape[0]
@@ -163,7 +161,7 @@ class Integrator:
             self.velocity_n.resize((new_size, 3), refcheck=False)
             self.Cnb.resize((new_size, 3, 3), refcheck=False)
 
-        integrate_fast(dt, self.lla, self.velocity_n, self.Cnb,
+        integrate_fast(np.asarray(increments.dt), self.lla, self.velocity_n, self.Cnb,
                        theta, dv, n_data - 1, self.with_altitude)
         rph = transform.mat_to_rph(self.Cnb[n_data:n_data + n_readings])
         trajectory = pd.DataFrame(
