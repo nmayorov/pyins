@@ -2,7 +2,7 @@
 import numpy as np
 from scipy.spatial.transform import Rotation
 from . import earth
-from .util import VEL_COLS, RPH_COLS
+from .util import VEL_COLS, RPH_COLS, TRAJECTORY_ERROR_COLS
 
 #: Degrees to radians.
 DEG_TO_RAD = np.pi / 180
@@ -124,9 +124,6 @@ def difference_trajectories(t1, t2):
         Trajectory difference. It can be interpreted as errors in `t1` relative
         to `t2`.
     """
-    TRAJECTORY_ERROR_COLUMNS = ['north', 'east', 'down', 'VN', 'VE', 'VD',
-                                'roll', 'pitch', 'heading']
-
     index = t1.index.intersection(t2.index)
     columns = t1.columns.intersection(t2.columns)
 
@@ -146,8 +143,8 @@ def difference_trajectories(t1, t2):
     diff = diff.rename(columns={'lat': 'north', 'lon': 'east', 'alt': 'down'})
 
     other_columns = [column for column in diff.columns
-                     if column not in TRAJECTORY_ERROR_COLUMNS]
-    diff = diff[TRAJECTORY_ERROR_COLUMNS + other_columns]
+                     if column not in TRAJECTORY_ERROR_COLS]
+    diff = diff[TRAJECTORY_ERROR_COLS + other_columns]
 
     return diff.loc[t1.index.intersection(t2.index)]
 

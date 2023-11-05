@@ -10,6 +10,9 @@ GYRO_COLS = ['gyro_x', 'gyro_y', 'gyro_z']
 ACCEL_COLS = ['accel_x', 'accel_y', 'accel_z']
 THETA_COLS = ['theta_x', 'theta_y', 'theta_z']
 DV_COLS = ['dv_x', 'dv_y', 'dv_z']
+NED_COLS = ["north", "east", "down"]
+TRAJECTORY_COLS = LLA_COLS + VEL_COLS + RPH_COLS
+TRAJECTORY_ERROR_COLS = NED_COLS + VEL_COLS + RPH_COLS
 
 
 def mm_prod(a, b, at=False, bt=False):

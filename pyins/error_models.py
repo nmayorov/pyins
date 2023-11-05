@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from scipy.spatial.transform import Rotation
 from . import earth, util, transform
-from .util import LLA_COLS, VEL_COLS, RPH_COLS
+from .util import LLA_COLS, VEL_COLS, RPH_COLS, TRAJECTORY_ERROR_COLS
 
 
 class InsErrorModel:
@@ -464,8 +464,6 @@ def propagate_errors(trajectory,
     x_out[:, error_model.DRPH] = np.rad2deg(x_out[:, error_model.DRPH])
     error_out = pd.DataFrame(data=x_out,
                              index=trajectory.index,
-                             columns=['north', 'east', 'down',
-                                      'VN', 'VE', 'VD',
-                                      'roll', 'pitch', 'heading'])
+                             columns=TRAJECTORY_ERROR_COLS)
 
     return error_out, state

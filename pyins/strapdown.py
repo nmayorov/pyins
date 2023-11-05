@@ -2,7 +2,7 @@
 import numpy as np
 import pandas as pd
 from . import transform
-from .util import LLA_COLS, RPH_COLS, VEL_COLS, GYRO_COLS, ACCEL_COLS
+from .util import LLA_COLS, RPH_COLS, VEL_COLS, GYRO_COLS, ACCEL_COLS, TRAJECTORY_COLS
 from ._integrate import integrate_fast
 
 
@@ -168,8 +168,7 @@ class Integrator:
             np.hstack([self.lla[n_data : n_data + n_readings],
                        self.velocity_n[n_data : n_data + n_readings],
                        rph]),
-            index=increments.index, columns=LLA_COLS + VEL_COLS + RPH_COLS
-        )
+            index=increments.index, columns=TRAJECTORY_COLS)
         self.trajectory = pd.concat([self.trajectory, trajectory])
 
         return self.trajectory.iloc[-n_readings - 1:]

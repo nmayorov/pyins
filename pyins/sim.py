@@ -5,7 +5,7 @@ from scipy.interpolate import CubicSpline, CubicHermiteSpline
 from scipy.spatial.transform import Rotation, RotationSpline
 from scipy._lib._util import check_random_state
 from . import earth, transform, util
-from .util import LLA_COLS, VEL_COLS, RPH_COLS, GYRO_COLS, ACCEL_COLS
+from .util import LLA_COLS, VEL_COLS, RPH_COLS, GYRO_COLS, ACCEL_COLS, TRAJECTORY_COLS
 
 
 def _compute_increment_readings(dt, a, b, c, d, e):
@@ -174,8 +174,7 @@ def generate_imu(time, lla, rph, velocity_n=None, sensor_type='rate'):
 
     index = pd.Index(time, name='time')
     trajectory = pd.DataFrame(np.hstack([lla, velocity_n, rph]),
-                              index=index,
-                              columns=LLA_COLS + VEL_COLS + RPH_COLS)
+                              index=index, columns=TRAJECTORY_COLS)
     imu = pd.DataFrame(data=np.hstack((gyros, accels)), index=index,
                        columns=GYRO_COLS + ACCEL_COLS)
     return trajectory, imu

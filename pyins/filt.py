@@ -5,7 +5,8 @@ import pandas as pd
 from scipy.spatial.transform import Rotation
 from . import error_models, kalman, util, transform, strapdown
 from .imu_model import InertialSensor
-from .util import LLA_COLS, VEL_COLS, RPH_COLS, THETA_COLS, DV_COLS
+from .util import (LLA_COLS, VEL_COLS, RPH_COLS, THETA_COLS, DV_COLS,
+                   TRAJECTORY_ERROR_COLS)
 
 
 FIRST_ORDER_TIMESTEP_MAX = 0.1
@@ -993,11 +994,11 @@ def compute_sd(P, trajectory, error_model, gyro_model, accel_model):
     sd_gyro = np.diagonal(P_gyro, axis1=1, axis2=2) ** 0.5
     sd_accel = np.diagonal(P_accel, axis1=1, axis2=2) ** 0.5
 
-    columns = (['north', 'east', 'down', 'VN', 'VE', 'VD', 'roll', 'pitch', 'heading'] +
-               list(gyro_model.states.keys()) + list(accel_model.states.keys()))
-
     result = pd.DataFrame(np.hstack((sd_nav, sd_gyro, sd_accel)),
-                          index=trajectory.index, columns=columns)
+                          index=trajectory.index,
+                          columns=TRAJECTORY_ERROR_COLS +
+                                  list(gyro_model.states.keys()) +
+                                  list(accel_model.states.keys()))
     result[RPH_COLS] = np.rad2deg(result[RPH_COLS])
     return result
 
