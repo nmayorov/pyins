@@ -885,11 +885,20 @@ def compute_average_pva(pva_1, pva_2):
     ])
 
 
-def compute_initial_x_and_P(pva,
-                            pos_sd, vel_sd, level_sd, azimuth_sd,
-                            error_model : error_models.InsErrorModel,
-                            gyro_model : InertialSensor,
-                            accel_model : InertialSensor):
+def concatenate_states(error_model, gyro_model, accel_model):
+    states = error_model.STATES.copy()
+    for name, state in gyro_model.states.items():
+        states['GYRO_' + name] = error_model.N_STATES + state
+    for name, state in accel_model.states.items():
+        states['ACCEL_' + name] = error_model.N_STATES + gyro_model.n_states + state
+    return list(states.keys())
+
+
+def initialize_covariance(pva,
+                          pos_sd, vel_sd, level_sd, azimuth_sd,
+                          error_model : error_models.InsErrorModel,
+                          gyro_model : InertialSensor,
+                          accel_model : InertialSensor):
     level_sd = np.deg2rad(level_sd)
     azimuth_sd = np.deg2rad(azimuth_sd)
 
@@ -916,7 +925,7 @@ def compute_initial_x_and_P(pva,
     P[gyro_block, gyro_block] = gyro_model.P
     P[accel_block, accel_block] = accel_model.P
 
-    return np.zeros(n_states), P
+    return P
 
 
 def compute_error_propagation_matrices(pva, gyro, accel, time_delta,
@@ -966,6 +975,93 @@ def compute_error_propagation_matrices(pva, gyro, accel, time_delta,
                                            time_delta, 'expm')
 
 
+def compute_sd(P, trajectory, error_model, gyro_model, accel_model):
+    inertial_block = slice(error_model.N_STATES)
+    gyro_block = slice(error_model.N_STATES, error_model.N_STATES + gyro_model.n_states)
+    accel_block = slice(
+        error_model.N_STATES + gyro_model.n_states,
+        error_model.N_STATES + gyro_model.n_states + accel_model.n_states)
+
+    P_ins = P[:, inertial_block, inertial_block]
+    P_gyro = P[:, gyro_block, gyro_block]
+    P_accel = P[:, accel_block, accel_block]
+
+    T = error_model.transform_to_output(trajectory)
+    P_nav = util.mm_prod(T, P_ins)
+    P_nav = util.mm_prod(P_nav, T, bt=True)
+    sd_nav = np.diagonal(P_nav, axis1=1, axis2=2) ** 0.5
+    sd_gyro = np.diagonal(P_gyro, axis1=1, axis2=2) ** 0.5
+    sd_accel = np.diagonal(P_accel, axis1=1, axis2=2) ** 0.5
+
+    columns = (['north', 'east', 'down', 'VN', 'VE', 'VD', 'roll', 'pitch', 'heading'] +
+               list(gyro_model.states.keys()) + list(accel_model.states.keys()))
+
+    result = pd.DataFrame(np.hstack((sd_nav, sd_gyro, sd_accel)),
+                          index=trajectory.index, columns=columns)
+    result[RPH_COLS] = np.rad2deg(result[RPH_COLS])
+    return result
+
+
+class InertialEstimates:
+    def __init__(self, kind, states):
+        if kind not in ['gyro', 'accel']:
+            raise ValueError("`kind` must be `'gyro' or 'accel'")
+        self.kind = kind.upper()
+        self.transform = np.identity(3)
+        self.bias = np.zeros(3)
+        self.states = states
+
+    def update(self, x):
+        if len(x) != len(self.states):
+            raise ValueError("`x` must have the same length as `states` from the "
+                             "constructor")
+        for state, xi in zip(self.states, x):
+            items = state.split("_")
+            if items[0] == self.kind:
+                if items[1] == 'BIAS':
+                    axis = int(items[2]) - 1
+                    self.bias[axis] += xi
+                elif items[1] == 'SCALE' and items[2] == 'MISAL':
+                    axis_out = int(items[3][0]) - 1
+                    axis_in = int(items[3][1]) - 1
+                    self.transform[axis_out, axis_in] += xi
+
+    def correct_increments(self, dt, increments):
+        dt = np.asarray(dt).reshape(-1, 1)
+        result = np.linalg.solve(
+            self.transform,
+            (increments.values - self.bias * dt).transpose()).transpose()
+        result = np.ascontiguousarray(result)
+        return pd.DataFrame(result, index=increments.index, columns=increments.columns)
+
+    def get_estimates(self):
+        states = []
+        estimates = []
+        for state in self.states:
+            items = state.split("_")
+            if items[0] != self.kind:
+                continue
+            if items[1] == 'BIAS':
+                axis = int(items[2]) - 1
+                states.append(state)
+                estimates.append(self.bias[axis])
+            elif items[1] == 'SCALE' and items[2] == 'MISAL':
+                axis_out = int(items[3][0]) - 1
+                axis_in = int(items[3][1]) - 1
+                states.append(state)
+                estimates.append(self.transform[axis_out, axis_in])
+        return pd.Series(estimates, index=states)
+
+
+def correct_increments(increments, gyro_estimates, accel_estimates):
+    result = increments.copy()
+    result[THETA_COLS] = gyro_estimates.correct_increments(increments.dt,
+                                                           increments[THETA_COLS])
+    result[DV_COLS] = accel_estimates.correct_increments(increments.dt,
+                                                         increments[DV_COLS])
+    return result
+
+
 def run_feedback_filter(initial_pva,
                         pos_sd, vel_sd, level_sd, azimuth_sd,
                         increments, gyro_model=None, accel_model=None,
@@ -989,19 +1085,23 @@ def run_feedback_filter(initial_pva,
     observation_times_index = 0
 
     error_model = error_models.ModifiedPhiModel()
+    P = initialize_covariance(initial_pva, pos_sd, vel_sd, level_sd, azimuth_sd,
+                              error_model, gyro_model, accel_model)
+    states = concatenate_states(error_model, gyro_model, accel_model)
+    gyro_estimates = InertialEstimates('gyro', states)
+    accel_estimates = InertialEstimates('accel', states)
 
-    x, P = compute_initial_x_and_P(initial_pva, pos_sd, vel_sd, level_sd, azimuth_sd,
-                                   error_model, gyro_model, accel_model)
-    n_states = len(x)
-
-    times_all = []
-    x_all = []
+    n_states = len(states)
+    trajectory_result = []
+    gyro_result = []
+    accel_result = []
     P_all = []
 
     integrator = strapdown.Integrator(initial_pva, True)
     while integrator.get_time() < end_time:
         time = integrator.get_time()
         if observation_times[observation_times_index] == time:
+            x = np.zeros(n_states)
             ins_state = integrator.get_state()
             for observation in observations:
                 ret = observation.compute_obs(time, ins_state, error_model)
@@ -1012,17 +1112,21 @@ def run_feedback_filter(initial_pva,
                     kalman.correct(x, P, z, H_full, R)
 
             integrator.set_state(error_model.correct_state(ins_state, x))
-            x[:error_model.N_STATES] = 0
+            gyro_estimates.update(x)
+            accel_estimates.update(x)
             observation_times_index += 1
 
-        times_all.append(time)
-        x_all.append(x)
+        trajectory_result.append(integrator.get_state())
+        gyro_result.append(gyro_estimates.get_estimates())
+        accel_result.append(accel_estimates.get_estimates())
         P_all.append(P)
 
         next_time = min(time + time_step,
                         observation_times[observation_times_index])
         time_delta = next_time - time
-        increments_batch = increments.loc[np.nextafter(time, next_time) : next_time]
+        increments_batch = correct_increments(
+            increments.loc[np.nextafter(time, next_time) : next_time],
+            gyro_estimates, accel_estimates)
 
         pva_old = integrator.get_state()
         integrator.integrate(increments_batch)
@@ -1035,40 +1139,13 @@ def run_feedback_filter(initial_pva,
                                                      accel_average, time_delta,
                                                      error_model, gyro_model,
                                                      accel_model)
-        x = Phi @ x
         P = Phi @ P @ Phi.transpose() + Qd
 
-    times_all = np.asarray(times_all)
-    x_all = np.asarray(x_all)
     P_all = np.asarray(P_all)
+    trajectory_result = pd.DataFrame(trajectory_result)
+    gyro_result = pd.DataFrame(gyro_result, index=trajectory_result.index)
+    accel_result = pd.DataFrame(accel_result, index=trajectory_result.index)
+    state = pd.concat([trajectory_result, gyro_result, accel_result], axis='columns')
+    sd = compute_sd(P_all, trajectory_result, error_model, gyro_model, accel_model)
 
-    trajectory = integrator.trajectory.loc[times_all]
-    T = error_model.transform_to_output(trajectory)
-    y = util.mv_prod(T, x_all[:, :error_model.N_STATES])
-    Py = util.mm_prod(T, P_all[:, :error_model.N_STATES, :error_model.N_STATES])
-    Py = util.mm_prod(Py, T, bt=True)
-    sd_y = np.diagonal(Py, axis1=1, axis2=2) ** 0.5
-
-    error = pd.DataFrame(index=trajectory.index)
-    error['north'] = y[:, error_model.DRN]
-    error['east'] = y[:, error_model.DRE]
-    error['down'] = y[:, error_model.DRD]
-    error['VN'] = y[:, error_model.DVN]
-    error['VE'] = y[:, error_model.DVE]
-    error['VD'] = y[:, error_model.DVD]
-    error['roll'] = np.rad2deg(y[:, error_model.DROLL])
-    error['pitch'] = np.rad2deg(y[:, error_model.DPITCH])
-    error['heading'] = np.rad2deg(y[:, error_model.DHEADING])
-
-    sd = pd.DataFrame(index=trajectory.index)
-    sd['north'] = sd_y[:, error_model.DRN]
-    sd['east'] = sd_y[:, error_model.DRE]
-    sd['down'] = sd_y[:, error_model.DRD]
-    sd['VN'] = sd_y[:, error_model.DVN]
-    sd['VE'] = sd_y[:, error_model.DVE]
-    sd['VD'] = sd_y[:, error_model.DVD]
-    sd['roll'] = np.rad2deg(sd_y[:, error_model.DROLL])
-    sd['pitch'] = np.rad2deg(sd_y[:, error_model.DPITCH])
-    sd['heading'] = np.rad2deg(sd_y[:, error_model.DHEADING])
-
-    return trajectory, sd
+    return state, sd

@@ -113,7 +113,7 @@ def test_run_feedback_filter():
 
     error = transform.difference_trajectories(trajectory, trajectory_true)
 
-    relative_error = error / sd
+    relative_error = error / sd[error.columns]
     assert (util.compute_rms(relative_error) < 1.5).all()
 
 

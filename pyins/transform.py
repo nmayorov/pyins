@@ -127,6 +127,12 @@ def difference_trajectories(t1, t2):
     TRAJECTORY_ERROR_COLUMNS = ['north', 'east', 'down', 'VN', 'VE', 'VD',
                                 'roll', 'pitch', 'heading']
 
+    index = t1.index.intersection(t2.index)
+    columns = t1.columns.intersection(t2.columns)
+
+    t1 = t1.loc[index, columns]
+    t2 = t2.loc[index, columns]
+
     diff = t1 - t2
     rn, _, rp = earth.principal_radii(0.5 * (t1.lat + t2.lat),
                                       0.5 * (t1.alt + t2.alt))
