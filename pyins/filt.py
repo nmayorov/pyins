@@ -889,9 +889,9 @@ def compute_average_pva(pva_1, pva_2):
 def concatenate_states(error_model, gyro_model, accel_model):
     states = error_model.STATES.copy()
     for name, state in gyro_model.states.items():
-        states['GYRO_' + name] = error_model.N_STATES + state
+        states['gyro_' + name] = error_model.N_STATES + state
     for name, state in accel_model.states.items():
-        states['ACCEL_' + name] = error_model.N_STATES + gyro_model.n_states + state
+        states['accel_' + name] = error_model.N_STATES + gyro_model.n_states + state
     return list(states.keys())
 
 
@@ -1007,7 +1007,7 @@ class InertialEstimates:
     def __init__(self, kind, states):
         if kind not in ['gyro', 'accel']:
             raise ValueError("`kind` must be `'gyro' or 'accel'")
-        self.kind = kind.upper()
+        self.kind = kind
         self.transform = np.identity(3)
         self.bias = np.zeros(3)
         self.states = states
@@ -1019,12 +1019,12 @@ class InertialEstimates:
         for state, xi in zip(self.states, x):
             items = state.split("_")
             if items[0] == self.kind:
-                if items[1] == 'BIAS':
+                if items[1] == 'bias':
                     axis = int(items[2]) - 1
                     self.bias[axis] += xi
-                elif items[1] == 'SCALE' and items[2] == 'MISAL':
-                    axis_out = int(items[3][0]) - 1
-                    axis_in = int(items[3][1]) - 1
+                elif items[1] == 'sm':
+                    axis_out = int(items[2][0]) - 1
+                    axis_in = int(items[2][1]) - 1
                     self.transform[axis_out, axis_in] += xi
 
     def correct_increments(self, dt, increments):
@@ -1042,13 +1042,13 @@ class InertialEstimates:
             items = state.split("_")
             if items[0] != self.kind:
                 continue
-            if items[1] == 'BIAS':
+            if items[1] == 'bias':
                 axis = int(items[2]) - 1
                 states.append(state)
                 estimates.append(self.bias[axis])
-            elif items[1] == 'SCALE' and items[2] == 'MISAL':
-                axis_out = int(items[3][0]) - 1
-                axis_in = int(items[3][1]) - 1
+            elif items[1] == 'sm':
+                axis_out = int(items[2][0]) - 1
+                axis_in = int(items[2][1]) - 1
                 states.append(state)
                 estimates.append(self.transform[axis_out, axis_in])
         return pd.Series(estimates, index=states)

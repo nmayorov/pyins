@@ -65,7 +65,7 @@ class InertialSensor:
             if bias[axis] > 0:
                 P[n_states, n_states] = bias[axis] ** 2
                 H[axis, n_states] = 1
-                states[f"BIAS_{axis + 1}"] = n_states
+                states[f"bias_{axis + 1}"] = n_states
 
                 if bias_walk[axis] > 0:
                     G[n_states, n_noises] = 1
@@ -87,7 +87,7 @@ class InertialSensor:
                         P[n_states, n_states] = scale_misal[
                             output_axis, input_axis] ** 2
                         states[
-                            f"SCALE_MISAL_{output_axis + 1}{input_axis + 1}"] = n_states
+                            f"sm_{output_axis + 1}{input_axis + 1}"] = n_states
                         n_states += 1
 
         n_output_noises = 0

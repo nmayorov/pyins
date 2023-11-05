@@ -20,7 +20,7 @@ def test_InertialSensor():
     assert_equal(s.n_states, 3)
     assert_equal(s.n_noises, 3)
     assert_equal(s.n_output_noises, 0)
-    assert_equal(list(s.states.keys()), ['BIAS_1', 'BIAS_2', 'BIAS_3'])
+    assert_equal(list(s.states.keys()), ['bias_1', 'bias_2', 'bias_3'])
     assert_equal(list(s.states.values()), [0, 1, 2])
     assert_allclose(s.P, 0.01 * np.identity(3))
     assert_equal(s.q, [0.2, 0.2, 0.2])
@@ -35,7 +35,7 @@ def test_InertialSensor():
     assert_equal(s.n_states, 2)
     assert_equal(s.n_noises, 1)
     assert_equal(s.n_output_noises, 1)
-    assert_equal(list(s.states.keys()), ['BIAS_1', 'BIAS_3'])
+    assert_equal(list(s.states.keys()), ['bias_1', 'bias_3'])
     assert_equal(list(s.states.values()), [0, 1])
     assert_allclose(s.P, np.diag([0.1**2, 0.2**2]))
     assert_equal(s.q, [0.01])
@@ -51,8 +51,7 @@ def test_InertialSensor():
     assert_equal(s.n_noises, 3)
     assert_equal(s.n_output_noises, 0)
     assert_equal(list(s.states.keys()),
-                 ['BIAS_1', 'BIAS_2', 'BIAS_3',
-                  'SCALE_MISAL_11', 'SCALE_MISAL_22', 'SCALE_MISAL_33'])
+                 ['bias_1', 'bias_2', 'bias_3', 'sm_11', 'sm_22', 'sm_33'])
     assert_equal(list(s.states.values()), np.arange(6))
     assert_allclose(s.P, np.diag([0.01, 0.01, 0.01, 0.09, 0.09, 0.09]))
     assert_equal(s.q, [0.2, 0.2, 0.2])
