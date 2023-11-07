@@ -5,7 +5,8 @@ from scipy.interpolate import CubicSpline, CubicHermiteSpline
 from scipy.spatial.transform import Rotation, RotationSpline
 from scipy._lib._util import check_random_state
 from . import earth, transform, util
-from .util import LLA_COLS, VEL_COLS, RPH_COLS, GYRO_COLS, ACCEL_COLS, TRAJECTORY_COLS
+from .util import (LLA_COLS, VEL_COLS, RPH_COLS, GYRO_COLS, ACCEL_COLS, TRAJECTORY_COLS,
+                   INDEX_TO_XYZ)
 
 
 def _compute_increment_readings(dt, a, b, c, d, e):
@@ -288,6 +289,7 @@ class ImuErrors:
         self.bias_walk = np.asarray(bias_walk)
         self.noise = np.asarray(noise)
         self.rng = check_random_state(rng)
+        self.dataframe = None
 
     @classmethod
     def from_inertial_sensor_model(cls, inertial_sensor_model, rng=None):
@@ -316,6 +318,19 @@ class ImuErrors:
             result += self.noise * dt**0.5 * self.rng.randn(*readings.shape)
         else:
             raise ValueError("`sensor_type` must be either 'rate' or 'increment ")
+
+        self.dataframe = pd.DataFrame(index=readings.index)
+        for axis in range(3):
+            if self.bias[axis] != 0 or self.bias_walk[axis] != 0:
+                self.dataframe[f'bias_{INDEX_TO_XYZ[axis]}'] = bias[:, axis]
+        for axis_out in range(3):
+            for axis_in in range(3):
+                nominal = 1 if axis_out == axis_in else 0
+                actual = self.transform[axis_out, axis_in]
+                if actual != nominal:
+                    self.dataframe[(f"sm_{INDEX_TO_XYZ[axis_out]}"
+                                    f"{INDEX_TO_XYZ[axis_in]}")] = actual - nominal
+
         return pd.DataFrame(data=result, index=readings.index, columns=readings.columns)
 
 
