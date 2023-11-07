@@ -2,7 +2,7 @@ import pandas as pd
 from numpy.testing import assert_allclose
 import numpy as np
 from pyins import sim
-from pyins.transform import difference_trajectories
+from pyins.transform import compute_state_difference
 from pyins.strapdown import compute_theta_and_dv, Integrator
 from pyins.util import GYRO_COLS, ACCEL_COLS, THETA_COLS, DV_COLS
 
@@ -28,7 +28,7 @@ def run_integration_test(reference_trajectory, imu, sensor_type, thresholds):
     increments = compute_theta_and_dv(imu, sensor_type)
     integrator = Integrator(reference_trajectory.iloc[0])
     result = integrator.integrate(increments)
-    diff = difference_trajectories(result, reference_trajectory).abs().max(axis=0)
+    diff = compute_state_difference(result, reference_trajectory).abs().max(axis=0)
     assert (diff < thresholds).all()
 
 

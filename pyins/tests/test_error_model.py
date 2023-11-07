@@ -3,7 +3,7 @@ import pytest
 from numpy.testing import assert_allclose
 from pyins import earth, error_models, sim, transform
 from pyins.strapdown import compute_theta_and_dv, Integrator
-from pyins.transform import perturb_lla, difference_trajectories
+from pyins.transform import perturb_lla, compute_state_difference
 from pyins.util import LLA_COLS, VEL_COLS, RPH_COLS, GYRO_COLS, ACCEL_COLS
 
 
@@ -36,7 +36,7 @@ def test_propagate_errors(error_model):
 
     integrator = Integrator(initial)
     traj_c = integrator.integrate(increments)
-    error_true = difference_trajectories(traj_c, trajectory)
+    error_true = compute_state_difference(traj_c, trajectory)
 
     error_linear, _ = error_models.propagate_errors(trajectory,
                                                     delta_position_n,

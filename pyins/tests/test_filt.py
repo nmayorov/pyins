@@ -54,7 +54,7 @@ def test_FeedbackFilter():
                    observations=[position_obs, ned_velocity_obs, body_velocity_obs],
                    feedback_period=5)
 
-    error = transform.difference_trajectories(result.trajectory, trajectory)
+    error = transform.compute_state_difference(result.trajectory, trajectory)
 
     relative_error = error / result.sd
     assert (util.compute_rms(relative_error) < 1.5).all()
@@ -111,7 +111,7 @@ def test_run_feedback_filter():
         accel_model, observations=[position_obs, ned_velocity_obs, body_velocity_obs],
         time_step=1)
 
-    error = transform.difference_trajectories(result.trajectory, trajectory_true)
+    error = transform.compute_state_difference(result.trajectory, trajectory_true)
 
     relative_error = error / result.trajectory_sd[error.columns]
     assert (util.compute_rms(relative_error) < 1.5).all()
@@ -164,7 +164,7 @@ def test_FeedforwardFilter():
                    observations=[position_obs, ned_velocity_obs,
                                  body_velocity_obs])
 
-    error = transform.difference_trajectories(result.trajectory, trajectory)
+    error = transform.compute_state_difference(result.trajectory, trajectory)
 
     relative_error = error / result.sd
     assert (util.compute_rms(relative_error) < 1.6).all()

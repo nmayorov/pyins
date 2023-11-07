@@ -1,8 +1,10 @@
 """Coordinate transformations."""
 import numpy as np
-from scipy.spatial.transform import Rotation
+import pandas as pd
+from scipy.interpolate import interp1d
+from scipy.spatial.transform import Rotation, Slerp
+from .util import LLA_COLS, VEL_COLS, RPH_COLS, NED_COLS, TRAJECTORY_COLS
 from . import earth
-from .util import VEL_COLS, RPH_COLS, TRAJECTORY_ERROR_COLS
 
 #: Degrees to radians.
 DEG_TO_RAD = np.pi / 180
@@ -110,43 +112,101 @@ def difference_lla(lla1, lla2):
     return result[0] if single else result
 
 
-def difference_trajectories(t1, t2):
-    """Compute trajectory difference.
+def to_180_degrees_range(angle):
+    angle = angle % 360.0
+    if isinstance(angle, (pd.Series, pd.DataFrame)):
+        angle = angle.copy()
+    else:
+        angle = np.asarray(angle)
+    angle[angle < -180.0] += 360.0
+    angle[angle > 180.0] -= 360.0
+    return angle
 
-    Parameters
-    ----------
-    t1, t2 : DataFrame
-        Trajectories.
 
-    Returns
-    -------
-    diff : DataFrame
-        Trajectory difference. It can be interpreted as errors in `t1` relative
-        to `t2`.
-    """
-    index = t1.index.intersection(t2.index)
-    columns = t1.columns.intersection(t2.columns)
+def compute_state_difference(first, second):
+    def has_lla(data):
+        return all(col in data for col in LLA_COLS)
 
-    t1 = t1.loc[index, columns]
-    t2 = t2.loc[index, columns]
+    def has_velocity(data):
+        return all(col in data for col in VEL_COLS)
 
-    diff = t1 - t2
-    rn, _, rp = earth.principal_radii(0.5 * (t1.lat + t2.lat),
-                                      0.5 * (t1.alt + t2.alt))
-    diff.lat *= np.deg2rad(rn)
-    diff.lon *= np.deg2rad(rp)
-    diff.alt = -diff.alt
-    diff.heading %= 360
-    diff.heading[diff.heading < -180] += 360
-    diff.heading[diff.heading > 180] -= 360
+    def has_rph(data):
+        return all(col in data for col in RPH_COLS)
 
-    diff = diff.rename(columns={'lat': 'north', 'lon': 'east', 'alt': 'down'})
+    if np.median(np.diff(first.index)) < np.median(np.diff(second.index)):
+        result_sign = -1.0
+        first, second = second, first
+    else:
+        result_sign = 1.0
 
-    other_columns = [column for column in diff.columns
-                     if column not in TRAJECTORY_ERROR_COLS]
-    diff = diff[TRAJECTORY_ERROR_COLS + other_columns]
+    first = first[~first.index.duplicated()]
 
-    return diff.loc[t1.index.intersection(t2.index)]
+    index = first.index
+    index = index[(index >= second.index[0]) & (index <= second.index[-1])]
+
+    results = []
+
+    if has_lla(first) and has_lla(second):
+        lla_second_interpolator = interp1d(second.index, second[LLA_COLS], axis=0)
+        lla_second = pd.DataFrame(lla_second_interpolator(index),
+                                  index=index, columns=LLA_COLS)
+
+        rn, _, rp = earth.principal_radii(0.5 * (first.lat + lla_second.lat),
+                                          0.5 * (first.alt + lla_second.alt))
+        difference = pd.DataFrame(index=index, columns=NED_COLS)
+        difference['north'] = (first.lat - lla_second.lat) * rn * DEG_TO_RAD
+        difference['east'] = (first.lon - lla_second.lon) * rp * DEG_TO_RAD
+        difference['down'] = -(first.alt - lla_second.alt)
+        results.append(difference)
+
+    if has_velocity(first) and has_velocity(second):
+        velocity_second_interpolator = interp1d(second.index, second[VEL_COLS], axis=0)
+        velocity_second_at_first = velocity_second_interpolator(index)
+        difference = pd.DataFrame(
+            first.loc[index, VEL_COLS].values - velocity_second_at_first,
+            index=index, columns=VEL_COLS)
+        results.append(difference)
+
+    if has_rph(first) and has_rph(second):
+        rpy_second_interpolator = Slerp(
+            second.index, Rotation.from_euler('xyz', second[RPH_COLS], True))
+        rpy_second_at_first = rpy_second_interpolator(index).as_euler('xyz', True)
+        difference = pd.DataFrame(
+            to_180_degrees_range(first.loc[index, RPH_COLS].values -
+                                 rpy_second_at_first), index=index, columns=RPH_COLS)
+        results.append(difference)
+    else:
+        if 'heading' in first and 'heading' in second:
+            heading_second_interpolator = Slerp(
+                second.index, Rotation.from_euler('z', second.heading, True))
+            heading_second_at_first = heading_second_interpolator(index).as_euler(
+                'xyz', True)[:, 2]
+            difference = pd.DataFrame(
+                to_180_degrees_range(first.loc[index, 'heading'].values -
+                                     heading_second_at_first),
+                index=index, columns=['heading'])
+            results.append(difference)
+        if 'pitch' in first and 'pitch' in second:
+            pitch_second_interpolator = Slerp(
+                second.index, Rotation.from_euler('y', second.pitch, True))
+            pitch_second_at_first = pitch_second_interpolator(index).as_euler(
+                'xyz', True)[:, 1]
+            difference = pd.DataFrame(first.loc[index, 'pitch'].values -
+                                      pitch_second_at_first,
+                                      index=index, columns=['pitch'])
+            results.append(difference)
+
+    other_columns = first.columns.intersection(second.columns).difference(
+        TRAJECTORY_COLS)
+    if not other_columns.empty:
+        second_interpolator = interp1d(second.index, second[other_columns], axis=0)
+        difference = pd.DataFrame(
+            first.loc[index, other_columns].values - second_interpolator(index),
+            index=index, columns=other_columns)
+        results.append(difference)
+
+    return (result_sign * pd.concat(results, axis=1) if results
+            else pd.DataFrame(index=index))
 
 
 def correct_trajectory(trajectory, error):
