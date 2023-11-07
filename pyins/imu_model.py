@@ -61,12 +61,12 @@ class InertialSensor:
 
         n_states = 0
         n_noises = 0
-        states = OrderedDict()
+        states = []
         for axis in range(3):
             if bias[axis] > 0:
                 P[n_states, n_states] = bias[axis] ** 2
                 H[axis, n_states] = 1
-                states[f"bias_{INDEX_TO_XYZ[axis]}"] = n_states
+                states.append(f"bias_{INDEX_TO_XYZ[axis]}")
 
                 if bias_walk[axis] > 0:
                     G[n_states, n_noises] = 1
@@ -87,8 +87,8 @@ class InertialSensor:
                         scale_misal_states.append(n_states)
                         P[n_states, n_states] = scale_misal[
                             output_axis, input_axis] ** 2
-                        states[(f"sm_{INDEX_TO_XYZ[output_axis]}"
-                                f"{INDEX_TO_XYZ[input_axis]}")] = n_states
+                        states.append(f"sm_{INDEX_TO_XYZ[output_axis]}"
+                                      f"{INDEX_TO_XYZ[input_axis]}")
                         n_states += 1
 
         n_output_noises = 0

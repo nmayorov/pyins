@@ -887,12 +887,9 @@ def compute_average_pva(pva_1, pva_2):
 
 
 def concatenate_states(error_model, gyro_model, accel_model):
-    states = error_model.STATES.copy()
-    for name, state in gyro_model.states.items():
-        states['gyro_' + name] = error_model.N_STATES + state
-    for name, state in accel_model.states.items():
-        states['accel_' + name] = error_model.N_STATES + gyro_model.n_states + state
-    return list(states.keys())
+    return (list(error_model.STATES.keys()) +
+            ['gyro_' + state for state in gyro_model.states] +
+            ['accel_' + state for state in accel_model.states])
 
 
 def initialize_covariance(pva,
@@ -996,9 +993,8 @@ def compute_sd(P, trajectory, error_model, gyro_model, accel_model):
 
     result = pd.DataFrame(np.hstack((sd_nav, sd_gyro, sd_accel)),
                           index=trajectory.index,
-                          columns=TRAJECTORY_ERROR_COLS +
-                                  list(gyro_model.states.keys()) +
-                                  list(accel_model.states.keys()))
+                          columns=TRAJECTORY_ERROR_COLS + gyro_model.states +
+                                  accel_model.states)
     result[RPH_COLS] = np.rad2deg(result[RPH_COLS])
     return result
 
