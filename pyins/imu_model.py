@@ -1,7 +1,7 @@
 """Statistical model for IMU."""
-from collections import OrderedDict
+import pandas as pd
 import numpy as np
-from .util import INDEX_TO_XYZ
+from .util import INDEX_TO_XYZ, XYZ_TO_INDEX
 
 
 class InertialSensor:
@@ -125,6 +125,9 @@ class InertialSensor:
         self.J = J
         self.v = v
 
+        self.transform = np.identity(3)
+        self.bias = np.zeros(3)
+
     @staticmethod
     def _verify_param(param, shape, name):
         if param is None:
@@ -157,3 +160,46 @@ class InertialSensor:
             H[:] = self.H
             H[:, output_axes, states] = readings[:, input_axes]
         return H
+
+    def reset_estimates(self):
+        self.transform = np.identity(3)
+        self.bias = np.zeros(3)
+
+    def update_estimates(self, x):
+        if len(x) != len(self.states):
+            raise ValueError("`x` must have the same length as `states` from the "
+                             "constructor")
+        for state, xi in zip(self.states, x):
+            items = state.split("_")
+            if items[0] == 'bias':
+                axis = XYZ_TO_INDEX[items[1]]
+                self.bias[axis] += xi
+            elif items[0] == 'sm':
+                axis_out = XYZ_TO_INDEX(items[1][0])
+                axis_in = XYZ_TO_INDEX(items[2][1])
+                self.transform[axis_out, axis_in] += xi
+
+    def correct_increments(self, dt, increments):
+        dt = np.asarray(dt).reshape(-1, 1)
+        result = np.linalg.solve(
+            self.transform,
+            (increments.values - self.bias * dt).transpose()).transpose()
+        result = np.ascontiguousarray(result)
+        return pd.DataFrame(result, index=increments.index, columns=increments.columns)
+
+    def get_estimates(self):
+        states = []
+        estimates = []
+        for state in self.states:
+            items = state.split("_")
+            if items[0] == 'bias':
+                axis = XYZ_TO_INDEX[items[1]]
+                states.append(state)
+                estimates.append(self.bias[axis])
+            elif items[0] == 'sm':
+                axis_out = XYZ_TO_INDEX[items[1][0]]
+                axis_in = XYZ_TO_INDEX[items[1][1]]
+                states.append(state)
+                estimates.append(self.transform[axis_out, axis_in] -
+                                 1 if axis_out == axis_in else 0)
+        return pd.Series(estimates, index=states)

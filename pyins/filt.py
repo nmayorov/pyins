@@ -987,67 +987,17 @@ def compute_sd(P, trajectory, error_model, gyro_model, accel_model):
     T = error_model.transform_to_output(trajectory)
     P_nav = util.mm_prod(T, P_ins)
     P_nav = util.mm_prod(P_nav, T, bt=True)
-    sd_nav = np.diagonal(P_nav, axis1=1, axis2=2) ** 0.5
-    sd_gyro = np.diagonal(P_gyro, axis1=1, axis2=2) ** 0.5
-    sd_accel = np.diagonal(P_accel, axis1=1, axis2=2) ** 0.5
+    trajectory_sd = np.diagonal(P_nav, axis1=1, axis2=2) ** 0.5
+    gyro_sd = np.diagonal(P_gyro, axis1=1, axis2=2) ** 0.5
+    accel_sd = np.diagonal(P_accel, axis1=1, axis2=2) ** 0.5
 
-    result = pd.DataFrame(np.hstack((sd_nav, sd_gyro, sd_accel)),
-                          index=trajectory.index,
-                          columns=TRAJECTORY_ERROR_COLS + gyro_model.states +
-                                  accel_model.states)
-    result[RPH_COLS] = np.rad2deg(result[RPH_COLS])
-    return result
-
-
-class InertialEstimates:
-    def __init__(self, kind, states):
-        if kind not in ['gyro', 'accel']:
-            raise ValueError("`kind` must be `'gyro' or 'accel'")
-        self.kind = kind
-        self.transform = np.identity(3)
-        self.bias = np.zeros(3)
-        self.states = states
-
-    def update(self, x):
-        if len(x) != len(self.states):
-            raise ValueError("`x` must have the same length as `states` from the "
-                             "constructor")
-        for state, xi in zip(self.states, x):
-            items = state.split("_")
-            if items[0] == self.kind:
-                if items[1] == 'bias':
-                    axis = XYZ_TO_INDEX[items[2]]
-                    self.bias[axis] += xi
-                elif items[1] == 'sm':
-                    axis_out = XYZ_TO_INDEX(items[2][0])
-                    axis_in = XYZ_TO_INDEX(items[2][1])
-                    self.transform[axis_out, axis_in] += xi
-
-    def correct_increments(self, dt, increments):
-        dt = np.asarray(dt).reshape(-1, 1)
-        result = np.linalg.solve(
-            self.transform,
-            (increments.values - self.bias * dt).transpose()).transpose()
-        result = np.ascontiguousarray(result)
-        return pd.DataFrame(result, index=increments.index, columns=increments.columns)
-
-    def get_estimates(self):
-        states = []
-        estimates = []
-        for state in self.states:
-            items = state.split("_")
-            if items[0] != self.kind:
-                continue
-            if items[1] == 'bias':
-                axis = XYZ_TO_INDEX[items[2]]
-                states.append(state)
-                estimates.append(self.bias[axis])
-            elif items[1] == 'sm':
-                axis_out = XYZ_TO_INDEX[items[2][0]]
-                axis_in = XYZ_TO_INDEX[items[2][1]]
-                states.append(state)
-                estimates.append(self.transform[axis_out, axis_in])
-        return pd.Series(estimates, index=states)
+    trajectory_sd = pd.DataFrame(trajectory_sd, index=trajectory.index,
+                                 columns=TRAJECTORY_ERROR_COLS)
+    trajectory_sd[RPH_COLS] = np.rad2deg(trajectory_sd[RPH_COLS])
+    gyro_sd = pd.DataFrame(gyro_sd, index=trajectory.index, columns=gyro_model.states)
+    accel_sd = pd.DataFrame(accel_sd, index=trajectory.index,
+                            columns=accel_model.states)
+    return trajectory_sd, gyro_sd, accel_sd
 
 
 def correct_increments(increments, gyro_estimates, accel_estimates):
@@ -1085,8 +1035,10 @@ def run_feedback_filter(initial_pva,
     P = initialize_covariance(initial_pva, pos_sd, vel_sd, level_sd, azimuth_sd,
                               error_model, gyro_model, accel_model)
     states = concatenate_states(error_model, gyro_model, accel_model)
-    gyro_estimates = InertialEstimates('gyro', states)
-    accel_estimates = InertialEstimates('accel', states)
+
+    inertial_block = slice(error_model.N_STATES)
+    gyro_block = slice(error_model.N_STATES, error_model.N_STATES + gyro_model.n_states)
+    accel_block = slice(error_model.N_STATES + gyro_model.n_states, None)
 
     n_states = len(states)
     trajectory_result = []
@@ -1095,6 +1047,9 @@ def run_feedback_filter(initial_pva,
     P_all = []
 
     integrator = strapdown.Integrator(initial_pva, True)
+    gyro_model.reset_estimates()
+    accel_model.reset_estimates()
+
     while integrator.get_time() < end_time:
         time = integrator.get_time()
         if observation_times[observation_times_index] == time:
@@ -1105,17 +1060,18 @@ def run_feedback_filter(initial_pva,
                 if ret is not None:
                     z, H, R = ret
                     H_full = np.zeros((len(z), n_states))
-                    H_full[:, :error_model.N_STATES] = H
+                    H_full[:, inertial_block] = H
                     kalman.correct(x, P, z, H_full, R)
 
-            integrator.set_state(error_model.correct_state(ins_state, x))
-            gyro_estimates.update(x)
-            accel_estimates.update(x)
+            integrator.set_state(
+                error_model.correct_state(ins_state, x[inertial_block]))
+            gyro_model.update_estimates(x[gyro_block])
+            accel_model.update_estimates(x[accel_block])
             observation_times_index += 1
 
         trajectory_result.append(integrator.get_state())
-        gyro_result.append(gyro_estimates.get_estimates())
-        accel_result.append(accel_estimates.get_estimates())
+        gyro_result.append(gyro_model.get_estimates())
+        accel_result.append(accel_model.get_estimates())
         P_all.append(P)
 
         next_time = min(time + time_step,
@@ -1123,7 +1079,7 @@ def run_feedback_filter(initial_pva,
         time_delta = next_time - time
         increments_batch = correct_increments(
             increments.loc[np.nextafter(time, next_time) : next_time],
-            gyro_estimates, accel_estimates)
+            gyro_model, accel_model)
 
         pva_old = integrator.get_state()
         integrator.integrate(increments_batch)
@@ -1140,9 +1096,12 @@ def run_feedback_filter(initial_pva,
 
     P_all = np.asarray(P_all)
     trajectory_result = pd.DataFrame(trajectory_result)
-    gyro_result = pd.DataFrame(gyro_result, index=trajectory_result.index)
-    accel_result = pd.DataFrame(accel_result, index=trajectory_result.index)
-    state = pd.concat([trajectory_result, gyro_result, accel_result], axis='columns')
-    sd = compute_sd(P_all, trajectory_result, error_model, gyro_model, accel_model)
-
-    return state, sd
+    trajectory_sd, gyro_sd, accel_sd = compute_sd(
+        P_all, trajectory_result, error_model, gyro_model, accel_model)
+    return util.Bunch(
+        trajectory=trajectory_result,
+        trajectory_sd=trajectory_sd,
+        gyro=pd.DataFrame(gyro_result, index=trajectory_result.index),
+        gyro_sd=gyro_sd,
+        accel=pd.DataFrame(accel_result, index=trajectory_result.index),
+        accel_sd=accel_sd)

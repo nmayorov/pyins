@@ -106,14 +106,14 @@ def test_run_feedback_filter():
     initial = sim.perturb_trajectory_point(trajectory_true.iloc[0], pos_sd, vel_sd,
                                            level_sd, azimuth_sd, rng=rng)
 
-    trajectory, sd = filt.run_feedback_filter(
+    result = filt.run_feedback_filter(
         initial, pos_sd, vel_sd, level_sd, azimuth_sd, increments, gyro_model,
         accel_model, observations=[position_obs, ned_velocity_obs, body_velocity_obs],
         time_step=1)
 
-    error = transform.difference_trajectories(trajectory, trajectory_true)
+    error = transform.difference_trajectories(result.trajectory, trajectory_true)
 
-    relative_error = error / sd[error.columns]
+    relative_error = error / result.trajectory_sd[error.columns]
     assert (util.compute_rms(relative_error) < 1.5).all()
 
 
