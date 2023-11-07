@@ -31,9 +31,9 @@ def test_FeedbackFilter():
         noise=1 * transform.DRH_TO_RRS, rng=rng)
     accel_errors = sim.ImuErrors(bias=[0.1, -0.1, 0.2], noise=1.0 / 60, rng=rng)
 
-    gyro_model = filt.InertialSensor(bias=100 * transform.DH_TO_RS,
+    gyro_model = filt.InertialSensor(bias_sd=100 * transform.DH_TO_RS,
                                      noise=1 * transform.DRH_TO_RRS)
-    accel_model = filt.InertialSensor(bias=0.1, noise=1.0 / 60)
+    accel_model = filt.InertialSensor(bias_sd=0.1, noise=1.0 / 60)
 
     imu = sim.apply_imu_errors(imu_true, dt, 'increment', gyro_errors, accel_errors)
     increments = strapdown.compute_theta_and_dv(imu)
@@ -91,9 +91,9 @@ def test_run_feedback_filter():
         noise=1 * transform.DRH_TO_RRS, rng=rng)
     accel_errors = sim.ImuErrors(bias=[0.1, -0.1, 0.2], noise=1.0 / 60, rng=rng)
 
-    gyro_model = filt.InertialSensor(bias=100 * transform.DH_TO_RS,
+    gyro_model = filt.InertialSensor(bias_sd=100 * transform.DH_TO_RS,
                                      noise=1 * transform.DRH_TO_RRS)
-    accel_model = filt.InertialSensor(bias=0.1, noise=1.0 / 60)
+    accel_model = filt.InertialSensor(bias_sd=0.1, noise=1.0 / 60)
 
     imu = sim.apply_imu_errors(imu_true, 'increment', gyro_errors, accel_errors)
     increments = strapdown.compute_theta_and_dv(imu, 'increment')
@@ -139,9 +139,9 @@ def test_FeedforwardFilter():
     accel_errors = sim.ImuErrors(bias=[0.01, -0.01, 0.02],
                                  noise=0.01 / 60,
                                  rng=rng)
-    gyro_model = filt.InertialSensor(bias=1 * transform.DH_TO_RS,
+    gyro_model = filt.InertialSensor(bias_sd=1 * transform.DH_TO_RS,
                                      noise=0.001 * transform.DRH_TO_RRS)
-    accel_model = filt.InertialSensor(bias=0.01, noise=0.01 / 60)
+    accel_model = filt.InertialSensor(bias_sd=0.01, noise=0.01 / 60)
 
     imu = sim.apply_imu_errors(imu_true, dt, 'increment', gyro_errors, accel_errors)
     increments = strapdown.compute_theta_and_dv(imu)

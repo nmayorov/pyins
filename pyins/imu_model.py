@@ -21,7 +21,7 @@ class InertialSensor:
 
     Parameters
     ----------
-    bias : array_like or None
+    bias_sd : array_like or None
         Standard deviation of a bias, which is modeled as a random constant
         (plus an optional random walk).
     noise : array_like or None
@@ -30,7 +30,7 @@ class InertialSensor:
     bias_walk : array_like or None
         Strength of white noise which is integrated into the bias. Known as
         a rate random walk for gyros. Can be set only if `bias` is set.
-    scale_misal : array_like, shape (3, 3) or None
+    scale_misal_sd : array_like, shape (3, 3) or None
         Standard deviations of matrix elements which represent sensor triad
         scale factor errors and misalignment. Non-positive elements will
         disable the corresponding effect estimation.
@@ -39,13 +39,13 @@ class InertialSensor:
     MAX_NOISES = 3
     MAX_OUTPUT_NOISES = 3
 
-    def __init__(self, bias=None, noise=None, bias_walk=None, scale_misal=None):
-        bias = self._verify_param(bias, (3,), "bias")
+    def __init__(self, bias_sd=None, noise=None, bias_walk=None, scale_misal_sd=None):
+        bias_sd = self._verify_param(bias_sd, (3,), "bias")
         noise = self._verify_param(noise, (3,), "noise")
         bias_walk = self._verify_param(bias_walk, (3,), "bias_walk")
-        scale_misal = self._verify_param(scale_misal, (3, 3), "scale_misal")
+        scale_misal_sd = self._verify_param(scale_misal_sd, (3, 3), "scale_misal")
 
-        if np.any(bias_walk[bias <= 0] > 0):
+        if np.any(bias_walk[bias_sd <= 0] > 0):
             raise ValueError(
                 "``bias_walk` can be enabled only for axes where `bias` enabled")
 
@@ -63,8 +63,8 @@ class InertialSensor:
         n_noises = 0
         states = []
         for axis in range(3):
-            if bias[axis] > 0:
-                P[n_states, n_states] = bias[axis] ** 2
+            if bias_sd[axis] > 0:
+                P[n_states, n_states] = bias_sd[axis] ** 2
                 H[axis, n_states] = 1
                 states.append(f"bias_{INDEX_TO_XYZ[axis]}")
 
@@ -78,14 +78,14 @@ class InertialSensor:
         output_axes = []
         input_axes = []
         scale_misal_states = []
-        if scale_misal is not None:
+        if scale_misal_sd is not None:
             for output_axis in range(3):
                 for input_axis in range(3):
-                    if scale_misal[output_axis, input_axis] > 0:
+                    if scale_misal_sd[output_axis, input_axis] > 0:
                         output_axes.append(output_axis)
                         input_axes.append(input_axis)
                         scale_misal_states.append(n_states)
-                        P[n_states, n_states] = scale_misal[
+                        P[n_states, n_states] = scale_misal_sd[
                             output_axis, input_axis] ** 2
                         states.append(f"sm_{INDEX_TO_XYZ[output_axis]}"
                                       f"{INDEX_TO_XYZ[input_axis]}")
@@ -111,11 +111,11 @@ class InertialSensor:
         self.n_noises = n_noises
         self.n_output_noises = n_output_noises
         self.states = states
-        self.bias = bias
+        self.bias_sd = bias_sd
         self.noise = noise
         self.bias_walk = bias_walk
         self.readings_required = bool(output_axes)
-        self.scale_misal = scale_misal
+        self.scale_misal_sd = scale_misal_sd
         self.scale_misal_data = output_axes, input_axes, scale_misal_states
         self.P = P
         self.q = q

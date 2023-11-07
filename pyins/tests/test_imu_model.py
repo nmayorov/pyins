@@ -16,7 +16,7 @@ def test_InertialSensor():
     assert_equal(s.G.shape, (0, 0))
     assert_equal(s.output_matrix().shape, (3, 0))
 
-    s = InertialSensor(bias=0.1, bias_walk=0.2)
+    s = InertialSensor(bias_sd=0.1, bias_walk=0.2)
     assert_equal(s.n_states, 3)
     assert_equal(s.n_noises, 3)
     assert_equal(s.n_output_noises, 0)
@@ -29,7 +29,7 @@ def test_InertialSensor():
     assert_equal(s.J, np.empty((3, 0)))
     assert_equal(s.output_matrix(), np.identity(3))
 
-    s = InertialSensor(bias=[0.1, 0.0, 0.2], bias_walk=[0.0, 0.0, 0.01],
+    s = InertialSensor(bias_sd=[0.1, 0.0, 0.2], bias_walk=[0.0, 0.0, 0.01],
                        noise=[0.0, 0.02, 0.0])
     assert_equal(s.n_states, 2)
     assert_equal(s.n_noises, 1)
@@ -43,8 +43,8 @@ def test_InertialSensor():
     assert_equal(s.J, [[0], [1], [0]])
     assert_equal(s.output_matrix(), [[1, 0], [0, 0], [0, 1]])
 
-    s = InertialSensor(bias=0.1, bias_walk=0.2,
-                       scale_misal=np.diag([0.3, 0.3, 0.3]))
+    s = InertialSensor(bias_sd=0.1, bias_walk=0.2,
+                       scale_misal_sd=np.diag([0.3, 0.3, 0.3]))
     assert_equal(s.n_states, 6)
     assert_equal(s.n_noises, 3)
     assert_equal(s.n_output_noises, 0)

@@ -284,9 +284,16 @@ class ImuErrors:
         if noise is None:
             noise = 0
 
+        bias = np.asarray(bias)
+        if bias.ndim == 0:
+            bias = np.resize(bias, 3)
+        bias_walk = np.asarray(bias_walk)
+        if bias_walk.ndim == 0:
+            bias_walk = np.resize(bias_walk, 3)
+
         self.transform = np.asarray(transform)
-        self.bias = np.asarray(bias)
-        self.bias_walk = np.asarray(bias_walk)
+        self.bias = bias
+        self.bias_walk = bias_walk
         self.noise = np.asarray(noise)
         self.rng = check_random_state(rng)
         self.dataframe = None
@@ -294,12 +301,8 @@ class ImuErrors:
     @classmethod
     def from_inertial_sensor_model(cls, inertial_sensor_model, rng=None):
         rng = check_random_state(rng)
-        transform = (np.eye(3) +
-                     inertial_sensor_model.scale_misal * rng.randn(3, 3))
-        if inertial_sensor_model.bias is None:
-            bias = None
-        else:
-            bias = inertial_sensor_model.bias * rng.randn(3)
+        transform = np.eye(3) + inertial_sensor_model.scale_misal_sd * rng.randn(3, 3)
+        bias = inertial_sensor_model.bias_sd * rng.randn(3)
         return cls(transform, bias, inertial_sensor_model.noise,
                    inertial_sensor_model.bias_walk, rng)
 
