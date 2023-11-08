@@ -67,8 +67,7 @@ def test_run_feedback_filter():
     assert (util.compute_rms(result.innovations['BodyVelocityObs']) < 3.0).all()
 
 
-
-def test_FeedforwardFilter():
+def test_run_feedforward_filter():
     dt = 0.01
     rng = np.random.RandomState(123456789)
 
@@ -94,8 +93,8 @@ def test_FeedforwardFilter():
                                      noise=0.001 * transform.DRH_TO_RRS)
     accel_model = filt.InertialSensor(bias_sd=0.01, noise=0.01 / 60)
 
-    imu = sim.apply_imu_errors(imu_true, dt, 'increment', gyro_errors, accel_errors)
-    increments = strapdown.compute_theta_and_dv(imu)
+    imu = sim.apply_imu_errors(imu_true, 'increment', gyro_errors, accel_errors)
+    increments = strapdown.compute_theta_and_dv(imu, 'increment')
 
     pos_sd = 10
     vel_sd = 0.1
@@ -104,28 +103,23 @@ def test_FeedforwardFilter():
 
     initial = sim.perturb_trajectory_point(trajectory.iloc[0], pos_sd, vel_sd, level_sd,
                                            azimuth_sd, rng=rng)
-    integrator = strapdown.Integrator(dt, initial)
+    integrator = strapdown.Integrator(initial)
     trajectory_computed = integrator.integrate(increments)
 
-    f = filt.FeedforwardFilter(dt, trajectory, pos_sd=pos_sd, vel_sd=vel_sd,
-                               azimuth_sd=azimuth_sd, level_sd=level_sd,
-                               gyro_model=gyro_model, accel_model=accel_model)
-
-    result = f.run(trajectory_computed,
-                   observations=[position_obs, ned_velocity_obs,
-                                 body_velocity_obs])
+    result = filt.run_feedforward_filter(
+        trajectory, trajectory_computed, pos_sd, vel_sd, level_sd, azimuth_sd,
+        gyro_model, accel_model,
+        observations=[position_obs, ned_velocity_obs, body_velocity_obs], time_step=1)
 
     error = transform.compute_state_difference(result.trajectory, trajectory)
 
-    relative_error = error / result.sd
+    relative_error = error / result.trajectory_sd
     assert (util.compute_rms(relative_error) < 1.6).all()
 
-    gyro_bias_relative_error = (np.abs(result.gyro_estimates.iloc[-1] -
-                                       gyro_errors.bias)
+    gyro_bias_relative_error = (np.abs(result.gyro.iloc[-1] - gyro_errors.bias)
                                 / result.gyro_sd.iloc[-1])
     assert (gyro_bias_relative_error < 2.0).all()
 
-    accel_bias_relative_error = (np.abs(result.accel_estimates.iloc[-1] -
-                                        accel_errors.bias)
+    accel_bias_relative_error = (np.abs(result.accel.iloc[-1] - accel_errors.bias)
                                  / result.accel_sd.iloc[-1])
     assert (accel_bias_relative_error < 2.0).all()
