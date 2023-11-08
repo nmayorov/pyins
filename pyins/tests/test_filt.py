@@ -62,6 +62,10 @@ def test_run_feedback_filter():
                                                      accel_errors.dataframe)
     assert ((accel_error.iloc[-1] / result.accel_sd.iloc[-1]).abs() < 2.0).all()
 
+    assert (util.compute_rms(result.innovations['PositionObs']) < 3.0).all()
+    assert (util.compute_rms(result.innovations['NedVelocityObs']) < 3.0).all()
+    assert (util.compute_rms(result.innovations['BodyVelocityObs']) < 3.0).all()
+
 
 
 def test_FeedforwardFilter():

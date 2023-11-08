@@ -701,6 +701,13 @@ def run_feedback_filter(initial_pva,
     gyro_model.reset_estimates()
     accel_model.reset_estimates()
 
+    innovations = {}
+    innovations_times = {}
+    for observation in observations:
+        name = observation.__class__.__name__
+        innovations[name] = []
+        innovations_times[name] = []
+
     while integrator.get_time() < end_time:
         time = integrator.get_time()
         if observation_times[observation_times_index] == time:
@@ -712,7 +719,10 @@ def run_feedback_filter(initial_pva,
                     z, H, R = ret
                     H_full = np.zeros((len(z), n_states))
                     H_full[:, inertial_block] = H
-                    kalman.correct(x, P, z, H_full, R)
+                    innovation = kalman.correct(x, P, z, H_full, R)
+                    name = observation.__class__.__name__
+                    innovations[name].append(innovation)
+                    innovations_times[name].append(time)
 
             integrator.set_state(
                 error_model.correct_state(ins_state, x[inertial_block]))
@@ -749,10 +759,17 @@ def run_feedback_filter(initial_pva,
     trajectory_result = pd.DataFrame(trajectory_result)
     trajectory_sd, gyro_sd, accel_sd = compute_sd(
         P_all, trajectory_result, error_model, gyro_model, accel_model)
+
+    for observation in observations:
+        name = observation.__class__.__name__
+        innovations[name] = pd.DataFrame(innovations[name], innovations_times[name],
+                                         columns=observation.data.columns)
+
     return util.Bunch(
         trajectory=trajectory_result,
         trajectory_sd=trajectory_sd,
         gyro=pd.DataFrame(gyro_result, index=trajectory_result.index),
         gyro_sd=gyro_sd,
         accel=pd.DataFrame(accel_result, index=trajectory_result.index),
-        accel_sd=accel_sd)
+        accel_sd=accel_sd,
+        innovations=innovations)
