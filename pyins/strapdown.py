@@ -129,24 +129,7 @@ class Integrator:
         self.trajectory = self._init_values.to_frame().transpose(copy=True)
         self.trajectory.index.name = 'stamp'
 
-    def integrate(self, increments):
-        """Integrate inertial readings.
-
-        The integration continues from the last computed value.
-
-        Parameters
-        ----------
-        increments : pd.DataFrame
-            Rotation vectors and velocity increments computed from gyro and
-            accelerometer readings after applying coning and sculling
-            corrections.
-
-        Returns
-        -------
-        traj_last : DataFrame
-            Added chunk of the trajectory. It contains n_readings + 1 rows
-            including the last point before `theta` and `dv` where integrated.
-        """
+    def _integrate(self, increments, mode):
         theta = np.ascontiguousarray(increments[['theta_x', 'theta_y', 'theta_z']])
         dv = np.ascontiguousarray(increments[['dv_x', 'dv_y', 'dv_z']])
 
@@ -169,9 +152,37 @@ class Integrator:
                        self.velocity_n[n_data : n_data + n_readings],
                        rph]),
             index=increments.index, columns=TRAJECTORY_COLS)
-        self.trajectory = pd.concat([self.trajectory, trajectory])
 
-        return self.trajectory.iloc[-n_readings - 1:]
+        if mode == 'integrate':
+            self.trajectory = pd.concat([self.trajectory, trajectory])
+            return self.trajectory.iloc[-n_readings - 1:]
+        elif mode == 'predict':
+            return trajectory
+        else:
+            assert False
+
+    def integrate(self, increments):
+        """Integrate inertial readings.
+
+        The integration continues from the last computed value.
+
+        Parameters
+        ----------
+        increments : pd.DataFrame
+            Rotation vectors and velocity increments computed from gyro and
+            accelerometer readings after applying coning and sculling
+            corrections.
+
+        Returns
+        -------
+        traj_last : DataFrame
+            Added chunk of the trajectory. It contains n_readings + 1 rows
+            including the last point before `theta` and `dv` where integrated.
+        """
+        return self._integrate(increments, 'integrate')
+
+    def predict(self, increment):
+        return self._integrate(increment.to_frame().transpose(), 'predict').iloc[0]
 
     def get_time(self):
         return self.trajectory.index[-1]
