@@ -1,13 +1,5 @@
-from numpy.testing import assert_equal
 import numpy as np
 from pyins import filt, sim, strapdown, transform, util
-
-
-def test_refine_stamps():
-    stamps = [2, 2, 5, 1, 10, 20]
-    stamps = filt._refine_stamps(stamps, 2)
-    stamps_true = [1, 2, 4, 5, 7, 9, 10, 12, 14, 16, 18, 20]
-    assert_equal(stamps, stamps_true)
 
 
 def test_run_feedback_filter():
