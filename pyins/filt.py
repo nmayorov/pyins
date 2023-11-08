@@ -179,12 +179,6 @@ def compute_average_pva(pva_1, pva_2):
     ])
 
 
-def concatenate_states(error_model, gyro_model, accel_model):
-    return (list(error_model.STATES.keys()) +
-            ['gyro_' + state for state in gyro_model.states] +
-            ['accel_' + state for state in accel_model.states])
-
-
 def initialize_covariance(pva,
                           pos_sd, vel_sd, level_sd, azimuth_sd,
                           error_model : error_models.InsErrorModel,
@@ -375,13 +369,12 @@ def run_feedback_filter(initial_pva,
     error_model = error_models.ModifiedPhiModel()
     P = initialize_covariance(initial_pva, pos_sd, vel_sd, level_sd, azimuth_sd,
                               error_model, gyro_model, accel_model)
-    states = concatenate_states(error_model, gyro_model, accel_model)
 
     inertial_block = slice(error_model.N_STATES)
     gyro_block = slice(error_model.N_STATES, error_model.N_STATES + gyro_model.n_states)
     accel_block = slice(error_model.N_STATES + gyro_model.n_states, None)
 
-    n_states = len(states)
+    n_states = len(P)
     trajectory_result = []
     gyro_result = []
     accel_result = []
@@ -500,11 +493,10 @@ def run_feedforward_filter(trajectory_nominal, trajectory, pos_sd, vel_sd, level
     P = initialize_covariance(trajectory_nominal.iloc[0], pos_sd, vel_sd, level_sd,
                               azimuth_sd, error_model, gyro_model, accel_model)
     x = np.zeros(len(P))
-    states = concatenate_states(error_model, gyro_model, accel_model)
 
     inertial_block = slice(error_model.N_STATES)
 
-    n_states = len(states)
+    n_states = len(P)
     x_all = []
     P_all = []
     times_all = []
