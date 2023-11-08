@@ -56,6 +56,27 @@ def mm_prod(a, b, at=False, bt=False):
     return np.einsum("...ij,...jk->...ik", a, b)
 
 
+def mm_prod_symmetric(a, b):
+    """Compute symmetric product of stack of matrices.
+
+    The result is ``a @ b @ a.T`.
+
+    Parameters
+    ----------
+    a, b : array_like with 2 or 3 dimensions
+        Single matrix or stack of matrices. Matrices are stored in the two
+        trailing dimensions. If one of the arrays is 2-D and another is
+        3-D then broadcasting along the 0-th axis is applied.
+
+    Returns
+    -------
+    ndarray
+        Computed products.
+    """
+    ab = mm_prod(a, b)
+    return mm_prod(ab, a, bt=True)
+
+
 def mv_prod(a, b, at=False):
     """Compute products of multiple matrices and vectors stored in a stack.
 
