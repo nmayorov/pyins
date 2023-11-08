@@ -7,15 +7,15 @@ def test_run_feedback_filter():
     rng = np.random.RandomState(123456789)
 
     trajectory_true, imu_true = sim.sinusoid_velocity_motion(
-        dt, 300, [50, 60, 100], [1, -1, 0.5], [3, 3, 0.5])
+        0.5 * dt, 300, [50, 60, 100], [1, -1, 0.5], [3, 3, 0.5], sensor_type='rate')
 
     position_obs = filt.PositionObs(
-        sim.generate_position_observations(trajectory_true.iloc[::100], 1, rng), 1)
+        sim.generate_position_observations(trajectory_true.iloc[1::200], 1, rng), 1)
     ned_velocity_obs = filt.NedVelocityObs(
-        sim.generate_ned_velocity_observations(trajectory_true.iloc[30::100], 0.5,
+        sim.generate_ned_velocity_observations(trajectory_true.iloc[31::200], 0.5,
                                                rng), 0.5)
     body_velocity_obs = filt.BodyVelocityObs(
-        sim.generate_body_velocity_observations(trajectory_true.iloc[60::100], 0.2,
+        sim.generate_body_velocity_observations(trajectory_true.iloc[61::200], 0.2,
                                                 rng), 0.2)
 
     gyro_errors = sim.ImuErrors(
@@ -27,8 +27,8 @@ def test_run_feedback_filter():
                                      noise=1 * transform.DRH_TO_RRS)
     accel_model = filt.InertialSensor(bias_sd=0.1, noise=1.0 / 60)
 
-    imu = sim.apply_imu_errors(imu_true, 'increment', gyro_errors, accel_errors)
-    increments = strapdown.compute_theta_and_dv(imu, 'increment')
+    imu = sim.apply_imu_errors(imu_true.iloc[::2], 'rate', gyro_errors, accel_errors)
+    increments = strapdown.compute_theta_and_dv(imu, 'rate')
 
     pos_sd = 10
     vel_sd = 2

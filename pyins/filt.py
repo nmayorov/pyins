@@ -391,13 +391,17 @@ def run_feedback_filter(initial_pva,
         innovations[name] = []
         innovations_times[name] = []
 
+    increments_index = 0
     while integrator.get_time() < end_time:
         time = integrator.get_time()
-        if observation_times[observation_times_index] == time:
+        observation_time = observation_times[observation_times_index]
+        increment = increments.iloc[increments_index]
+        if observation_time < increment.name:
             x = np.zeros(n_states)
-            ins_state = integrator.get_state()
+            pva = integrator.predict((observation_time - time) / increment['dt'] *
+                                     increment)
             for observation in observations:
-                ret = observation.compute_obs(time, ins_state, error_model)
+                ret = observation.compute_obs(observation_time, pva, error_model)
                 if ret is not None:
                     z, H, R = ret
                     H_full = np.zeros((len(z), n_states))
@@ -405,10 +409,10 @@ def run_feedback_filter(initial_pva,
                     innovation = kalman.correct(x, P, z, H_full, R)
                     name = observation.__class__.__name__
                     innovations[name].append(innovation)
-                    innovations_times[name].append(time)
+                    innovations_times[name].append(observation_time)
 
             integrator.set_state(
-                error_model.correct_state(ins_state, x[inertial_block]))
+                error_model.correct_state(integrator.get_state(), x[inertial_block]))
             gyro_model.update_estimates(x[gyro_block])
             accel_model.update_estimates(x[accel_block])
             observation_times_index += 1
@@ -420,14 +424,17 @@ def run_feedback_filter(initial_pva,
 
         next_time = min(time + time_step,
                         observation_times[observation_times_index])
-        time_delta = next_time - time
+        next_increment_index = np.searchsorted(increments.index, next_time,
+                                               side='right')
         increments_batch = correct_increments(
-            increments.loc[np.nextafter(time, next_time) : next_time],
+            increments.iloc[increments_index : next_increment_index],
             gyro_model, accel_model)
+        increments_index = next_increment_index
 
         pva_old = integrator.get_state()
         integrator.integrate(increments_batch)
         pva_new = integrator.get_state()
+        time_delta = integrator.get_time() - time
         pva_average = compute_average_pva(pva_old, pva_new)
         gyro_average = increments_batch[THETA_COLS].sum(axis=0) / time_delta
         accel_average = increments_batch[DV_COLS].sum(axis=0) / time_delta
