@@ -2,7 +2,7 @@
 import numpy as np
 import pandas as pd
 from scipy.spatial.transform import Rotation
-from . import error_models, kalman, util, transform, strapdown
+from . import earth, error_models, kalman, util, transform, strapdown
 from .imu_model import InertialSensor
 from .util import (LLA_COLS, VEL_COLS, RPH_COLS, THETA_COLS, DV_COLS,
                    TRAJECTORY_ERROR_COLS)
@@ -316,8 +316,15 @@ def compute_feedforward_result(trajectory_nominal, trajectory, x, P,
                              columns=TRAJECTORY_ERROR_COLS)
     error_nav[RPH_COLS] *= transform.RAD_TO_DEG
 
+    rn, _, rp = earth.principal_radii(trajectory_nominal.lat, trajectory_nominal.alt)
+    trajectory = trajectory.copy()
+    trajectory.lat -= error_nav.north / rn * transform.RAD_TO_DEG
+    trajectory.lon -= error_nav.east / rp * transform.RAD_TO_DEG
+    trajectory.alt += error_nav.down
+    trajectory[VEL_COLS] -= error_nav[VEL_COLS]
+    trajectory[RPH_COLS] -= error_nav[RPH_COLS]
+
     P_nav = util.mm_prod_symmetric(T, P_ins)
-    trajectory = transform.correct_trajectory(trajectory, error_nav)
     trajectory_sd = pd.DataFrame(np.diagonal(P_nav, axis1=1, axis2=2) ** 0.5,
                                  index=trajectory.index, columns=TRAJECTORY_ERROR_COLS)
     trajectory_sd[RPH_COLS] *= transform.RAD_TO_DEG

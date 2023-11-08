@@ -209,34 +209,6 @@ def compute_state_difference(first, second):
             else pd.DataFrame(index=index))
 
 
-def correct_trajectory(trajectory, error):
-    """Correct trajectory by estimated errors.
-
-    Note that it means subtracting errors from the trajectory.
-
-    Parameters
-    ----------
-    trajectory : DataFrame
-        Trajectory.
-    error : DataFrame
-        Estimated errors.
-
-    Returns
-    -------
-    traj_corr : DataFrame
-        Corrected trajectory.
-    """
-    rn, _, rp = earth.principal_radii(trajectory.lat, trajectory.alt)
-
-    result = trajectory.copy()
-    result['lat'] -= np.rad2deg(error.north / rn)
-    result['lon'] -= np.rad2deg(error.east / rp)
-    result['alt'] += error.down
-    result[VEL_COLS] -= error[VEL_COLS]
-    result[RPH_COLS] -= error[RPH_COLS]
-    return result.dropna()
-
-
 def phi_to_delta_rph(rph):
     """Compute transformation matrix relating small phi angle and rph error.
 
