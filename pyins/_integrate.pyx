@@ -9,7 +9,7 @@ from libc cimport math
 
 cdef double DEG2RAD = math.pi / 180.0
 cdef double RAD2DEG = 180.0 / math.pi
-cdef double RATE = 7.2921157e-5
+cdef double RATE = 7.292115e-5
 cdef double R0 = 6378137.0
 cdef double E2 = 6.6943799901413e-3
 cdef double GE = 9.7803253359

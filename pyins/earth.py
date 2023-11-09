@@ -5,7 +5,7 @@ from . util import mv_prod
 
 
 #: Rotation rate of Earth in rad/s.
-RATE = 7.2921157e-5
+RATE = 7.292115e-5
 #: Approximate value of gravity.
 G0 = 9.8
 #: Semi major axis of Earth ellipsoid (or radius of Earth approximately).
