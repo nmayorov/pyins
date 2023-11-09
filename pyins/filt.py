@@ -190,12 +190,13 @@ def _initialize_covariance(pva, pos_sd, vel_sd, level_sd, azimuth_sd,
     P_nav[error_model.DHEADING, error_model.DHEADING] = azimuth_sd ** 2
 
     n_states = error_model.N_STATES + gyro_model.n_states + accel_model.n_states
-    P = np.zeros((n_states, n_states))
-    T = error_model.transform_to_output(pva)
 
     ins_block = slice(error_model.N_STATES)
     gyro_block = slice(error_model.N_STATES, error_model.N_STATES + gyro_model.n_states)
     accel_block = slice(error_model.N_STATES + gyro_model.n_states, n_states)
+
+    P = np.zeros((n_states, n_states))
+    T = np.linalg.inv(error_model.transform_to_output(pva))
 
     P[ins_block, ins_block] = T @ P_nav @ T.transpose()
     P[gyro_block, gyro_block] = gyro_model.P
