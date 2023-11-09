@@ -330,6 +330,49 @@ def _correct_increments(increments, gyro_model, accel_model):
 def run_feedback_filter(initial_pva, position_sd, velocity_sd, level_sd, azimuth_sd,
                         increments, gyro_model=None, accel_model=None,
                         observations=None, time_step=0.1):
+    """Run INS filter with feedback corrections.
+
+    Also known as Extended Kalman Filter.
+
+    Parameters
+    ----------
+    initial_pva : Pva
+        Initial position-velocity-attitude.
+    position_sd : float
+        Initial assumed position standard deviation in meters.
+    velocity_sd : float
+        Initial assumed velocity standard deviation in m/s.
+    level_sd : float
+        Initial assumed roll and pitch standard deviation in degrees.
+    azimuth_sd : float
+        Initial assumed heading standard deviation in degrees.
+    increments : Increments
+        IMU increments.
+    gyro_model : InertiaSensor, optional
+        Sensor model for gyros. If None (default), a default model will be used.
+    accel_model : InertialSensor, optional
+        Sensor model for accelerometers.
+        If None (default), a default model will be used.
+    observations : list of Observation. optional
+        Observations, empty by default.
+    time_step : float, optional
+        Time step for error state propagation.
+        The value typically should not exceed 1 second. Default is 0.1 second.
+
+    Returns
+    -------
+    Bunch with the following fields:
+
+        trajectory, trajectory_sd : DataFrame
+            Estimated trajectory and error standard deviations.
+        gyro, gyro_sd : DataFrame
+            Estimated gyro model parameters and its standard deviations.
+        accel, accel_sd : DataFrame
+            Estimated accelerometer model parameters and its standard deviations.
+        innovations : dict of DataFrame
+            For each observation class name contains DataFrame with measurement
+            innovations.
+    """
     if gyro_model is None:
         gyro_model = imu_model.InertialSensor()
     if accel_model is None:
