@@ -1,10 +1,12 @@
 import numpy as np
+import pandas as pd
 import pytest
 from numpy.testing import assert_allclose
 from pyins import earth, error_models, sim, transform
 from pyins.strapdown import compute_theta_and_dv, Integrator
 from pyins.transform import perturb_lla, compute_state_difference
-from pyins.util import LLA_COLS, VEL_COLS, RPH_COLS, GYRO_COLS, ACCEL_COLS
+from pyins.util import (LLA_COLS, VEL_COLS, RPH_COLS, NED_COLS, GYRO_COLS, ACCEL_COLS,
+                        TRAJECTORY_ERROR_COLS)
 
 
 @pytest.mark.parametrize("error_model", [error_models.ModifiedPhiModel,
@@ -25,22 +27,21 @@ def test_propagate_errors(error_model):
 
     increments = compute_theta_and_dv(imu, 'increment')
 
-    delta_position_n = [-200, 100, 20]
-    delta_velocity_n = [0.1, -0.2, -0.05]
-    delta_rph = [np.rad2deg(-2 * b / earth.G0), np.rad2deg(b / earth.G0), 0.5]
+    pva_error = pd.Series(index=TRAJECTORY_ERROR_COLS)
+    pva_error[NED_COLS] = [200, 100, 20]
+    pva_error[VEL_COLS] = [0.1, -0.2, -0.05]
+    pva_error[RPH_COLS] = [np.rad2deg(-2 * b / earth.G0), np.rad2deg(b / earth.G0), 0.5]
 
     initial = trajectory.iloc[0].copy()
-    initial[LLA_COLS] = perturb_lla(initial[LLA_COLS], delta_position_n)
-    initial[VEL_COLS] += delta_velocity_n
-    initial[RPH_COLS] += delta_rph
+    initial[LLA_COLS] = perturb_lla(initial[LLA_COLS], pva_error[NED_COLS])
+    initial[VEL_COLS] += pva_error[VEL_COLS]
+    initial[RPH_COLS] += pva_error[RPH_COLS]
 
     integrator = Integrator(initial)
     traj_c = integrator.integrate(increments)
     error_true = compute_state_difference(traj_c, trajectory)
 
-    error_linear, _ = error_models.propagate_errors(trajectory,
-                                                    delta_position_n,
-                                                    delta_velocity_n, delta_rph,
+    error_linear, _ = error_models.propagate_errors(trajectory, pva_error,
                                                     gyro_bias, accel_bias,
                                                     error_model=error_model())
 

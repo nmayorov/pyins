@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from scipy.spatial.transform import Rotation
 from . import earth, util, transform
-from .util import LLA_COLS, VEL_COLS, RPH_COLS, TRAJECTORY_ERROR_COLS
+from .util import LLA_COLS, VEL_COLS, RPH_COLS, NED_COLS, TRAJECTORY_ERROR_COLS
 
 
 class InsErrorModel:
@@ -408,25 +408,16 @@ class ModifiedPsiModel(InsErrorModel):
         return result
 
 
-def propagate_errors(trajectory,
-                     delta_position_n=np.zeros(3),
-                     delta_velocity_n=np.zeros(3),
-                     delta_rph=np.zeros(3),
-                     delta_gyro=np.zeros(3),
-                     delta_accel=np.zeros(3),
-                     error_model=ModifiedPhiModel()):
+def propagate_errors(trajectory, pva_error=None, delta_gyro=np.zeros(3),
+                     delta_accel=np.zeros(3), error_model=ModifiedPhiModel()):
     """Deterministic linear propagation of INS errors.
 
     Parameters
     ----------
     trajectory : Trajectory
         Trajectory.
-    delta_position_n : array_like, shape (3,), optional
-        Initial position errors in meters resolved in NED.
-    delta_velocity_n : array_like, shape (3,), optional
-        Initial velocity errors resolved in NED.
-    delta_rph : array_like, shape (3,), optional
-        Initial heading, pitch and roll errors.
+    pva_error : PvaError, optional
+        Initial position-velocity-attitude error. If None (default) zeros will be used.
     delta_gyro, delta_accel : array_like
         Gyro and accelerometer errors (in SI units). Can be constant or
         specified for each time stamp in `trajectory`.
@@ -435,8 +426,10 @@ def propagate_errors(trajectory,
 
     Returns
     -------
-    traj_err : TrajectoryError
+    trajectory_error : TrajectoryError
         Trajectory errors.
+    model_error : DataFrame
+        Errors expressed using internal states of `error_model`.
     """
     dt = np.diff(trajectory.index)
     Fi, Fig, Fia = error_model.system_matrix(trajectory)
@@ -449,8 +442,13 @@ def propagate_errors(trajectory,
                           delta_accel[1:] + delta_accel[:-1])
 
     T = error_model.transform_to_output(trajectory)
-    x0 = np.hstack([delta_position_n, delta_velocity_n, np.deg2rad(delta_rph)])
-    x0 = np.linalg.inv(T[0]).dot(x0)
+    if pva_error is None:
+        pva_error = pd.Series(data=np.zeros(9), index=TRAJECTORY_ERROR_COLS)
+
+    x0 = np.hstack([pva_error[NED_COLS].values,
+                    pva_error[VEL_COLS].values,
+                    pva_error[RPH_COLS].values * transform.DEG_TO_RAD])
+    x0 = np.linalg.solve(T[0], x0)
 
     n_samples = Fi.shape[0]
     x = np.empty((n_samples, error_model.N_STATES))
@@ -458,13 +456,10 @@ def propagate_errors(trajectory,
     for i in range(n_samples - 1):
         x[i + 1] = Phi[i].dot(x[i]) + delta_sensor[i] * dt[i]
 
-    state = pd.DataFrame(data=x, index=trajectory.index,
-                         columns=list(error_model.STATES.keys()))
+    model_error = pd.DataFrame(data=x, index=trajectory.index,
+                               columns=list(error_model.STATES.keys()))
+    trajectory_error = pd.DataFrame(data=util.mv_prod(T, x), index=trajectory.index,
+                                    columns=TRAJECTORY_ERROR_COLS)
+    trajectory_error[RPH_COLS] *= transform.RAD_TO_DEG
 
-    x_out = util.mv_prod(T, x)
-    x_out[:, error_model.DRPH] = np.rad2deg(x_out[:, error_model.DRPH])
-    error_out = pd.DataFrame(data=x_out,
-                             index=trajectory.index,
-                             columns=TRAJECTORY_ERROR_COLS)
-
-    return error_out, state
+    return trajectory_error, model_error
