@@ -5,8 +5,8 @@ from scipy.interpolate import CubicSpline, CubicHermiteSpline
 from scipy.spatial.transform import Rotation, RotationSpline
 from scipy._lib._util import check_random_state
 from . import earth, transform, util
-from .util import (LLA_COLS, VEL_COLS, RPH_COLS, GYRO_COLS, ACCEL_COLS, TRAJECTORY_COLS,
-                   INDEX_TO_XYZ)
+from .util import (LLA_COLS, VEL_COLS, RPH_COLS, NED_COLS, GYRO_COLS, ACCEL_COLS,
+                   TRAJECTORY_COLS, TRAJECTORY_ERROR_COLS, INDEX_TO_XYZ)
 
 
 def _compute_increment_readings(dt, a, b, c, d, e):
@@ -261,13 +261,20 @@ def generate_body_velocity_observations(trajectory, error_sd, rng=None):
                         columns=['VX', 'VY', 'VZ'])
 
 
-def perturb_pva(pva, position_sd, velocity_sd, level_sd, azimuth_sd, rng=None):
+def generate_pva_error(position_sd, velocity_sd, level_sd, azimuth_sd, rng=None):
     rng = check_random_state(rng)
+    result = pd.Series(index=TRAJECTORY_ERROR_COLS)
+    result[NED_COLS] = position_sd * rng.randn(3)
+    result[VEL_COLS] = velocity_sd * rng.randn(3)
+    result[RPH_COLS] = [level_sd, level_sd, azimuth_sd] * rng.randn(3)
+    return result
+
+
+def perturb_pva(pva, pva_error):
     result = pva.copy()
-    result[LLA_COLS] = transform.perturb_lla(result[LLA_COLS],
-                                             position_sd * rng.randn(3))
-    result[VEL_COLS] += velocity_sd * rng.randn(3)
-    result[RPH_COLS] += [level_sd, level_sd, azimuth_sd] * rng.randn(3)
+    result[LLA_COLS] = transform.perturb_lla(result[LLA_COLS], pva_error[NED_COLS])
+    result[VEL_COLS] += pva_error[VEL_COLS]
+    result[RPH_COLS] += pva_error[RPH_COLS]
     return result
 
 
