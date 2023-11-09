@@ -364,7 +364,10 @@ def run_feedback_filter(initial_pva, position_sd, velocity_sd, level_sd, azimuth
     Bunch with the following fields:
 
         trajectory, trajectory_sd : DataFrame
-            Estimated trajectory and error standard deviations.
+            Estimated trajectory and its error standard deviations.
+            Note that `trajectory` will contain rows for each time moment, whereas
+            `trajectory_sd` will contain rows only for some time moments (controlled
+            by `time_step` parameter).
         gyro, gyro_sd : DataFrame
             Estimated gyro model parameters and its standard deviations.
         accel, accel_sd : DataFrame
@@ -400,7 +403,7 @@ def run_feedback_filter(initial_pva, position_sd, velocity_sd, level_sd, azimuth
     accel_block = slice(error_model.N_STATES + gyro_model.n_states, None)
 
     n_states = len(P)
-    trajectory_result = []
+    times_result = []
     gyro_result = []
     accel_result = []
     P_result = []
@@ -442,7 +445,7 @@ def run_feedback_filter(initial_pva, position_sd, velocity_sd, level_sd, azimuth
             accel_model.update_estimates(x[accel_block])
             observation_times_index += 1
 
-        trajectory_result.append(integrator.get_pva())
+        times_result.append(time)
         gyro_result.append(gyro_model.get_estimates())
         accel_result.append(accel_model.get_estimates())
         P_result.append(P)
@@ -471,9 +474,9 @@ def run_feedback_filter(initial_pva, position_sd, velocity_sd, level_sd, azimuth
         P = Phi @ P @ Phi.transpose() + Qd
 
     P_result = np.asarray(P_result)
-    trajectory_result = pd.DataFrame(trajectory_result)
     trajectory_sd, gyro_sd, accel_sd = _compute_sd(
-        P_result, trajectory_result, error_model, gyro_model, accel_model)
+        P_result, integrator.trajectory.loc[times_result], error_model,
+        gyro_model, accel_model)
 
     for observation in observations:
         name = observation.__class__.__name__
@@ -481,11 +484,11 @@ def run_feedback_filter(initial_pva, position_sd, velocity_sd, level_sd, azimuth
                                          columns=observation.data.columns)
 
     return util.Bunch(
-        trajectory=trajectory_result,
+        trajectory=integrator.trajectory,
         trajectory_sd=trajectory_sd,
-        gyro=pd.DataFrame(gyro_result, index=trajectory_result.index),
+        gyro=pd.DataFrame(gyro_result, index=times_result),
         gyro_sd=gyro_sd,
-        accel=pd.DataFrame(accel_result, index=trajectory_result.index),
+        accel=pd.DataFrame(accel_result, index=times_result),
         accel_sd=accel_sd,
         innovations=innovations)
 
