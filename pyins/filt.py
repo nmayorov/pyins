@@ -2,8 +2,7 @@
 import numpy as np
 import pandas as pd
 from scipy.spatial.transform import Rotation
-from . import earth, error_models, kalman, util, transform, strapdown
-from .imu_model import InertialSensor
+from . import earth, error_models, imu_model, kalman, util, transform, strapdown
 from .util import (LLA_COLS, VEL_COLS, RPH_COLS, THETA_COLS, DV_COLS,
                    TRAJECTORY_ERROR_COLS)
 
@@ -21,7 +20,7 @@ class Observation:
     Parameters
     ----------
     data : DataFrame
-        Observed values as a DataFrame. Index must contain time stamps.
+        Observed values as a DataFrame indexed by time.
 
     Attributes
     ----------
@@ -30,36 +29,36 @@ class Observation:
 
     See Also
     --------
-    LatLonObs
-    VeVnObs
+    PositionObs
+    NedVelocityObs
+    BodyVelocityObs
     """
     def __init__(self, data):
         self.data = data
 
     def compute_obs(self, time, pva, error_model):
-        """Compute ingredients for a single linearized observation.
+        """Compute matrices for a single linearized observation.
 
         It must compute the observation model (z, H, R) at a given time stamp.
-        If the observation is not available at a given `stamp`, it must return
+        If the observation is not available at the given `time`, it must return
         None.
 
         Parameters
         ----------
-        time : int
-            Time stamp.
-        pva : Series
-            Point of INS trajectory at `stamp`.
+        time : float
+            Time.
+        pva : Pva
+            Position-velocity-attitude estimates from INS at `time`.
         error_model : InsErrorModel
             Error model object.
 
         Returns
         -------
         z : ndarray, shape (n_obs,)
-            Observation vector. A difference between an INS corresponding
-            value and an observed value.
-        H : ndarray, shape (n_obs, 7)
-            Observation model matrix. It relates the vector `z` to the
-            INS error states.
+            Observation vector. A difference between the value derived from `pva`
+            and an observed value.
+        H : ndarray, shape (n_obs, 9)
+            Observation model matrix. It relates the vector `z` to the INS error states.
         R : ndarray, shape (n_obs, n_obs)
             Covariance matrix of the observation error.
         """
@@ -67,13 +66,13 @@ class Observation:
 
 
 class PositionObs(Observation):
-    """Observation of latitude and longitude (from GPS or any other source).
+    """Observation of latitude, longitude and altitude (from GNSS or any other source).
 
     Parameters
     ----------
     data : DataFrame
-        Must contain columns 'lat', 'lon' and `alt` columns for latitude,
-        longitude and altitude. Index must contain time stamps.
+        Must be indexed by time and contain columns 'lat', 'lon' and `alt` columns for
+        latitude, longitude and altitude.
     sd : float
         Measurement accuracy in meters.
     imu_to_antenna_b : array_like, shape (3,) or None, optional
@@ -94,26 +93,23 @@ class PositionObs(Observation):
         if time not in self.data.index:
             return None
 
-        z = transform.difference_lla(pva[LLA_COLS],
-                                     self.data.loc[time, LLA_COLS])
-        if self.imu_to_antenna_b:
+        z = transform.difference_lla(pva[LLA_COLS], self.data.loc[time, LLA_COLS])
+        if self.imu_to_antenna_b is not None:
             mat_nb = transform.mat_from_rph(pva[RPH_COLS])
             z += mat_nb @ self.imu_to_antenna_b
 
-        H = error_model.position_error_jacobian(pva,
-                                                self.imu_to_antenna_b)
+        H = error_model.position_error_jacobian(pva, self.imu_to_antenna_b)
 
         return z, H, self.R
 
 
 class NedVelocityObs(Observation):
-    """Observation of velocity resolved in NED frame.
+    """Observation of velocity resolved in NED frame (typically from GNSS).
 
     Parameters
     ----------
     data : DataFrame
-        Must contain columns 'VE', 'VN' and 'VU' columns.
-        Index must contain time stamps.
+        Must be indexed by time and contain 'VN', 'VE' and 'VD' columns.
     sd : float
         Measurement accuracy in m/s.
 
@@ -142,8 +138,7 @@ class BodyVelocityObs(Observation):
     Parameters
     ----------
     data : DataFrame
-        Must contain columns 'VX', 'VY' and 'VZ' columns.
-        Index must contain time stamps.
+        Must be indexed by `time` and contain columns 'VX', 'VY' and 'VZ'.
     sd : float
         Measurement accuracy in m/s.
 
@@ -160,14 +155,13 @@ class BodyVelocityObs(Observation):
         if time not in self.data.index:
             return None
 
-        Cnb = transform.mat_from_rph(pva[RPH_COLS])
-        z = (Cnb.transpose() @ pva[VEL_COLS] -
-             self.data.loc[time, ['VX', 'VY', 'VZ']])
+        mat_nb = transform.mat_from_rph(pva[RPH_COLS])
+        z = mat_nb.T @ pva[VEL_COLS] - self.data.loc[time, ['VX', 'VY', 'VZ']]
         H = error_model.body_velocity_error_jacobian(pva)
         return z, H, self.R
 
 
-def interpolate_pva(first, second, alpha):
+def _interpolate_pva(first, second, alpha):
     rot_1 = Rotation.from_euler('xyz', first[RPH_COLS], True)
     rot_2 = Rotation.from_euler('xyz', second[RPH_COLS], True)
     rph_average = pd.Series(Rotation.concatenate([rot_1, rot_2])
@@ -179,11 +173,8 @@ def interpolate_pva(first, second, alpha):
     ])
 
 
-def initialize_covariance(pva,
-                          pos_sd, vel_sd, level_sd, azimuth_sd,
-                          error_model : error_models.InsErrorModel,
-                          gyro_model : InertialSensor,
-                          accel_model : InertialSensor):
+def _initialize_covariance(pva, pos_sd, vel_sd, level_sd, azimuth_sd,
+                           error_model, gyro_model, accel_model):
     level_sd = np.deg2rad(level_sd)
     azimuth_sd = np.deg2rad(azimuth_sd)
 
@@ -202,21 +193,19 @@ def initialize_covariance(pva,
     P = np.zeros((n_states, n_states))
     T = error_model.transform_to_output(pva)
 
-    inertial_block = slice(error_model.N_STATES)
+    ins_block = slice(error_model.N_STATES)
     gyro_block = slice(error_model.N_STATES, error_model.N_STATES + gyro_model.n_states)
     accel_block = slice(error_model.N_STATES + gyro_model.n_states, n_states)
 
-    P[inertial_block, inertial_block] = T @ P_nav @ T.transpose()
+    P[ins_block, ins_block] = T @ P_nav @ T.transpose()
     P[gyro_block, gyro_block] = gyro_model.P
     P[accel_block, accel_block] = accel_model.P
 
     return P
 
 
-def compute_error_propagation_matrices(pva, gyro, accel, time_delta,
-                                       error_model : error_models.InsErrorModel,
-                                       gyro_model : InertialSensor,
-                                       accel_model : InertialSensor):
+def _compute_error_propagation_matrices(pva, gyro, accel, time_delta,
+                                        error_model, gyro_model, accel_model):
     n_states = error_model.N_STATES + gyro_model.n_states + accel_model.n_states
     n_noises = (gyro_model.n_output_noises + gyro_model.n_noises +
                 accel_model.n_output_noises + accel_model.n_noises)
@@ -226,7 +215,7 @@ def compute_error_propagation_matrices(pva, gyro, accel, time_delta,
     Hg = gyro_model.output_matrix(gyro)
     Ha = accel_model.output_matrix(accel)
 
-    inertial_block = slice(error_model.N_STATES)
+    ins_block = slice(error_model.N_STATES)
     gyro_block = slice(error_model.N_STATES, error_model.N_STATES + gyro_model.n_states)
     accel_block = slice(error_model.N_STATES + gyro_model.n_states, n_states)
 
@@ -242,15 +231,15 @@ def compute_error_propagation_matrices(pva, gyro, accel, time_delta,
         n_noises)
 
     F = np.zeros((n_states, n_states))
-    F[inertial_block, inertial_block] = Fii
-    F[inertial_block, gyro_block] = Fig @ Hg
-    F[inertial_block, accel_block] = Fia @ Ha
+    F[ins_block, ins_block] = Fii
+    F[ins_block, gyro_block] = Fig @ Hg
+    F[ins_block, accel_block] = Fia @ Ha
     F[gyro_block, gyro_block] = gyro_model.F
     F[accel_block, accel_block] = accel_model.F
 
     G = np.zeros((n_states, n_noises))
-    G[inertial_block, gyro_out_noise_block] = Fig @ gyro_model.J
-    G[inertial_block, accel_out_noise_block] = Fia @ accel_model.J
+    G[ins_block, gyro_out_noise_block] = Fig @ gyro_model.J
+    G[ins_block, accel_out_noise_block] = Fia @ accel_model.J
     G[gyro_block, gyro_noise_block] = gyro_model.G
     G[accel_block, accel_noise_block] = accel_model.G
 
@@ -260,53 +249,50 @@ def compute_error_propagation_matrices(pva, gyro, accel, time_delta,
                                            time_delta, 'expm')
 
 
-def compute_sd(P, trajectory, error_model, gyro_model, accel_model):
-    inertial_block = slice(error_model.N_STATES)
+def _compute_sd(P, trajectory, error_model, gyro_model, accel_model):
+    ins_block = slice(error_model.N_STATES)
     gyro_block = slice(error_model.N_STATES, error_model.N_STATES + gyro_model.n_states)
     accel_block = slice(
         error_model.N_STATES + gyro_model.n_states,
         error_model.N_STATES + gyro_model.n_states + accel_model.n_states)
 
-    P_ins = P[:, inertial_block, inertial_block]
+    P_ins = P[:, ins_block, ins_block]
     P_gyro = P[:, gyro_block, gyro_block]
     P_accel = P[:, accel_block, accel_block]
 
     T = error_model.transform_to_output(trajectory)
-    P_nav = util.mm_prod(T, P_ins)
-    P_nav = util.mm_prod(P_nav, T, bt=True)
-    trajectory_sd = np.diagonal(P_nav, axis1=1, axis2=2) ** 0.5
+    trajectory_sd = np.diagonal(
+        util.mm_prod_symmetric(T, P_ins), axis1=1, axis2=2) ** 0.5
     gyro_sd = np.diagonal(P_gyro, axis1=1, axis2=2) ** 0.5
     accel_sd = np.diagonal(P_accel, axis1=1, axis2=2) ** 0.5
 
     trajectory_sd = pd.DataFrame(trajectory_sd, index=trajectory.index,
                                  columns=TRAJECTORY_ERROR_COLS)
-    trajectory_sd[RPH_COLS] = np.rad2deg(trajectory_sd[RPH_COLS])
+    trajectory_sd[RPH_COLS] *= transform.RAD_TO_DEG
     gyro_sd = pd.DataFrame(gyro_sd, index=trajectory.index, columns=gyro_model.states)
     accel_sd = pd.DataFrame(accel_sd, index=trajectory.index,
                             columns=accel_model.states)
     return trajectory_sd, gyro_sd, accel_sd
 
 
-def compute_feedforward_result(trajectory_nominal, trajectory, x, P,
-                               error_model, gyro_model, accel_model):
-    inertial_block = slice(error_model.N_STATES)
+def _compute_feedforward_result(x, P, trajectory_nominal, trajectory,
+                                error_model, gyro_model, accel_model):
+    ins_block = slice(error_model.N_STATES)
     gyro_block = slice(error_model.N_STATES, error_model.N_STATES + gyro_model.n_states)
     accel_block = slice(
         error_model.N_STATES + gyro_model.n_states,
         error_model.N_STATES + gyro_model.n_states + accel_model.n_states)
 
-    P_ins = P[:, inertial_block, inertial_block]
+    P_ins = P[:, ins_block, ins_block]
     P_gyro = P[:, gyro_block, gyro_block]
     P_accel = P[:, accel_block, accel_block]
 
-    x_ins = x[:, inertial_block]
+    x_ins = x[:, ins_block]
     x_gyro = x[:, gyro_block]
     x_accel = x[:, accel_block]
 
     T = error_model.transform_to_output(trajectory_nominal)
-
-    x_nav = util.mv_prod(T, x_ins)
-    error_nav = pd.DataFrame(x_nav, index=trajectory.index,
+    error_nav = pd.DataFrame(util.mv_prod(T, x_ins), index=trajectory.index,
                              columns=TRAJECTORY_ERROR_COLS)
     error_nav[RPH_COLS] *= transform.RAD_TO_DEG
 
@@ -318,40 +304,38 @@ def compute_feedforward_result(trajectory_nominal, trajectory, x, P,
     trajectory[VEL_COLS] -= error_nav[VEL_COLS]
     trajectory[RPH_COLS] -= error_nav[RPH_COLS]
 
-    P_nav = util.mm_prod_symmetric(T, P_ins)
-    trajectory_sd = pd.DataFrame(np.diagonal(P_nav, axis1=1, axis2=2) ** 0.5,
-                                 index=trajectory.index, columns=TRAJECTORY_ERROR_COLS)
+    trajectory_sd = pd.DataFrame(
+        np.diagonal(util.mm_prod_symmetric(T, P_ins), axis1=1, axis2=2) ** 0.5,
+        index=trajectory.index, columns=TRAJECTORY_ERROR_COLS)
     trajectory_sd[RPH_COLS] *= transform.RAD_TO_DEG
 
     gyro = pd.DataFrame(x_gyro, index=trajectory.index, columns=gyro_model.states)
     gyro_sd = pd.DataFrame(np.diagonal(P_gyro, axis1=1, axis2=2) ** 0.5,
                            index=trajectory.index, columns=gyro_model.states)
 
-    accel = pd.DataFrame(x_accel, index=trajectory.index,
-                         columns=accel_model.states)
+    accel = pd.DataFrame(x_accel, index=trajectory.index, columns=accel_model.states)
     accel_sd = pd.DataFrame(np.diagonal(P_accel, axis1=1, axis2=2) ** 0.5,
                             index=trajectory.index, columns=accel_model.states)
 
     return trajectory, trajectory_sd, gyro, gyro_sd, accel, accel_sd
 
 
-def correct_increments(increments, gyro_estimates, accel_estimates):
+def _correct_increments(increments, gyro_model, accel_model):
     result = increments.copy()
-    result[THETA_COLS] = gyro_estimates.correct_increments(increments.dt,
-                                                           increments[THETA_COLS])
-    result[DV_COLS] = accel_estimates.correct_increments(increments.dt,
-                                                         increments[DV_COLS])
+    result[THETA_COLS] = gyro_model.correct_increments(increments.dt,
+                                                       increments[THETA_COLS])
+    result[DV_COLS] = accel_model.correct_increments(increments.dt,
+                                                     increments[DV_COLS])
     return result
 
 
-def run_feedback_filter(initial_pva,
-                        pos_sd, vel_sd, level_sd, azimuth_sd,
+def run_feedback_filter(initial_pva, position_sd, velocity_sd, level_sd, azimuth_sd,
                         increments, gyro_model=None, accel_model=None,
                         observations=None, time_step=0.1):
     if gyro_model is None:
-        gyro_model = InertialSensor()
+        gyro_model = imu_model.InertialSensor()
     if accel_model is None:
-        accel_model = InertialSensor()
+        accel_model = imu_model.InertialSensor()
     if observations is None:
         observations = []
 
@@ -367,10 +351,10 @@ def run_feedback_filter(initial_pva,
     observation_times_index = 0
 
     error_model = error_models.ModifiedPhiModel()
-    P = initialize_covariance(initial_pva, pos_sd, vel_sd, level_sd, azimuth_sd,
-                              error_model, gyro_model, accel_model)
+    P = _initialize_covariance(initial_pva, position_sd, velocity_sd, level_sd,
+                               azimuth_sd, error_model, gyro_model, accel_model)
 
-    inertial_block = slice(error_model.N_STATES)
+    ins_block = slice(error_model.N_STATES)
     gyro_block = slice(error_model.N_STATES, error_model.N_STATES + gyro_model.n_states)
     accel_block = slice(error_model.N_STATES + gyro_model.n_states, None)
 
@@ -378,7 +362,7 @@ def run_feedback_filter(initial_pva,
     trajectory_result = []
     gyro_result = []
     accel_result = []
-    P_all = []
+    P_result = []
 
     integrator = strapdown.Integrator(initial_pva, True)
     gyro_model.reset_estimates()
@@ -405,14 +389,14 @@ def run_feedback_filter(initial_pva,
                 if ret is not None:
                     z, H, R = ret
                     H_full = np.zeros((len(z), n_states))
-                    H_full[:, inertial_block] = H
+                    H_full[:, ins_block] = H
                     innovation = kalman.correct(x, P, z, H_full, R)
                     name = observation.__class__.__name__
                     innovations[name].append(innovation)
                     innovations_times[name].append(observation_time)
 
             integrator.set_pva(
-                error_model.correct_pva(integrator.get_pva(), x[inertial_block]))
+                error_model.correct_pva(integrator.get_pva(), x[ins_block]))
             gyro_model.update_estimates(x[gyro_block])
             accel_model.update_estimates(x[accel_block])
             observation_times_index += 1
@@ -420,13 +404,13 @@ def run_feedback_filter(initial_pva,
         trajectory_result.append(integrator.get_pva())
         gyro_result.append(gyro_model.get_estimates())
         accel_result.append(accel_model.get_estimates())
-        P_all.append(P)
+        P_result.append(P)
 
         next_time = min(time + time_step,
                         observation_times[observation_times_index])
         next_increment_index = np.searchsorted(increments.index, next_time,
                                                side='right')
-        increments_batch = correct_increments(
+        increments_batch = _correct_increments(
             increments.iloc[increments_index : next_increment_index],
             gyro_model, accel_model)
         increments_index = next_increment_index
@@ -435,20 +419,20 @@ def run_feedback_filter(initial_pva,
         integrator.integrate(increments_batch)
         pva_new = integrator.get_pva()
         time_delta = integrator.get_time() - time
-        pva_average = interpolate_pva(pva_old, pva_new, 0.5)
+        pva_average = _interpolate_pva(pva_old, pva_new, 0.5)
         gyro_average = increments_batch[THETA_COLS].sum(axis=0) / time_delta
         accel_average = increments_batch[DV_COLS].sum(axis=0) / time_delta
 
-        Phi, Qd = compute_error_propagation_matrices(pva_average, gyro_average,
-                                                     accel_average, time_delta,
-                                                     error_model, gyro_model,
-                                                     accel_model)
+        Phi, Qd = _compute_error_propagation_matrices(pva_average, gyro_average,
+                                                      accel_average, time_delta,
+                                                      error_model, gyro_model,
+                                                      accel_model)
         P = Phi @ P @ Phi.transpose() + Qd
 
-    P_all = np.asarray(P_all)
+    P_result = np.asarray(P_result)
     trajectory_result = pd.DataFrame(trajectory_result)
-    trajectory_sd, gyro_sd, accel_sd = compute_sd(
-        P_all, trajectory_result, error_model, gyro_model, accel_model)
+    trajectory_sd, gyro_sd, accel_sd = _compute_sd(
+        P_result, trajectory_result, error_model, gyro_model, accel_model)
 
     for observation in observations:
         name = observation.__class__.__name__
@@ -465,8 +449,8 @@ def run_feedback_filter(initial_pva,
         innovations=innovations)
 
 
-def run_feedforward_filter(trajectory_nominal, trajectory, pos_sd, vel_sd, level_sd,
-                           azimuth_sd, gyro_model=None, accel_model=None,
+def run_feedforward_filter(trajectory_nominal, trajectory, position_sd, velocity_sd,
+                           level_sd, azimuth_sd, gyro_model=None, accel_model=None,
                            observations=None, increments=None, time_step=0.1):
     if (trajectory_nominal.index != trajectory.index).any():
         raise ValueError(
@@ -474,16 +458,16 @@ def run_feedforward_filter(trajectory_nominal, trajectory, pos_sd, vel_sd, level
     times = trajectory_nominal.index
 
     if gyro_model is None:
-        gyro_model = InertialSensor()
+        gyro_model = imu_model.InertialSensor()
     if accel_model is None:
-        accel_model = InertialSensor()
+        accel_model = imu_model.InertialSensor()
     if observations is None:
         observations = []
 
     if increments is None and (gyro_model.readings_required or
                                accel_model.readings_required):
-        raise ValueError("When scale or misalignments errors are modelled `increments` "
-                         "must be provided")
+        raise ValueError("When scale or misalignments errors are modelled, "
+                         "`increments` must be provided")
 
     observation_times = np.hstack([
         np.asarray(observation.data.index) for observation in observations])
@@ -497,16 +481,17 @@ def run_feedforward_filter(trajectory_nominal, trajectory, pos_sd, vel_sd, level
     observation_times_index = 0
 
     error_model = error_models.ModifiedPhiModel()
-    P = initialize_covariance(trajectory_nominal.iloc[0], pos_sd, vel_sd, level_sd,
-                              azimuth_sd, error_model, gyro_model, accel_model)
+    P = _initialize_covariance(trajectory_nominal.iloc[0], position_sd, velocity_sd,
+                               level_sd, azimuth_sd, error_model,
+                               gyro_model, accel_model)
     x = np.zeros(len(P))
 
     inertial_block = slice(error_model.N_STATES)
 
     n_states = len(P)
-    x_all = []
-    P_all = []
-    times_all = []
+    x_result = []
+    P_result = []
+    times_result = []
 
     innovations = {}
     innovations_times = {}
@@ -521,8 +506,8 @@ def run_feedforward_filter(trajectory_nominal, trajectory, pos_sd, vel_sd, level
         next_time = times[index + 1]
         observation_time = observation_times[observation_times_index]
         if observation_time < next_time:
-            pva = interpolate_pva(trajectory.iloc[index], trajectory.iloc[index + 1],
-                                  (observation_time - time) / (next_time - time))
+            pva = _interpolate_pva(trajectory.iloc[index], trajectory.iloc[index + 1],
+                                   (observation_time - time) / (next_time - time))
             for observation in observations:
                 ret = observation.compute_obs(observation_time, pva, error_model)
                 if ret is not None:
@@ -536,9 +521,9 @@ def run_feedforward_filter(trajectory_nominal, trajectory, pos_sd, vel_sd, level
 
             observation_times_index += 1
 
-        times_all.append(time)
-        x_all.append(x)
-        P_all.append(P)
+        times_result.append(time)
+        x_result.append(x)
+        P_result.append(P)
 
         next_time = min(time + time_step,
                         observation_times[observation_times_index])
@@ -548,32 +533,32 @@ def run_feedforward_filter(trajectory_nominal, trajectory, pos_sd, vel_sd, level
 
         pva_old = trajectory_nominal.iloc[index]
         pva_new = trajectory_nominal.iloc[next_index]
-        pva_average = interpolate_pva(pva_old, pva_new, 0.5)
-        if increments is not None:
+        pva_average = _interpolate_pva(pva_old, pva_new, 0.5)
+        if increments is None:
+            gyro_average = None
+            accel_average = None
+        else:
             increments_batch = increments.loc[np.nextafter(time, next_time) : next_time]
             gyro_average = increments_batch[THETA_COLS].sum(axis=0) / time_delta
             accel_average = increments_batch[DV_COLS].sum(axis=0) / time_delta
-        else:
-            gyro_average = None
-            accel_average = None
 
-        Phi, Qd = compute_error_propagation_matrices(pva_average, gyro_average,
-                                                     accel_average, time_delta,
-                                                     error_model, gyro_model,
-                                                     accel_model)
+        Phi, Qd = _compute_error_propagation_matrices(pva_average, gyro_average,
+                                                      accel_average, time_delta,
+                                                      error_model, gyro_model,
+                                                      accel_model)
         x = Phi @ x
         P = Phi @ P @ Phi.transpose() + Qd
         index = next_index
 
-    times_all = np.asarray(times_all)
-    x_all = np.asarray(x_all)
-    P_all = np.asarray(P_all)
-    trajectory_nominal = trajectory_nominal.loc[times_all]
-    trajectory = trajectory.loc[times_all]
+    times_result = np.asarray(times_result)
+    x_result = np.asarray(x_result)
+    P_result = np.asarray(P_result)
+    trajectory_nominal = trajectory_nominal.loc[times_result]
+    trajectory = trajectory.loc[times_result]
 
     trajectory, trajectory_sd, gyro, gyro_sd, accel, accel_sd = (
-        compute_feedforward_result(trajectory_nominal, trajectory, x_all, P_all,
-                                   error_model, gyro_model, accel_model))
+        _compute_feedforward_result(x_result, P_result, trajectory_nominal, trajectory,
+                                    error_model, gyro_model, accel_model))
 
     for observation in observations:
         name = observation.__class__.__name__
