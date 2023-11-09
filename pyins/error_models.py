@@ -1,5 +1,4 @@
 """INS error models to use in EKF-like estimation filters."""
-from collections import OrderedDict
 import numpy as np
 import pandas as pd
 from scipy.spatial.transform import Rotation
@@ -33,7 +32,7 @@ class InsErrorModel:
     ----------
     N_STATES : int
         Number of states used in error models. This value is always equal to 9.
-    STATES : OrderedDict
+    STATES : dict
         Mapping from the internal error states names to their indices in the
         state vector.
     """
@@ -182,9 +181,9 @@ class ModifiedPhiModel(InsErrorModel):
     DV = [DV1, DV2, DV3]
     PHI = [PHI1, PHI2, PHI3]
 
-    STATES = OrderedDict(DR1=DR1, DR2=DR2, DR3=DR3,
-                         DV1=DV1, DV2=DV2, DV3=DV3,
-                         PHI1=PHI1, PHI2=PHI2, PHI3=PHI3)
+    STATES = dict(DR1=DR1, DR2=DR2, DR3=DR3,
+                  DV1=DV1, DV2=DV2, DV3=DV3,
+                  PHI1=PHI1, PHI2=PHI2, PHI3=PHI3)
 
     def system_matrix(self, trajectory):
         is_series = isinstance(trajectory, pd.Series)
@@ -304,9 +303,9 @@ class ModifiedPsiModel(InsErrorModel):
     DV = [DV1, DV2, DV3]
     PSI = [PSI1, PSI2, PSI3]
 
-    STATES = OrderedDict(DR1=DR1, DR2=DR2, DR3=DR3,
-                         DV1=DV1, DV2=DV2, DV3=DV3,
-                         PSI1=PSI1, PSI2=PSI1, PSI3=PSI1)
+    STATES = dict(DR1=DR1, DR2=DR2, DR3=DR3,
+                  DV1=DV1, DV2=DV2, DV3=DV3,
+                  PSI1=PSI1, PSI2=PSI1, PSI3=PSI1)
 
     def system_matrix(self, trajectory):
         is_series = isinstance(trajectory, pd.Series)

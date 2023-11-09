@@ -1,5 +1,4 @@
 """Utility functions and definitions."""
-from collections import OrderedDict
 import numpy as np
 
 
@@ -145,15 +144,15 @@ def compute_rms(data):
     return np.mean(np.square(data), axis=0) ** 0.5
 
 
-class Bunch(OrderedDict):
+class Bunch(dict):
     def __getattr__(self, name):
         try:
             return self[name]
         except KeyError:
             raise AttributeError(name)
 
-    __setattr__ = OrderedDict.__setitem__
-    __delattr__ = OrderedDict.__delitem__
+    __setattr__ = dict.__setitem__
+    __delattr__ = dict.__delitem__
 
     def __repr__(self):
         if self.keys():
