@@ -261,10 +261,9 @@ def generate_body_velocity_observations(trajectory, error_sd, rng=None):
                         columns=['VX', 'VY', 'VZ'])
 
 
-def perturb_trajectory_point(trajectory_point, position_sd, velocity_sd,
-                             level_sd, azimuth_sd, rng=None):
+def perturb_pva(pva, position_sd, velocity_sd, level_sd, azimuth_sd, rng=None):
     rng = check_random_state(rng)
-    result = trajectory_point.copy()
+    result = pva.copy()
     result[LLA_COLS] = transform.perturb_lla(result[LLA_COLS],
                                              position_sd * rng.randn(3))
     result[VEL_COLS] += velocity_sd * rng.randn(3)

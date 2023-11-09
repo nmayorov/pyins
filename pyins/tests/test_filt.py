@@ -35,8 +35,8 @@ def test_run_feedback_filter():
     level_sd = 1.0
     azimuth_sd = 5.0
 
-    initial = sim.perturb_trajectory_point(trajectory_true.iloc[0], pos_sd, vel_sd,
-                                           level_sd, azimuth_sd, rng=rng)
+    initial = sim.perturb_pva(trajectory_true.iloc[0], pos_sd, vel_sd,
+                              level_sd, azimuth_sd, rng=rng)
 
     result = filt.run_feedback_filter(
         initial, pos_sd, vel_sd, level_sd, azimuth_sd, increments, gyro_model,
@@ -94,8 +94,8 @@ def test_run_feedforward_filter():
     level_sd = 0.05
     azimuth_sd = 0.2
 
-    initial = sim.perturb_trajectory_point(trajectory.iloc[0], pos_sd, vel_sd, level_sd,
-                                           azimuth_sd, rng=rng)
+    initial = sim.perturb_pva(trajectory.iloc[0], pos_sd, vel_sd, level_sd,
+                              azimuth_sd, rng=rng)
     integrator = strapdown.Integrator(initial)
     trajectory_computed = integrator.integrate(increments)
 

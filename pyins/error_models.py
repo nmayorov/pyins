@@ -79,12 +79,12 @@ class InsErrorModel:
         """
         raise NotImplementedError
 
-    def correct_state(self, trajectory_point, error):
+    def correct_pva(self, pva, error):
         """Correct navigation state with estimated errors.
 
         Parameters
         ----------
-        trajectory_point : pd.Series
+        pva : pd.Series
             Point of trajectory.
         error : ndarray
             Estimates errors. First N_STATES components are assumed to
@@ -96,7 +96,7 @@ class InsErrorModel:
         """
         raise NotImplementedError
 
-    def position_error_jacobian(self, trajectory_point,
+    def position_error_jacobian(self, pva,
                                 imu_to_antenna_b=None):
         """Compute position error Jacobian matrix.
 
@@ -105,7 +105,7 @@ class InsErrorModel:
 
         Parameters
         ----------
-        trajectory_point : pd.Series
+        pva : pd.Series
             Point of trajectory.
         imu_to_antenna_b : array_like or None, optional
             Vector from IMU to antenna (measurement point) expressed in body
@@ -117,7 +117,7 @@ class InsErrorModel:
         """
         raise NotImplementedError
 
-    def ned_velocity_error_jacobian(self, trajectory_point):
+    def ned_velocity_error_jacobian(self, pva):
         """Compute NED velocity error Jacobian matrix.
 
         This is the matrix which linearly relates the velocity error in
@@ -125,7 +125,7 @@ class InsErrorModel:
 
         Parameters
         ----------
-        trajectory_point : pd.Series
+        pva : pd.Series
             Point of trajectory.
 
         Returns
@@ -135,7 +135,7 @@ class InsErrorModel:
 
         raise NotImplementedError
 
-    def body_velocity_error_jacobian(self, trajectory_point):
+    def body_velocity_error_jacobian(self, pva):
         """Compute body velocity error Jacobian matrix.
 
         This is the matrix which linearly relates the velocity error in
@@ -143,7 +143,7 @@ class InsErrorModel:
 
         Parameters
         ----------
-        trajectory_point : pd.Series
+        pva : pd.Series
             Point of trajectory.
 
         Returns
@@ -244,32 +244,32 @@ class ModifiedPhiModel(InsErrorModel):
 
         return T[0] if series else T
 
-    def correct_state(self, trajectory_point, error):
+    def correct_pva(self, pva, error):
         Ctp = Rotation.from_rotvec(error[self.PHI]).as_matrix()
-        lla = transform.perturb_lla(trajectory_point[LLA_COLS], -error[self.DR])
-        velocity_n = Ctp @ (trajectory_point[VEL_COLS] - error[self.DV])
+        lla = transform.perturb_lla(pva[LLA_COLS], -error[self.DR])
+        velocity_n = Ctp @ (pva[VEL_COLS] - error[self.DV])
         rph = transform.mat_to_rph(Ctp @ transform.mat_from_rph(
-            trajectory_point[RPH_COLS]))
+            pva[RPH_COLS]))
 
         return pd.Series(data=np.hstack((lla, velocity_n, rph)),
-                         index=trajectory_point.index)
+                         index=pva.index)
 
-    def position_error_jacobian(self, trajectory_point, imu_to_antenna_b=None):
+    def position_error_jacobian(self, pva, imu_to_antenna_b=None):
         result = np.zeros((3, self.N_STATES))
         result[:, self.DR] = np.eye(3)
         if imu_to_antenna_b is not None:
-            mat_nb = transform.mat_from_rph(trajectory_point[RPH_COLS])
+            mat_nb = transform.mat_from_rph(pva[RPH_COLS])
             result[:, self.PHI] = util.skew_matrix(mat_nb @ imu_to_antenna_b)
         return result
 
-    def ned_velocity_error_jacobian(self, trajectory_point):
+    def ned_velocity_error_jacobian(self, pva):
         result = np.zeros((3, self.N_STATES))
         result[:, self.DV] = np.eye(3)
-        result[:, self.PHI] = util.skew_matrix(trajectory_point[VEL_COLS])
+        result[:, self.PHI] = util.skew_matrix(pva[VEL_COLS])
         return result
 
-    def body_velocity_error_jacobian(self, trajectory_point):
-        Cnb = transform.mat_from_rph(trajectory_point[RPH_COLS])
+    def body_velocity_error_jacobian(self, pva):
+        Cnb = transform.mat_from_rph(pva[RPH_COLS])
         result = np.zeros((3, self.N_STATES))
         result[:, self.DV] = Cnb.transpose()
         return result
@@ -368,40 +368,40 @@ class ModifiedPsiModel(InsErrorModel):
 
         return T[0] if series else T
 
-    def correct_state(self, trajectory_point, error):
-        R = earth.curvature_matrix(trajectory_point.lat, trajectory_point.alt)
+    def correct_pva(self, pva, error):
+        R = earth.curvature_matrix(pva.lat, pva.alt)
         Ctp = Rotation.from_rotvec(error[self.PSI] +
                                    R @ error[self.DR]).as_matrix()
-        lla = transform.perturb_lla(trajectory_point[LLA_COLS], -error[self.DR])
-        velocity_n = Ctp @ (trajectory_point[VEL_COLS] - error[self.DV])
+        lla = transform.perturb_lla(pva[LLA_COLS], -error[self.DR])
+        velocity_n = Ctp @ (pva[VEL_COLS] - error[self.DV])
         rph = transform.mat_to_rph(Ctp @ transform.mat_from_rph(
-            trajectory_point[RPH_COLS]))
+            pva[RPH_COLS]))
 
         return pd.Series(data=np.hstack((lla, velocity_n, rph)),
-                         index=trajectory_point.index)
+                         index=pva.index)
 
-    def position_error_jacobian(self, trajectory_point,
+    def position_error_jacobian(self, pva,
                                 imu_to_antenna_b=None):
         result = np.zeros((3, self.N_STATES))
         result[:, self.DR] = np.eye(3)
         if imu_to_antenna_b is not None:
-            mat_nb = transform.mat_from_rph(trajectory_point[RPH_COLS])
+            mat_nb = transform.mat_from_rph(pva[RPH_COLS])
             S = util.skew_matrix(mat_nb @ imu_to_antenna_b)
-            F = earth.curvature_matrix(trajectory_point.lat,
-                                       trajectory_point.alt)
+            F = earth.curvature_matrix(pva.lat,
+                                       pva.alt)
             result[:, self.DR] += S @ F
             result[:, self.PSI] = S
 
         return result
 
-    def ned_velocity_error_jacobian(self, trajectory_point):
+    def ned_velocity_error_jacobian(self, pva):
         result = np.zeros((3, self.N_STATES))
         result[:, self.DV] = np.eye(3)
-        result[:, self.PSI] = util.skew_matrix(trajectory_point[VEL_COLS])
+        result[:, self.PSI] = util.skew_matrix(pva[VEL_COLS])
         return result
 
-    def body_velocity_error_jacobian(self, trajectory_point):
-        Cnb = transform.mat_from_rph(trajectory_point[RPH_COLS])
+    def body_velocity_error_jacobian(self, pva):
+        Cnb = transform.mat_from_rph(pva[RPH_COLS])
         result = np.zeros((3, self.N_STATES))
         result[:, self.DV] = Cnb.transpose()
         return result

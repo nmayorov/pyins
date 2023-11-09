@@ -80,7 +80,7 @@ class Integrator:
     ----------
     dt : float
         Sensors sampling period.
-    trajectory_point : pd.Series
+    pva : pd.Series
         Initial trajectory point.
     with_altitude : bool, optional
         Whether to compute altitude and vertical velocity. Default is True.
@@ -107,10 +107,10 @@ class Integrator:
     """
     INITIAL_SIZE = 10000
 
-    def __init__(self, trajectory_point, with_altitude=True):
+    def __init__(self, pva, with_altitude=True):
         self.with_altitude = with_altitude
         if not with_altitude:
-            trajectory_point.VD = 0.0
+            pva.VD = 0.0
 
         self.lla = np.empty((self.INITIAL_SIZE, 3))
         self.velocity_n = np.empty((self.INITIAL_SIZE, 3))
@@ -118,7 +118,7 @@ class Integrator:
 
         self.trajectory = None
 
-        self._init_values = trajectory_point
+        self._init_values = pva
         self.reset()
 
     def reset(self):
@@ -187,26 +187,26 @@ class Integrator:
     def get_time(self):
         return self.trajectory.index[-1]
 
-    def get_state(self):
+    def get_pva(self):
         """Get current integrator state.
 
         Returns
         -------
-        trajectory_point : pd.Series
+        pva : pd.Series
             Trajectory point.
         """
         return self.trajectory.iloc[-1]
 
-    def set_state(self, trajectory_point):
+    def set_pva(self, pva):
         """Set (overwrite) the current integrator state.
 
         Parameters
         ----------
-        trajectory_point : pd.Series
+        pva : pd.Series
             Trajectory point.
         """
         i = len(self.trajectory) - 1
-        self.lla[i] = trajectory_point[LLA_COLS]
-        self.velocity_n[i] = trajectory_point[VEL_COLS]
-        self.Cnb[i] = transform.mat_from_rph(trajectory_point[RPH_COLS])
-        self.trajectory.iloc[-1] = trajectory_point
+        self.lla[i] = pva[LLA_COLS]
+        self.velocity_n[i] = pva[VEL_COLS]
+        self.Cnb[i] = transform.mat_from_rph(pva[RPH_COLS])
+        self.trajectory.iloc[-1] = pva

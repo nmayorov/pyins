@@ -36,7 +36,7 @@ class Observation:
     def __init__(self, data):
         self.data = data
 
-    def compute_obs(self, stamp, trajectory_point, error_model):
+    def compute_obs(self, stamp, pva, error_model):
         """Compute ingredients for a single linearized observation.
 
         It must compute the observation model (z, H, R) at a given time stamp.
@@ -47,7 +47,7 @@ class Observation:
         ----------
         stamp : int
             Time stamp.
-        trajectory_point : Series
+        pva : Series
             Point of INS trajectory at `stamp`.
         error_model : InsErrorModel
             Error model object.
@@ -90,17 +90,17 @@ class PositionObs(Observation):
         self.R = sd**2 * np.eye(3)
         self.imu_to_antenna_b = imu_to_antenna_b
 
-    def compute_obs(self, stamp, trajectory_point, error_model):
+    def compute_obs(self, stamp, pva, error_model):
         if stamp not in self.data.index:
             return None
 
-        z = transform.difference_lla(trajectory_point[LLA_COLS],
+        z = transform.difference_lla(pva[LLA_COLS],
                                      self.data.loc[stamp, LLA_COLS])
         if self.imu_to_antenna_b:
-            mat_nb = transform.mat_from_rph(trajectory_point[RPH_COLS])
+            mat_nb = transform.mat_from_rph(pva[RPH_COLS])
             z += mat_nb @ self.imu_to_antenna_b
 
-        H = error_model.position_error_jacobian(trajectory_point,
+        H = error_model.position_error_jacobian(pva,
                                                 self.imu_to_antenna_b)
 
         return z, H, self.R
@@ -126,12 +126,12 @@ class NedVelocityObs(Observation):
         super(NedVelocityObs, self).__init__(data)
         self.R = sd**2 * np.eye(3)
 
-    def compute_obs(self, stamp, trajectory_point, error_model):
+    def compute_obs(self, stamp, pva, error_model):
         if stamp not in self.data.index:
             return None
 
-        z = trajectory_point[VEL_COLS] - self.data.loc[stamp, VEL_COLS]
-        H = error_model.ned_velocity_error_jacobian(trajectory_point)
+        z = pva[VEL_COLS] - self.data.loc[stamp, VEL_COLS]
+        H = error_model.ned_velocity_error_jacobian(pva)
 
         return z, H, self.R
 
@@ -156,14 +156,14 @@ class BodyVelocityObs(Observation):
         super(BodyVelocityObs, self).__init__(data)
         self.R = sd**2 * np.eye(3)
 
-    def compute_obs(self, stamp, trajectory_point, error_model):
+    def compute_obs(self, stamp, pva, error_model):
         if stamp not in self.data.index:
             return None
 
-        Cnb = transform.mat_from_rph(trajectory_point[RPH_COLS])
-        z = (Cnb.transpose() @ trajectory_point[VEL_COLS] -
+        Cnb = transform.mat_from_rph(pva[RPH_COLS])
+        z = (Cnb.transpose() @ pva[VEL_COLS] -
              self.data.loc[stamp, ['VX', 'VY', 'VZ']])
-        H = error_model.body_velocity_error_jacobian(trajectory_point)
+        H = error_model.body_velocity_error_jacobian(pva)
         return z, H, self.R
 
 
@@ -411,13 +411,13 @@ def run_feedback_filter(initial_pva,
                     innovations[name].append(innovation)
                     innovations_times[name].append(observation_time)
 
-            integrator.set_state(
-                error_model.correct_state(integrator.get_state(), x[inertial_block]))
+            integrator.set_pva(
+                error_model.correct_pva(integrator.get_pva(), x[inertial_block]))
             gyro_model.update_estimates(x[gyro_block])
             accel_model.update_estimates(x[accel_block])
             observation_times_index += 1
 
-        trajectory_result.append(integrator.get_state())
+        trajectory_result.append(integrator.get_pva())
         gyro_result.append(gyro_model.get_estimates())
         accel_result.append(accel_model.get_estimates())
         P_all.append(P)
@@ -431,9 +431,9 @@ def run_feedback_filter(initial_pva,
             gyro_model, accel_model)
         increments_index = next_increment_index
 
-        pva_old = integrator.get_state()
+        pva_old = integrator.get_pva()
         integrator.integrate(increments_batch)
-        pva_new = integrator.get_state()
+        pva_new = integrator.get_pva()
         time_delta = integrator.get_time() - time
         pva_average = interpolate_pva(pva_old, pva_new, 0.5)
         gyro_average = increments_batch[THETA_COLS].sum(axis=0) / time_delta
