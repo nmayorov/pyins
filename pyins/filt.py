@@ -348,11 +348,9 @@ def run_feedback_filter(initial_pva, position_sd, velocity_sd, level_sd, azimuth
         Initial assumed heading standard deviation in degrees.
     increments : Increments
         IMU increments.
-    gyro_model : InertiaSensor, optional
-        Sensor model for gyros. If None (default), a default model will be used.
-    accel_model : InertialSensor, optional
-        Sensor model for accelerometers.
-        If None (default), a default model will be used.
+    gyro_model, accel_model : InertiaSensor, optional
+        Sensor models for gyros and accelerometers.
+        If None (default), default models will be used.
     observations : list of Observation. optional
         Observations, empty by default.
     time_step : float, optional
@@ -496,6 +494,57 @@ def run_feedback_filter(initial_pva, position_sd, velocity_sd, level_sd, azimuth
 def run_feedforward_filter(trajectory_nominal, trajectory, position_sd, velocity_sd,
                            level_sd, azimuth_sd, gyro_model=None, accel_model=None,
                            observations=None, increments=None, time_step=0.1):
+    """Run INS filter with output errors compensation.
+
+    Also known as a linearized Kalman filter.
+    The approach is applicable in practice only for high-end precise INS systems.
+    It can also be used for covariance modelling given an accurate reference trajectory
+    (called `trajectory_nominal` in the function).
+
+    Parameters
+    ----------
+    trajectory_nominal, trajectory : Trajectory
+        Nominal and actually computed trajectories. The nominal trajectory can be
+        set to the computed trajectory (standard practical situation) or to an accurate
+        reference trajectory if available in a modelling scenario ("covariance
+        analysis"). Both trajectories must have exactly the same time index.
+    position_sd : float
+        Initial assumed position standard deviation in meters.
+    velocity_sd : float
+        Initial assumed velocity standard deviation in m/s.
+    level_sd : float
+        Initial assumed roll and pitch standard deviation in degrees.
+    azimuth_sd : float
+        Initial assumed heading standard deviation in degrees.
+    gyro_model, accel_model : InertiaSensor, optional
+        Sensor models for gyros and accelerometers.
+         If None (default), default models will be used.
+    observations : list of Observation. optional
+        Observations, empty by default.
+    increments : Increments or None, optional
+        IMU increments to be used when gyro or accelerometers scale factor errors or
+        misalignment are modelled. Not necessary otherwise.
+    time_step : float, optional
+        Time step for error state propagation.
+        The value typically should not exceed 1 second. Default is 0.1 second.
+
+    Returns
+    -------
+    Bunch with the following fields:
+
+        trajectory, trajectory_sd : DataFrame
+            Estimated trajectory and its error standard deviations.
+            Unlike `run_feedback_filter` both will contain rows only for time moments
+            when the error vector and covariance are computed (controlled
+            by `time_step` parameter).
+        gyro, gyro_sd : DataFrame
+            Estimated gyro model parameters and its standard deviations.
+        accel, accel_sd : DataFrame
+            Estimated accelerometer model parameters and its standard deviations.
+        innovations : dict of DataFrame
+            For each observation class name contains DataFrame with measurement
+            innovations.
+    """
     if (trajectory_nominal.index != trajectory.index).any():
         raise ValueError(
             "`trajectory_nominal` and `trajectory` must have the same time index")
