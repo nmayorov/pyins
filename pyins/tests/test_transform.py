@@ -6,15 +6,14 @@ from pyins import earth, transform
 
 def test_lla_to_ecef():
     r_e = transform.lla_to_ecef([0, 0, 10])
-    assert_allclose(r_e, [earth.R0 + 10, 0, 0])
+    assert_allclose(r_e, [earth.A + 10, 0, 0])
 
     r_e = transform.lla_to_ecef([-90, 0, -10])
-    b = (1 - earth.E2) ** 0.5 * earth.R0
+    b = (1 - earth.E2) ** 0.5 * earth.A
     assert_allclose(r_e, [0, 0, -b + 10], atol=1e-9)
 
     r_e = transform.lla_to_ecef([[0, 0, 10], [-90, 0, -10]])
-    assert_allclose(r_e, [[earth.R0 + 10, 0, 0],
-                          [0, 0, -b + 10]], atol=1e-9)
+    assert_allclose(r_e, [[earth.A + 10, 0, 0], [0, 0, -b + 10]], atol=1e-9)
 
 
 def test_perturb_ll():

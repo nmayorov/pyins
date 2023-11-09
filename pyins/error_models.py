@@ -207,7 +207,7 @@ class ModifiedPhiModel(InsErrorModel):
             2 * Omega_n + rho_n)
         F[np.ix_(samples, self.DV, self.PHI)] = -util.skew_matrix(g_n)
         F[:, self.DV3, self.DR3] = (2 * earth.gravity(trajectory.lat, 0)
-                                    / earth.R0)
+                                    / earth.A)
 
         F[np.ix_(samples, self.PHI, self.DR)] = util.mm_prod(
             util.skew_matrix(Omega_n), R)
@@ -331,7 +331,7 @@ class ModifiedPsiModel(InsErrorModel):
         F[np.ix_(samples, self.DV, self.DR)] = -g_n_skew @ R
         F[np.ix_(samples, self.DV, self.PSI)] = -g_n_skew
         F[:, self.DV3, self.DR3] += (2 * earth.gravity(trajectory.lat, 0)
-                                     / earth.R0)
+                                     / earth.A)
 
         F[np.ix_(samples, self.PSI, self.PSI)] = -util.skew_matrix(rho_n +
                                                                    Omega_n)

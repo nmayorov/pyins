@@ -1,7 +1,6 @@
-"""Earth geometry and gravity models."""
+"""Earth geometry and gravity models according to WGS84."""
 import numpy as np
-from . import transform
-from . util import mv_prod
+from . import transform, util
 
 
 #: Rotation rate of Earth in rad/s.
@@ -9,7 +8,7 @@ RATE = 7.292115e-5
 #: Approximate value of gravity.
 G0 = 9.8
 #: Semi major axis of Earth ellipsoid (or radius of Earth approximately).
-R0 = 6378137.0
+A = 6378137.0
 #: Squared eccentricity of Earth ellipsoid
 E2 = 6.6943799901413e-3
 #: Gravity at the equator
@@ -25,18 +24,16 @@ def principal_radii(lat, alt):
 
     Parameters
     ----------
-    lat : array_like
-        Latitude.
-    alt : array_like
-        Altitude.
+    lat, alt : array_like
+        Latitude and altitude.
 
     Returns
     -------
-    rn : ndarray
+    rn : float or ndarray
         Principle radius in North direction.
-    re : ndarray
+    re : float or ndarray
         Principle radius in East direction.
-    rp : ndarray
+    rp : float or ndarray
         Radius of cross-section along the parallel.
 
     References
@@ -48,7 +45,7 @@ def principal_radii(lat, alt):
     cos_lat = np.sqrt(1 - sin_lat**2)
 
     x = 1 - E2 * sin_lat ** 2
-    re = R0 / np.sqrt(x)
+    re = A / np.sqrt(x)
     rn = re * (1 - E2) / x
 
     return rn + alt, re + alt, (re + alt) * cos_lat
@@ -67,7 +64,7 @@ def gravity(lat, alt):
 
     Returns
     -------
-    g : float or ndarray, shape (n,)
+    gravity : float or ndarray
         Magnitude of the gravity.
 
     References
@@ -78,8 +75,8 @@ def gravity(lat, alt):
     sin_lat = np.sin(np.deg2rad(lat))
     alt = np.asarray(alt)
     F = (1 - E2) ** 0.5 * GP / GE - 1
-    return (GE * (1 + F * sin_lat**2) / (1 - E2 * sin_lat**2)**0.5
-            * (1 - 2 * alt / R0))
+    return (GE * (1 + F * sin_lat**2) / (1 - E2 * sin_lat**2) ** 0.5
+            * (1 - 2 * alt / A))
 
 
 def gravity_n(lat, alt):
@@ -87,10 +84,8 @@ def gravity_n(lat, alt):
 
     Parameters
     ----------
-    lat : array_like
-        Latitude.
-    alt : array_like
-        Altitude.
+    lat, alt : array_like
+        Latitude and altitude.
 
     Returns
     -------
@@ -129,25 +124,25 @@ def gravitation_ecef(lla):
 
     _, _, rp = principal_radii(lat, alt)
 
-    g0_g = np.zeros((3,) + sin_lat.shape)
+    g0_g = np.zeros((3,) + lat.shape)
     g0_g[0] = RATE**2 * rp * sin_lat
     g0_g[2] = gravity(lat, alt) + RATE ** 2 * rp * cos_lat
     g0_g = g0_g.T
 
-    Ceg = transform.mat_en_from_ll(lat, lon)
+    mat_eg = transform.mat_en_from_ll(lat, lon)
 
-    return mv_prod(Ceg, g0_g)
+    return util.mv_prod(mat_eg, g0_g)
 
 
 def curvature_matrix(lat, alt):
     """Compute Earth curvature matrix.
 
-    Curvature matrix `F` links linear displacement and angular rotation of
-    NED frame as `rotation_n = F @ translation_n`, where `translation_n` is
+    Curvature matrix ``F`` links linear displacement and angular rotation of
+    NED frame as ``rotation_n = F @ translation_n``, where `translation_n` is
     linear translation in NED and `rotation_n` is the corresponding small
     rotation vector of NED.
 
-    For example `transport_rate_n = F @ velocity_n`.
+    For example ``transport_rate_n = F @ velocity_n``.
 
     Parameters
     ----------
