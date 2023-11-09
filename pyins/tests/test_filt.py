@@ -61,18 +61,19 @@ def test_run_feedback_filter():
 
 def test_run_feedforward_filter():
     dt = 0.01
+    factor = 5
     rng = np.random.RandomState(123456789)
 
-    trajectory, imu_true = sim.sinusoid_velocity_motion(dt, 300, [50, 60, 100],
+    trajectory, imu_true = sim.sinusoid_velocity_motion(dt / factor, 300, [50, 60, 100],
                                                         [1, -1, 0.5], [3, 3, 0.5])
 
     position_obs = filt.PositionObs(
-        sim.generate_position_observations(trajectory.iloc[::100], 1, rng), 1)
+        sim.generate_position_observations(trajectory.iloc[1::100 * factor], 1, rng), 1)
     ned_velocity_obs = filt.NedVelocityObs(
-        sim.generate_ned_velocity_observations(trajectory.iloc[30::100], 0.5,
+        sim.generate_ned_velocity_observations(trajectory.iloc[32::100 * factor], 0.5,
                                                rng), 0.5)
     body_velocity_obs = filt.BodyVelocityObs(
-        sim.generate_body_velocity_observations(trajectory.iloc[60::100], 0.2,
+        sim.generate_body_velocity_observations(trajectory.iloc[64::100 * factor], 0.2,
                                                 rng), 0.2)
 
     gyro_errors = sim.ImuErrors(bias=np.array([-1, 2, 1]) * transform.DH_TO_RS,
@@ -99,8 +100,8 @@ def test_run_feedforward_filter():
     trajectory_computed = integrator.integrate(increments)
 
     result = filt.run_feedforward_filter(
-        trajectory, trajectory_computed, pos_sd, vel_sd, level_sd, azimuth_sd,
-        gyro_model, accel_model,
+        trajectory.iloc[::factor], trajectory_computed.iloc[::factor],
+        pos_sd, vel_sd, level_sd, azimuth_sd, gyro_model, accel_model,
         observations=[position_obs, ned_velocity_obs, body_velocity_obs], time_step=1)
 
     error = transform.compute_state_difference(result.trajectory, trajectory)
@@ -115,3 +116,7 @@ def test_run_feedforward_filter():
     accel_bias_relative_error = (np.abs(result.accel.iloc[-1] - accel_errors.bias)
                                  / result.accel_sd.iloc[-1])
     assert (accel_bias_relative_error < 2.0).all()
+
+    assert (util.compute_rms(result.innovations['PositionObs']) < 3.0).all()
+    assert (util.compute_rms(result.innovations['NedVelocityObs']) < 3.0).all()
+    assert (util.compute_rms(result.innovations['BodyVelocityObs']) < 3.0).all()

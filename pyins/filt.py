@@ -167,14 +167,14 @@ class BodyVelocityObs(Observation):
         return z, H, self.R
 
 
-def compute_average_pva(pva_1, pva_2):
-    rot_1 = Rotation.from_euler('xyz', pva_1[RPH_COLS], True)
-    rot_2 = Rotation.from_euler('xyz', pva_2[RPH_COLS], True)
-    rph_average = pd.Series(
-        Rotation.concatenate([rot_1, rot_2]).mean().as_euler('xyz', True), RPH_COLS)
+def interpolate_pva(first, second, alpha):
+    rot_1 = Rotation.from_euler('xyz', first[RPH_COLS], True)
+    rot_2 = Rotation.from_euler('xyz', second[RPH_COLS], True)
+    rph_average = pd.Series(Rotation.concatenate([rot_1, rot_2])
+                            .mean([1 - alpha, alpha]).as_euler('xyz', True), RPH_COLS)
     return pd.concat([
-        0.5 * (pva_1[LLA_COLS] + pva_1[LLA_COLS]),
-        0.5 * (pva_1[VEL_COLS] + pva_2[VEL_COLS]),
+        (1 - alpha) * first[LLA_COLS] + alpha * second[LLA_COLS],
+        (1 - alpha) * first[VEL_COLS] + alpha * second[VEL_COLS],
         rph_average
     ])
 
@@ -435,7 +435,7 @@ def run_feedback_filter(initial_pva,
         integrator.integrate(increments_batch)
         pva_new = integrator.get_state()
         time_delta = integrator.get_time() - time
-        pva_average = compute_average_pva(pva_old, pva_new)
+        pva_average = interpolate_pva(pva_old, pva_new, 0.5)
         gyro_average = increments_batch[THETA_COLS].sum(axis=0) / time_delta
         accel_average = increments_batch[DV_COLS].sum(axis=0) / time_delta
 
@@ -515,12 +515,16 @@ def run_feedforward_filter(trajectory_nominal, trajectory, pos_sd, vel_sd, level
         innovations[name] = []
         innovations_times[name] = []
 
-    time = start_time
-    while time < end_time:
-        pva = trajectory.loc[time]
-        if observation_times[observation_times_index] == time:
+    index = 0
+    while index + 1 < len(trajectory):
+        time = times[index]
+        next_time = times[index + 1]
+        observation_time = observation_times[observation_times_index]
+        if observation_time < next_time:
+            pva = interpolate_pva(trajectory.iloc[index], trajectory.iloc[index + 1],
+                                  (observation_time - time) / (next_time - time))
             for observation in observations:
-                ret = observation.compute_obs(time, pva, error_model)
+                ret = observation.compute_obs(observation_time, pva, error_model)
                 if ret is not None:
                     z, H, R = ret
                     H_full = np.zeros((len(z), n_states))
@@ -538,12 +542,13 @@ def run_feedforward_filter(trajectory_nominal, trajectory, pos_sd, vel_sd, level
 
         next_time = min(time + time_step,
                         observation_times[observation_times_index])
-        next_time = times[np.searchsorted(times, next_time, side='right') - 1]
+        next_index = np.searchsorted(times, next_time, side='right') - 1
+        next_time = times[next_index]
         time_delta = next_time - time
 
-        pva_old = trajectory_nominal.loc[time]
-        pva_new = trajectory_nominal.loc[next_time]
-        pva_average = compute_average_pva(pva_old, pva_new)
+        pva_old = trajectory_nominal.iloc[index]
+        pva_new = trajectory_nominal.iloc[next_index]
+        pva_average = interpolate_pva(pva_old, pva_new, 0.5)
         if increments is not None:
             increments_batch = increments.loc[np.nextafter(time, next_time) : next_time]
             gyro_average = increments_batch[THETA_COLS].sum(axis=0) / time_delta
@@ -558,7 +563,7 @@ def run_feedforward_filter(trajectory_nominal, trajectory, pos_sd, vel_sd, level
                                                      accel_model)
         x = Phi @ x
         P = Phi @ P @ Phi.transpose() + Qd
-        time = next_time
+        index = next_index
 
     times_all = np.asarray(times_all)
     x_all = np.asarray(x_all)
