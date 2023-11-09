@@ -12,13 +12,16 @@ class InsErrorModel:
 
     INS error model is a system of non-stationary linear differential equations
     which describe time evolution on INS errors. The system matrix depends
-    on the navigation state (trajectory).
+    on the trajectory.
 
     We consider error models consisting of 9 total states: 3 for position,
     velocity and attitude errors.
 
     The states can be selected in different  manners and several error models
     were proposed in the literature.
+
+    The output error states are always NED position error, NED velocity error and errors
+    of roll, pitch and heading angles.
 
     For education purposes two models implementing this interface are
     provided:
@@ -56,12 +59,12 @@ class InsErrorModel:
 
         Parameters
         ----------
-        trajectory : pd.DataFrame
-            Trajectory.
+        trajectory : Trajectory or Pva
+            Either full trajectory dataframe or single position-velocity-attitude.
 
         Returns
         -------
-        system_matrix : ndarray, shape (n_points, N_STATES, N_STATES)
+        system_matrix : ndarray, shape (n_points, N_STATES, N_STATES) or (N_STATES, N_STATES)
         """
         raise NotImplementedError
 
@@ -70,8 +73,8 @@ class InsErrorModel:
 
         Parameters
         ----------
-        trajectory : pd.DataFrame or pd.Series
-            Trajectory or a single trajectory point.
+        trajectory : Trajectory or Pva
+            Either full trajectory dataframe or single position-velocity-attitude.
 
         Returns
         -------
@@ -80,24 +83,22 @@ class InsErrorModel:
         raise NotImplementedError
 
     def correct_pva(self, pva, error):
-        """Correct navigation state with estimated errors.
+        """Correct position-velocity-attitude with estimated errors.
 
         Parameters
         ----------
-        pva : pd.Series
-            Point of trajectory.
-        error : ndarray
-            Estimates errors. First N_STATES components are assumed to
-            contain error states.
+        pva : Pva
+            Position-velocity-attitude.
+        error : array_like, shape (N_STATES,)
+            Estimates errors in the internal representation.
 
         Returns
         -------
-        corrected_trajectory_point : pd.Series
+        corrected_pva : pd.Series
         """
         raise NotImplementedError
 
-    def position_error_jacobian(self, pva,
-                                imu_to_antenna_b=None):
+    def position_error_jacobian(self, pva, imu_to_antenna_b=None):
         """Compute position error Jacobian matrix.
 
         This is the matrix which linearly relates the position error in
@@ -105,9 +106,9 @@ class InsErrorModel:
 
         Parameters
         ----------
-        pva : pd.Series
-            Point of trajectory.
-        imu_to_antenna_b : array_like or None, optional
+        pva : Pva
+            Position-velocity-attitude.
+        imu_to_antenna_b : array_like, shape (3,) or None, optional
             Vector from IMU to antenna (measurement point) expressed in body
             frame. If None, assumed to be zero.
 
@@ -125,8 +126,8 @@ class InsErrorModel:
 
         Parameters
         ----------
-        pva : pd.Series
-            Point of trajectory.
+        pva : Pva
+            Position-velocity-attitude.
 
         Returns
         -------
@@ -143,8 +144,8 @@ class InsErrorModel:
 
         Parameters
         ----------
-        pva : pd.Series
-            Point of trajectory.
+        pva : Pva
+            Position-velocity-attitude.
 
         Returns
         -------
@@ -418,15 +419,15 @@ def propagate_errors(trajectory,
 
     Parameters
     ----------
-    trajectory : DataFrame
+    trajectory : Trajectory
         Trajectory.
-    delta_position_n : array_like, shape (3,)
+    delta_position_n : array_like, shape (3,), optional
         Initial position errors in meters resolved in NED.
-    delta_velocity_n : array_like, shape (3,)
+    delta_velocity_n : array_like, shape (3,), optional
         Initial velocity errors resolved in NED.
-    delta_rph : array_like, shape (3,)
+    delta_rph : array_like, shape (3,), optional
         Initial heading, pitch and roll errors.
-    delta_gyro, delta_accel : float or array_like
+    delta_gyro, delta_accel : array_like
         Gyro and accelerometer errors (in SI units). Can be constant or
         specified for each time stamp in `trajectory`.
     error_model : InsErrorModel
@@ -434,7 +435,7 @@ def propagate_errors(trajectory,
 
     Returns
     -------
-    traj_err : DataFrame
+    traj_err : TrajectoryError
         Trajectory errors.
     """
     dt = np.diff(trajectory.index)
