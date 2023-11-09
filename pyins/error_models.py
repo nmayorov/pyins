@@ -408,8 +408,8 @@ class ModifiedPsiModel(InsErrorModel):
         return result
 
 
-def propagate_errors(trajectory, pva_error=None, delta_gyro=np.zeros(3),
-                     delta_accel=np.zeros(3), error_model=ModifiedPhiModel()):
+def propagate_errors(trajectory, pva_error=None, gyro_error=np.zeros(3),
+                     accel_error=np.zeros(3), error_model=ModifiedPhiModel()):
     """Deterministic linear propagation of INS errors.
 
     Parameters
@@ -418,7 +418,7 @@ def propagate_errors(trajectory, pva_error=None, delta_gyro=np.zeros(3),
         Trajectory.
     pva_error : PvaError, optional
         Initial position-velocity-attitude error. If None (default) zeros will be used.
-    delta_gyro, delta_accel : array_like
+    gyro_error, accel_error : array_like
         Gyro and accelerometer errors (in SI units). Can be constant or
         specified for each time stamp in `trajectory`.
     error_model : InsErrorModel
@@ -436,10 +436,10 @@ def propagate_errors(trajectory, pva_error=None, delta_gyro=np.zeros(3),
     Phi = 0.5 * (Fi[1:] + Fi[:-1]) * dt.reshape(-1, 1, 1)
     Phi[:] += np.identity(Phi.shape[-1])
 
-    delta_gyro = util.mv_prod(Fig, delta_gyro)
-    delta_accel = util.mv_prod(Fia, delta_accel)
-    delta_sensor = 0.5 * (delta_gyro[1:] + delta_gyro[:-1] +
-                          delta_accel[1:] + delta_accel[:-1])
+    gyro_error = util.mv_prod(Fig, gyro_error)
+    accel_error = util.mv_prod(Fia, accel_error)
+    delta_sensor = 0.5 * (gyro_error[1:] + gyro_error[:-1] +
+                          accel_error[1:] + accel_error[:-1])
 
     T = error_model.transform_to_output(trajectory)
     if pva_error is None:
