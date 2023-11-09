@@ -4,8 +4,8 @@ import pytest
 from numpy.testing import assert_allclose
 from pyins import earth, error_models, sim, transform
 from pyins.strapdown import compute_theta_and_dv, Integrator
-from pyins.transform import perturb_lla, compute_state_difference
-from pyins.util import (LLA_COLS, VEL_COLS, RPH_COLS, NED_COLS, GYRO_COLS, ACCEL_COLS,
+from pyins.transform import compute_state_difference
+from pyins.util import (VEL_COLS, RPH_COLS, NED_COLS, GYRO_COLS, ACCEL_COLS,
                         TRAJECTORY_ERROR_COLS)
 
 
@@ -32,11 +32,7 @@ def test_propagate_errors(error_model):
     pva_error[VEL_COLS] = [0.1, -0.2, -0.05]
     pva_error[RPH_COLS] = [np.rad2deg(-2 * b / earth.G0), np.rad2deg(b / earth.G0), 0.5]
 
-    initial = trajectory.iloc[0].copy()
-    initial[LLA_COLS] = perturb_lla(initial[LLA_COLS], pva_error[NED_COLS])
-    initial[VEL_COLS] += pva_error[VEL_COLS]
-    initial[RPH_COLS] += pva_error[RPH_COLS]
-
+    initial = sim.perturb_pva(trajectory.iloc[0], pva_error)
     integrator = Integrator(initial)
     traj_c = integrator.integrate(increments)
     error_true = compute_state_difference(traj_c, trajectory)
