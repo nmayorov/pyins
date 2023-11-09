@@ -127,7 +127,7 @@ class Integrator:
         self.velocity_n[0] = self._init_values[VEL_COLS]
         self.Cnb[0] = transform.mat_from_rph(self._init_values[RPH_COLS])
         self.trajectory = self._init_values.to_frame().transpose(copy=True)
-        self.trajectory.index.name = 'stamp'
+        self.trajectory.index.name = 'time'
 
     def _integrate(self, increments, mode):
         theta = np.ascontiguousarray(increments[['theta_x', 'theta_y', 'theta_z']])

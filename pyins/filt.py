@@ -36,7 +36,7 @@ class Observation:
     def __init__(self, data):
         self.data = data
 
-    def compute_obs(self, stamp, pva, error_model):
+    def compute_obs(self, time, pva, error_model):
         """Compute ingredients for a single linearized observation.
 
         It must compute the observation model (z, H, R) at a given time stamp.
@@ -45,7 +45,7 @@ class Observation:
 
         Parameters
         ----------
-        stamp : int
+        time : int
             Time stamp.
         pva : Series
             Point of INS trajectory at `stamp`.
@@ -90,12 +90,12 @@ class PositionObs(Observation):
         self.R = sd**2 * np.eye(3)
         self.imu_to_antenna_b = imu_to_antenna_b
 
-    def compute_obs(self, stamp, pva, error_model):
-        if stamp not in self.data.index:
+    def compute_obs(self, time, pva, error_model):
+        if time not in self.data.index:
             return None
 
         z = transform.difference_lla(pva[LLA_COLS],
-                                     self.data.loc[stamp, LLA_COLS])
+                                     self.data.loc[time, LLA_COLS])
         if self.imu_to_antenna_b:
             mat_nb = transform.mat_from_rph(pva[RPH_COLS])
             z += mat_nb @ self.imu_to_antenna_b
@@ -126,11 +126,11 @@ class NedVelocityObs(Observation):
         super(NedVelocityObs, self).__init__(data)
         self.R = sd**2 * np.eye(3)
 
-    def compute_obs(self, stamp, pva, error_model):
-        if stamp not in self.data.index:
+    def compute_obs(self, time, pva, error_model):
+        if time not in self.data.index:
             return None
 
-        z = pva[VEL_COLS] - self.data.loc[stamp, VEL_COLS]
+        z = pva[VEL_COLS] - self.data.loc[time, VEL_COLS]
         H = error_model.ned_velocity_error_jacobian(pva)
 
         return z, H, self.R
@@ -156,13 +156,13 @@ class BodyVelocityObs(Observation):
         super(BodyVelocityObs, self).__init__(data)
         self.R = sd**2 * np.eye(3)
 
-    def compute_obs(self, stamp, pva, error_model):
-        if stamp not in self.data.index:
+    def compute_obs(self, time, pva, error_model):
+        if time not in self.data.index:
             return None
 
         Cnb = transform.mat_from_rph(pva[RPH_COLS])
         z = (Cnb.transpose() @ pva[VEL_COLS] -
-             self.data.loc[stamp, ['VX', 'VY', 'VZ']])
+             self.data.loc[time, ['VX', 'VY', 'VZ']])
         H = error_model.body_velocity_error_jacobian(pva)
         return z, H, self.R
 
