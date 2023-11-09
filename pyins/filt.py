@@ -175,19 +175,16 @@ def _interpolate_pva(first, second, alpha):
 
 def _initialize_covariance(pva, pos_sd, vel_sd, level_sd, azimuth_sd,
                            error_model, gyro_model, accel_model):
-    level_sd = np.deg2rad(level_sd)
-    azimuth_sd = np.deg2rad(azimuth_sd)
-
-    P_nav = np.zeros((error_model.N_STATES, error_model.N_STATES))
-    P_nav[error_model.DRN, error_model.DRN] = pos_sd ** 2
-    P_nav[error_model.DRE, error_model.DRE] = pos_sd ** 2
-    P_nav[error_model.DRD, error_model.DRD] = pos_sd ** 2
-    P_nav[error_model.DVN, error_model.DVN] = vel_sd ** 2
-    P_nav[error_model.DVE, error_model.DVE] = vel_sd ** 2
-    P_nav[error_model.DVD, error_model.DVD] = vel_sd ** 2
-    P_nav[error_model.DROLL, error_model.DROLL] = level_sd ** 2
-    P_nav[error_model.DPITCH, error_model.DPITCH] = level_sd ** 2
-    P_nav[error_model.DHEADING, error_model.DHEADING] = azimuth_sd ** 2
+    P_pva = np.zeros((error_model.N_STATES, error_model.N_STATES))
+    P_pva[error_model.DRN, error_model.DRN] = pos_sd ** 2
+    P_pva[error_model.DRE, error_model.DRE] = pos_sd ** 2
+    P_pva[error_model.DRD, error_model.DRD] = pos_sd ** 2
+    P_pva[error_model.DVN, error_model.DVN] = vel_sd ** 2
+    P_pva[error_model.DVE, error_model.DVE] = vel_sd ** 2
+    P_pva[error_model.DVD, error_model.DVD] = vel_sd ** 2
+    P_pva[error_model.DROLL, error_model.DROLL] = np.deg2rad(level_sd) ** 2
+    P_pva[error_model.DPITCH, error_model.DPITCH] = np.deg2rad(level_sd) ** 2
+    P_pva[error_model.DHEADING, error_model.DHEADING] = np.deg2rad(azimuth_sd) ** 2
 
     n_states = error_model.N_STATES + gyro_model.n_states + accel_model.n_states
 
@@ -198,7 +195,7 @@ def _initialize_covariance(pva, pos_sd, vel_sd, level_sd, azimuth_sd,
     P = np.zeros((n_states, n_states))
     T = np.linalg.inv(error_model.transform_to_output(pva))
 
-    P[ins_block, ins_block] = T @ P_nav @ T.transpose()
+    P[ins_block, ins_block] = T @ P_pva @ T.transpose()
     P[gyro_block, gyro_block] = gyro_model.P
     P[accel_block, accel_block] = accel_model.P
 
