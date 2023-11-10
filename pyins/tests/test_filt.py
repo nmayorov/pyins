@@ -86,8 +86,8 @@ def test_run_feedforward_filter():
                                           noise=0.001 * transform.DRH_TO_RRS)
     accel_model = imu_model.InertialSensor(bias_sd=0.01, noise=0.01 / 60)
 
-    imu = sim.apply_imu_errors(imu_true, 'increment', gyro_errors, accel_errors)
-    increments = strapdown.compute_theta_and_dv(imu, 'increment')
+    imu = sim.apply_imu_errors(imu_true, 'rate', gyro_errors, accel_errors)
+    increments = strapdown.compute_theta_and_dv(imu, 'rate')
 
     pos_sd = 10
     vel_sd = 0.1

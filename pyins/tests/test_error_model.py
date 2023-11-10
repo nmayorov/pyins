@@ -22,10 +22,10 @@ def test_propagate_errors(error_model):
     gyro_bias = np.array([1, -2, 0.5]) * transform.DH_TO_RS
     accel_bias = np.array([b, -b, 2 * b])
 
-    imu[GYRO_COLS] += gyro_bias * dt
-    imu[ACCEL_COLS] += accel_bias * dt
+    imu[GYRO_COLS] += gyro_bias
+    imu[ACCEL_COLS] += accel_bias
 
-    increments = compute_theta_and_dv(imu, 'increment')
+    increments = compute_theta_and_dv(imu, 'rate')
 
     pva_error = pd.Series(index=TRAJECTORY_ERROR_COLS)
     pva_error[NED_COLS] = [200, 100, 20]
