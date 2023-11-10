@@ -16,16 +16,23 @@ def compute_theta_and_dv(imu, sensor_type):
     The algorithm assumes a linear model for the angular velocity and the
     specific force described in [1]_ and [2]_.
 
+    The number of returned increments is always one less than the number
+    of IMU readings, even for increment-type sensors (by convention). It means that
+    for increment sensors you need to supply an additional "before" sample.
+    The function `sim.generate_imu` already does that.
+
     Parameters
     ----------
-    imu : pd.DataFrame
-        IMU data.
+    imu : Imu
+        Dataframe with IMU data.
     sensor_type : 'rate' or 'increment'
+        IMU type.
 
     Returns
     -------
-    increments : pd.DataFrame
-        Angle and velocity increments.
+    Increments
+        DataFrame containing attitude and velocity increments with one less row than
+        the passed `imu`.
 
     References
     ----------
