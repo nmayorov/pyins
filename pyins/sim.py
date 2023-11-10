@@ -236,6 +236,25 @@ def sinusoid_velocity_motion(dt, total_time, lla0, velocity_mean,
 
 
 def generate_position_observations(trajectory, error_sd, rng=None):
+    """Generate data with latitude-longitude-altitude position observations.
+
+    The observations are computed as given (true) values perturbed by normal random
+    errors.
+
+    Parameters
+    ----------
+    trajectory : Trajectory
+        Trajectory dataframe, only 'lat', 'lon' and 'alt' columns are used.
+    error_sd : float
+        Standard deviation of errors in meters.
+    rng : None, int or numpy.RandomState
+        Random seed.
+
+    Returns
+    -------
+    DataFrame
+        Contains 'lat', 'lon' and 'alt' columns with perturbed coordinates.
+    """
     rng = check_random_state(rng)
     error = error_sd * rng.randn(len(trajectory), 3)
     lla = transform.perturb_lla(trajectory[LLA_COLS], error)
@@ -243,6 +262,25 @@ def generate_position_observations(trajectory, error_sd, rng=None):
 
 
 def generate_ned_velocity_observations(trajectory, error_sd, rng=None):
+    """Generate data with NED velocity observations.
+
+    The observations are computed as given (true) values perturbed by normal random
+    errors.
+
+    Parameters
+    ----------
+    trajectory : Trajectory
+        Trajectory dataframe, only 'VN', 'VE' and 'VD' columns are used.
+    error_sd : float
+        Standard deviation of errors in m/s.
+    rng : None, int or numpy.RandomState
+        Random seed.
+
+    Returns
+    -------
+    DataFrame
+        Contains 'VN', 'VE' and 'VD' columns with perturbed velocities.
+    """
     rng = check_random_state(rng)
     error = error_sd * rng.randn(len(trajectory), 3)
     velocity_n = trajectory[VEL_COLS] + error
@@ -250,10 +288,30 @@ def generate_ned_velocity_observations(trajectory, error_sd, rng=None):
 
 
 def generate_body_velocity_observations(trajectory, error_sd, rng=None):
+    """Generate data with velocity observations expressed in body frame.
+
+    The observations are computed by first projecting NED velocity into the body frame
+    and then adding normal random errors to it.
+
+    Parameters
+    ----------
+    trajectory : Trajectory
+        Trajectory dataframe, only 'VN', VE', 'VD', 'roll', 'pitch' and 'heading'
+        columns are used.
+    error_sd : float
+        Standard deviation of errors in m/s.
+    rng : None, int or numpy.RandomState
+        Random seed.
+
+    Returns
+    -------
+    DataFrame
+        Contains 'VX', 'VY' and 'VZ' columns with perturbed velocities.
+    """
     rng = check_random_state(rng)
     error = error_sd * rng.randn(len(trajectory), 3)
-    Cnb = transform.mat_from_rph(trajectory[RPH_COLS])
-    velocity_b = util.mv_prod(Cnb, trajectory[VEL_COLS], at=True) + error
+    mat_nb = transform.mat_from_rph(trajectory[RPH_COLS])
+    velocity_b = util.mv_prod(mat_nb, trajectory[VEL_COLS], at=True) + error
     return pd.DataFrame(data=velocity_b, index=trajectory.index,
                         columns=['VX', 'VY', 'VZ'])
 
