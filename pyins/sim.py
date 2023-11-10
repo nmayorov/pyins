@@ -317,6 +317,28 @@ def generate_body_velocity_observations(trajectory, error_sd, rng=None):
 
 
 def generate_pva_error(position_sd, velocity_sd, level_sd, azimuth_sd, rng=None):
+    """Generate random position-velocity-attitude error.
+
+    All errors are generated as independent and normally distributed.
+
+    Parameters
+    ----------
+    position_sd : float
+        Position error standard deviation in meters.
+    velocity_sd : float
+        Velocity error standard deviation in m/s.
+    level_sd : float
+        Roll and pitch standard deviation in degrees.
+    azimuth_sd : float
+        Heading standard deviation in degrees.
+    rng : None, int or RandomState
+        Random seed.
+
+    Returns
+    -------
+    PvaError
+        Series containing 9 elements with position-velocity-attitude errors.
+    """
     rng = check_random_state(rng)
     result = pd.Series(index=TRAJECTORY_ERROR_COLS)
     result[NED_COLS] = position_sd * rng.randn(3)
@@ -326,6 +348,20 @@ def generate_pva_error(position_sd, velocity_sd, level_sd, azimuth_sd, rng=None)
 
 
 def perturb_pva(pva, pva_error):
+    """Apply errors to position-velocity-attitude.
+
+    Parameters
+    ----------
+    pva : Pva
+        Position-velocity-attitude.
+    pva_error : PvaError
+        Errors of position-velocity-attitude.
+
+    Returns
+    -------
+    Pva
+        Position-velocity-attitude with applied errors.
+    """
     result = pva.copy()
     result[LLA_COLS] = transform.perturb_lla(result[LLA_COLS], pva_error[NED_COLS])
     result[VEL_COLS] += pva_error[VEL_COLS]
