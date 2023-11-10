@@ -59,8 +59,8 @@ def _compute_increment_readings(dt, a, b, c, d, e):
 def generate_imu(time, lla, rph, velocity_n=None, sensor_type='rate'):
     """Generate IMU readings from the trajectory.
 
-    Attitude angles (`rph`) must be always given and there are 3 options with
-    respect to position and velocity:
+    Attitude angles (`rph`) must be always given and there are 3 options for
+    position and velocity:
 
         - Both position and velocity are given
         - Only position is given
@@ -77,18 +77,18 @@ def generate_imu(time, lla, rph, velocity_n=None, sensor_type='rate'):
         Time series of roll, pitch and heading angles.
     velocity_n : array_like, shape (n_points, 3) or None
         Time series of velocity expressed in NED frame.
-    sensor_type: 'increment' or 'rate', optional
+    sensor_type: 'rate' or 'increment', optional
         Type of sensor to generate. If 'rate' (default), then instantaneous
         rate values are generated (in rad/s and m/s/s). If 'increment', then
         integrals over sampling intervals are generated (in rad and m/s).
 
     Returns
     -------
-    trajectory : DataFrame
-        Trajectory with n_points rows.
-    imu : DataFrame
-        IMU data. When `sensor_type` is 'increment' the first sample is duplicated
-        for more convenient future processing.
+    trajectory : Trajectory
+        Trajectory dataframe with n_points rows.
+    imu : Imu
+        IMU dataframe with n_points rows. When `sensor_type` is 'increment' the first
+        sample is duplicated for more convenient future processing.
     """
     MAX_ITER = 3
     ACCURACY = 0.01
@@ -97,7 +97,6 @@ def generate_imu(time, lla, rph, velocity_n=None, sensor_type='rate'):
         raise ValueError("`sensor_type` must be 'rate' or 'increment'.")
 
     lla = np.asarray(lla)
-
     if lla.ndim == 1 and velocity_n is None:
         raise ValueError("`velocity_n` must be provided when `lla` contains only "
                          "initial values")
@@ -110,75 +109,73 @@ def generate_imu(time, lla, rph, velocity_n=None, sensor_type='rate'):
         alt_spline = VU_spline.antiderivative()
         alt = alt0 + alt_spline(time)
 
-        lat0 = np.deg2rad(lat0)
-        lat = lat0
+        lat = lat0 = np.deg2rad(lat0)
         for iteration in range(MAX_ITER):
             rn, _, _ = earth.principal_radii(np.rad2deg(lat), alt)
             dlat_spline = CubicSpline(time, velocity_n[:, 0] / rn)
             lat_spline = dlat_spline.antiderivative()
-            lat_new = lat_spline(time) + lat0
+            lat_new = lat0 + lat_spline(time)
             delta = (lat - lat_new) * rn
             lat = lat_new
             if np.all(np.abs(delta) < ACCURACY):
                 break
 
-        _, _, rp = earth.principal_radii(np.rad2deg(lat), alt)
+        lat = np.rad2deg(lat)
+        _, _, rp = earth.principal_radii(lat, alt)
         dlon_spline = CubicSpline(time, velocity_n[:, 1] / rp)
         lon_spline = dlon_spline.antiderivative()
 
         lla = np.empty((n_points, 3))
-        lla[:, 0] = np.rad2deg(lat)
+        lla[:, 0] = lat
         lla[:, 1] = lon0 + np.rad2deg(lon_spline(time))
         lla[:, 2] = alt
 
     lla_inertial = lla.copy()
     lla_inertial[:, 1] += np.rad2deg(earth.RATE) * time
-    Cin = transform.mat_en_from_ll(lla_inertial[:, 0], lla_inertial[:, 1])
+    mat_in = transform.mat_en_from_ll(lla_inertial[:, 0], lla_inertial[:, 1])
 
     r_i = transform.lla_to_ecef(lla_inertial)
     earth_rate_i = [0, 0, earth.RATE]
     if velocity_n is None:
-        v_s = CubicSpline(time, r_i).derivative()
-        velocity_n = util.mv_prod(Cin, v_s(time) - np.cross(earth_rate_i, r_i), True)
+        v_i_spline = CubicSpline(time, r_i).derivative()
+        velocity_n = util.mv_prod(
+            mat_in, v_i_spline(time) - np.cross(earth_rate_i, r_i), True)
     else:
-        v_i = util.mv_prod(Cin, velocity_n) + np.cross(earth_rate_i, r_i)
-        v_s = CubicHermiteSpline(time, r_i, v_i).derivative()
+        v_i = util.mv_prod(mat_in, velocity_n) + np.cross(earth_rate_i, r_i)
+        v_i_spline = CubicHermiteSpline(time, r_i, v_i).derivative()
 
-    Cnb = transform.mat_from_rph(rph)
-    Cib = util.mm_prod(Cin, Cnb)
-
-    Cib_spline = RotationSpline(time, Rotation.from_matrix(Cib))
-    g = earth.gravitation_ecef(lla_inertial)
+    mat_ib = util.mm_prod(mat_in, transform.mat_from_rph(rph))
+    rot_ib_spline = RotationSpline(time, Rotation.from_matrix(mat_ib))
+    g_i = earth.gravitation_ecef(lla_inertial)
 
     if sensor_type == 'rate':
-        gyros = Cib_spline(time, 1)
-        accels = util.mv_prod(Cib, v_s(time, 1) - g, at=True)
+        gyro = rot_ib_spline(time, 1)
+        accel = util.mv_prod(mat_ib, v_i_spline(time, 1) - g_i, at=True)
     elif sensor_type == 'increment':
         dt = np.diff(time)[:, None]
 
-        a = Cib_spline.interpolator.c[2]
-        b = Cib_spline.interpolator.c[1]
-        c = Cib_spline.interpolator.c[0]
+        a = rot_ib_spline.interpolator.c[2]
+        b = rot_ib_spline.interpolator.c[1]
+        c = rot_ib_spline.interpolator.c[0]
 
-        a_s = v_s.derivative()
-        d = a_s.c[1] - g[:-1]
-        e = a_s.c[0] - np.diff(g, axis=0) / dt
+        a_s = v_i_spline.derivative()
+        d = a_s.c[1] - g_i[:-1]
+        e = a_s.c[0] - np.diff(g_i, axis=0) / dt
 
-        d = util.mv_prod(Cib[:-1], d, at=True)
-        e = util.mv_prod(Cib[:-1], e, at=True)
+        d = util.mv_prod(mat_ib[:-1], d, at=True)
+        e = util.mv_prod(mat_ib[:-1], e, at=True)
 
-        gyros, accels = _compute_increment_readings(dt, a, b, c, d, e)
-        gyros = np.insert(gyros, 0, gyros[0], axis=0)
-        accels = np.insert(accels, 0, accels[0], axis=0)
+        gyro, accel = _compute_increment_readings(dt, a, b, c, d, e)
+        gyro = np.insert(gyro, 0, gyro[0], axis=0)
+        accel = np.insert(accel, 0, accel[0], axis=0)
     else:
         assert False
 
     index = pd.Index(time, name='time')
-    trajectory = pd.DataFrame(np.hstack([lla, velocity_n, rph]),
-                              index=index, columns=TRAJECTORY_COLS)
-    imu = pd.DataFrame(data=np.hstack((gyros, accels)), index=index,
-                       columns=GYRO_COLS + ACCEL_COLS)
-    return trajectory, imu
+    return (pd.DataFrame(np.hstack([lla, velocity_n, rph]),
+                         index=index, columns=TRAJECTORY_COLS),
+            pd.DataFrame(data=np.hstack((gyro, accel)), index=index,
+                         columns=GYRO_COLS + ACCEL_COLS))
 
 
 def sinusoid_velocity_motion(dt, total_time, lla0, velocity_mean,
