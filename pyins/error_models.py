@@ -3,7 +3,8 @@ import numpy as np
 import pandas as pd
 from scipy.spatial.transform import Rotation
 from . import earth, util, transform
-from .util import LLA_COLS, VEL_COLS, RPH_COLS, NED_COLS, TRAJECTORY_ERROR_COLS
+from .util import (LLA_COLS, VEL_COLS, RPH_COLS, RATE_COLS, NED_COLS,
+                   TRAJECTORY_ERROR_COLS)
 
 
 class InsErrorModel:
@@ -117,7 +118,7 @@ class InsErrorModel:
         """
         raise NotImplementedError
 
-    def ned_velocity_error_jacobian(self, pva):
+    def ned_velocity_error_jacobian(self, pva, imu_to_antenna_b=None):
         """Compute NED velocity error Jacobian matrix.
 
         This is the matrix which linearly relates the velocity error in
@@ -126,13 +127,16 @@ class InsErrorModel:
         Parameters
         ----------
         pva : Pva
-            Position-velocity-attitude.
+            Position-velocity-attitude. To account for `imu_to_antenna_b` must
+            additionally contain elements 'rate_x', 'rate_y', 'rate_z'.
+        imu_to_antenna_b : array_like, shape (3,) or None, optional
+            Vector from IMU to antenna (measurement point) expressed in body
+            frame. If None (default), assumed to be zero.
 
         Returns
         -------
         jacobian : ndarray, shape (3, N_STATES)
         """
-
         raise NotImplementedError
 
     def body_velocity_error_jacobian(self, pva):
@@ -262,10 +266,13 @@ class ModifiedPhiModel(InsErrorModel):
             result[:, self.PHI] = util.skew_matrix(mat_nb @ imu_to_antenna_b)
         return result
 
-    def ned_velocity_error_jacobian(self, pva):
+    def ned_velocity_error_jacobian(self, pva, imu_to_antenna_b=None):
         result = np.zeros((3, self.N_STATES))
         result[:, self.DV] = np.eye(3)
         result[:, self.PHI] = util.skew_matrix(pva[VEL_COLS])
+        if imu_to_antenna_b is not None and all(col in pva for col in RATE_COLS):
+            mat_nb = transform.mat_from_rph(pva[RPH_COLS])
+            result[:, self.PHI] += mat_nb @ np.cross(pva[RATE_COLS], imu_to_antenna_b)
         return result
 
     def body_velocity_error_jacobian(self, pva):
@@ -394,10 +401,13 @@ class ModifiedPsiModel(InsErrorModel):
 
         return result
 
-    def ned_velocity_error_jacobian(self, pva):
+    def ned_velocity_error_jacobian(self, pva, imu_to_antenna_b=None):
         result = np.zeros((3, self.N_STATES))
         result[:, self.DV] = np.eye(3)
         result[:, self.PSI] = util.skew_matrix(pva[VEL_COLS])
+        if imu_to_antenna_b is not None and all(col in pva for col in RATE_COLS):
+            mat_nb = transform.mat_from_rph(pva[RPH_COLS])
+            result[:, self.PHI] += mat_nb @ np.cross(pva[RATE_COLS], imu_to_antenna_b)
         return result
 
     def body_velocity_error_jacobian(self, pva):

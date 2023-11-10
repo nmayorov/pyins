@@ -5,6 +5,7 @@ import numpy as np
 LLA_COLS = ['lat', 'lon', 'alt']
 VEL_COLS = ['VN', 'VE', 'VD']
 RPH_COLS = ['roll', 'pitch', 'heading']
+RATE_COLS = ['rate_x', 'rate_y', 'rate_z']
 GYRO_COLS = ['gyro_x', 'gyro_y', 'gyro_z']
 ACCEL_COLS = ['accel_x', 'accel_y', 'accel_z']
 THETA_COLS = ['theta_x', 'theta_y', 'theta_z']

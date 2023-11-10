@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from scipy.spatial.transform import Rotation
 from . import earth, error_models, imu_model, kalman, util, transform, strapdown
-from .util import (LLA_COLS, VEL_COLS, RPH_COLS, THETA_COLS, DV_COLS,
+from .util import (LLA_COLS, VEL_COLS, RPH_COLS, RATE_COLS, THETA_COLS, DV_COLS,
                    TRAJECTORY_ERROR_COLS)
 
 
@@ -112,21 +112,28 @@ class NedVelocityObs(Observation):
         Must be indexed by time and contain 'VN', 'VE' and 'VD' columns.
     sd : float
         Measurement accuracy in m/s.
+    imu_to_antenna_b : array_like, shape (3,) or None, optional
+        Vector from IMU to antenna (measurement point) expressed in body
+        frame. If None (default), assumed to be zero.
 
     Attributes
     ----------
     data : DataFrame
         Data saved from the constructor.
     """
-    def __init__(self, data, sd):
+    def __init__(self, data, sd, imu_to_antenna_b=None):
         super(NedVelocityObs, self).__init__(data)
         self.R = sd**2 * np.eye(3)
+        self.imu_to_antenna_b = imu_to_antenna_b
 
     def compute_matrices(self, time, pva, error_model):
         if time not in self.data.index:
             return None
 
         z = pva[VEL_COLS] - self.data.loc[time, VEL_COLS]
+        if self.imu_to_antenna_b is not None and all(col in pva for col in RATE_COLS):
+            mat_nb = transform.mat_from_rph(pva[RPH_COLS])
+            z += mat_nb @ np.cross(pva[RATE_COLS], self.imu_to_antenna_b)
         H = error_model.ned_velocity_error_jacobian(pva)
 
         return z, H, self.R
