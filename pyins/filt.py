@@ -36,7 +36,7 @@ class Observation:
     def __init__(self, data):
         self.data = data
 
-    def compute_obs(self, time, pva, error_model):
+    def compute_matrices(self, time, pva, error_model):
         """Compute matrices for a single linearized observation.
 
         It must compute the observation model (z, H, R) at a given time stamp.
@@ -89,7 +89,7 @@ class PositionObs(Observation):
         self.R = sd**2 * np.eye(3)
         self.imu_to_antenna_b = imu_to_antenna_b
 
-    def compute_obs(self, time, pva, error_model):
+    def compute_matrices(self, time, pva, error_model):
         if time not in self.data.index:
             return None
 
@@ -122,7 +122,7 @@ class NedVelocityObs(Observation):
         super(NedVelocityObs, self).__init__(data)
         self.R = sd**2 * np.eye(3)
 
-    def compute_obs(self, time, pva, error_model):
+    def compute_matrices(self, time, pva, error_model):
         if time not in self.data.index:
             return None
 
@@ -151,7 +151,7 @@ class BodyVelocityObs(Observation):
         super(BodyVelocityObs, self).__init__(data)
         self.R = sd**2 * np.eye(3)
 
-    def compute_obs(self, time, pva, error_model):
+    def compute_matrices(self, time, pva, error_model):
         if time not in self.data.index:
             return None
 
@@ -427,7 +427,7 @@ def run_feedback_filter(initial_pva, position_sd, velocity_sd, level_sd, azimuth
             pva = integrator.predict((observation_time - time) / increment['dt'] *
                                      increment)
             for observation in observations:
-                ret = observation.compute_obs(observation_time, pva, error_model)
+                ret = observation.compute_matrices(observation_time, pva, error_model)
                 if ret is not None:
                     z, H, R = ret
                     H_full = np.zeros((len(z), n_states))
@@ -602,7 +602,7 @@ def run_feedforward_filter(trajectory_nominal, trajectory, position_sd, velocity
             pva = _interpolate_pva(trajectory.iloc[index], trajectory.iloc[index + 1],
                                    (observation_time - time) / (next_time - time))
             for observation in observations:
-                ret = observation.compute_obs(observation_time, pva, error_model)
+                ret = observation.compute_matrices(observation_time, pva, error_model)
                 if ret is not None:
                     z, H, R = ret
                     H_full = np.zeros((len(z), n_states))
