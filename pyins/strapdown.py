@@ -6,7 +6,7 @@ from .util import LLA_COLS, RPH_COLS, VEL_COLS, GYRO_COLS, ACCEL_COLS, TRAJECTOR
 from ._integrate import integrate_fast
 
 
-def compute_theta_and_dv(imu, sensor_type):
+def compute_increments_from_imu(imu, sensor_type):
     """Compute attitude and velocity increments from IMU readings.
 
     This function transforms raw gyro and accelerometer readings into

@@ -30,7 +30,7 @@ def test_run_feedback_filter():
 
     imu = inertial_sensor.apply_imu_errors(imu_true.iloc[::2], 'rate',
                                            gyro_errors, accel_errors)
-    increments = strapdown.compute_theta_and_dv(imu, 'rate')
+    increments = strapdown.compute_increments_from_imu(imu, 'rate')
 
     pos_sd = 10
     vel_sd = 2
@@ -88,7 +88,7 @@ def test_run_feedforward_filter():
     accel_model = inertial_sensor.InertialSensorModel(bias_sd=0.01, noise=0.01 / 60)
 
     imu = inertial_sensor.apply_imu_errors(imu_true, 'rate', gyro_errors, accel_errors)
-    increments = strapdown.compute_theta_and_dv(imu, 'rate')
+    increments = strapdown.compute_increments_from_imu(imu, 'rate')
 
     pos_sd = 10
     vel_sd = 0.1

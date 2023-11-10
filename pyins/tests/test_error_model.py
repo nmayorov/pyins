@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 from numpy.testing import assert_allclose
 from pyins import earth, error_models, sim, transform
-from pyins.strapdown import compute_theta_and_dv, Integrator
+from pyins.strapdown import compute_increments_from_imu, Integrator
 from pyins.transform import compute_state_difference
 from pyins.util import (VEL_COLS, RPH_COLS, NED_COLS, GYRO_COLS, ACCEL_COLS,
                         TRAJECTORY_ERROR_COLS)
@@ -25,7 +25,7 @@ def test_propagate_errors(error_model):
     imu[GYRO_COLS] += gyro_bias
     imu[ACCEL_COLS] += accel_bias
 
-    increments = compute_theta_and_dv(imu, 'rate')
+    increments = compute_increments_from_imu(imu, 'rate')
 
     pva_error = pd.Series(index=TRAJECTORY_ERROR_COLS)
     pva_error[NED_COLS] = [200, 100, 20]

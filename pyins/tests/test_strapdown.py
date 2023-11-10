@@ -3,7 +3,7 @@ from numpy.testing import assert_allclose
 import numpy as np
 from pyins import sim
 from pyins.transform import compute_state_difference
-from pyins.strapdown import compute_theta_and_dv, Integrator
+from pyins.strapdown import compute_increments_from_imu, Integrator
 from pyins.util import GYRO_COLS, ACCEL_COLS, THETA_COLS, DV_COLS
 
 
@@ -19,13 +19,13 @@ def test_coning_sculling():
     dv_true[:, 0] = 0
     dv_true[:, 1] = -0.5e-3
     dv_true[:, 2] = 0.1
-    increments = compute_theta_and_dv(imu, 'increment')
+    increments = compute_increments_from_imu(imu, 'increment')
     assert_allclose(increments[THETA_COLS], imu[GYRO_COLS].iloc[1:], rtol=1e-10)
     assert_allclose(increments[DV_COLS], dv_true, rtol=1e-10)
 
 
 def run_integration_test(reference_trajectory, imu, sensor_type, thresholds):
-    increments = compute_theta_and_dv(imu, sensor_type)
+    increments = compute_increments_from_imu(imu, sensor_type)
     integrator = Integrator(reference_trajectory.iloc[0])
     result = integrator.integrate(increments)
     diff = compute_state_difference(result, reference_trajectory).abs().max(axis=0)
