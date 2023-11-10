@@ -2,7 +2,7 @@
 import numpy as np
 import pandas as pd
 from scipy.spatial.transform import Rotation
-from . import earth, error_models, imu_model, kalman, util, transform, strapdown
+from . import earth, error_models, inertial_sensor, kalman, util, transform, strapdown
 from .util import (LLA_COLS, VEL_COLS, RPH_COLS, RATE_COLS, THETA_COLS, DV_COLS,
                    TRAJECTORY_ERROR_COLS)
 
@@ -355,7 +355,7 @@ def run_feedback_filter(initial_pva, position_sd, velocity_sd, level_sd, azimuth
         Initial assumed heading standard deviation in degrees.
     increments : Increments
         IMU increments.
-    gyro_model, accel_model : InertiaSensor, optional
+    gyro_model, accel_model : InertialSensorModel, optional
         Sensor models for gyros and accelerometers.
         If None (default), default models will be used.
     observations : list of Observation. optional
@@ -382,9 +382,9 @@ def run_feedback_filter(initial_pva, position_sd, velocity_sd, level_sd, azimuth
             innovations.
     """
     if gyro_model is None:
-        gyro_model = imu_model.InertialSensor()
+        gyro_model = imu_model.InertialSensorModel()
     if accel_model is None:
-        accel_model = imu_model.InertialSensor()
+        accel_model = imu_model.InertialSensorModel()
     if observations is None:
         observations = []
 
@@ -523,7 +523,7 @@ def run_feedforward_filter(trajectory_nominal, trajectory, position_sd, velocity
         Initial assumed roll and pitch standard deviation in degrees.
     azimuth_sd : float
         Initial assumed heading standard deviation in degrees.
-    gyro_model, accel_model : InertiaSensor, optional
+    gyro_model, accel_model : InertialSensorModel, optional
         Sensor models for gyros and accelerometers.
          If None (default), default models will be used.
     observations : list of Observation. optional
@@ -558,9 +558,9 @@ def run_feedforward_filter(trajectory_nominal, trajectory, position_sd, velocity
     times = trajectory_nominal.index
 
     if gyro_model is None:
-        gyro_model = imu_model.InertialSensor()
+        gyro_model = imu_model.InertialSensorModel()
     if accel_model is None:
-        accel_model = imu_model.InertialSensor()
+        accel_model = imu_model.InertialSensorModel()
     if observations is None:
         observations = []
 

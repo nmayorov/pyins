@@ -1,11 +1,13 @@
 """Statistical model for IMU."""
 import pandas as pd
 import numpy as np
-from .util import INDEX_TO_XYZ, XYZ_TO_INDEX
+from scipy._lib._util import check_random_state
+from . import util
+from .util import GYRO_COLS, ACCEL_COLS, INDEX_TO_XYZ, XYZ_TO_INDEX
 
 
-class InertialSensor:
-    """Inertial sensor triad description.
+class InertialSensorModel:
+    """Description of inertial sensor model.
 
     Below all parameters might be floats or arrays.In the former case the parameter is
     assumed to be the same for each of 3 sensors. In the latter case a non-positive
@@ -194,3 +196,92 @@ class InertialSensor:
                 estimates.append(self.transform[axis_out, axis_in] -
                                  1 if axis_out == axis_in else 0)
         return pd.Series(estimates, index=self.states)
+
+
+class InertialSensorError:
+    def __init__(self, transform=None, bias=None, noise=None, bias_walk=None,
+                 rng=None):
+        if transform is None:
+            transform = np.identity(3)
+        if bias is None:
+            bias = 0
+        if bias_walk is None:
+            bias_walk = 0
+        if noise is None:
+            noise = 0
+
+        bias = np.asarray(bias)
+        if bias.ndim == 0:
+            bias = np.resize(bias, 3)
+        bias_walk = np.asarray(bias_walk)
+        if bias_walk.ndim == 0:
+            bias_walk = np.resize(bias_walk, 3)
+
+        self.transform = np.asarray(transform)
+        self.bias = bias
+        self.bias_walk = bias_walk
+        self.noise = np.asarray(noise)
+        self.rng = check_random_state(rng)
+        self.dataframe = None
+
+    @classmethod
+    def from_inertial_sensor_model(cls, inertial_sensor_model, rng=None):
+        rng = check_random_state(rng)
+        transform = np.eye(3) + inertial_sensor_model.scale_misal_sd * rng.randn(3, 3)
+        bias = inertial_sensor_model.bias_sd * rng.randn(3)
+        return cls(transform, bias, inertial_sensor_model.noise,
+                   inertial_sensor_model.bias_walk, rng)
+
+    def apply(self, readings, sensor_type):
+        dt = np.hstack([0, np.diff(readings.index)])[:, None]
+        bias = self.bias + self.bias_walk * np.cumsum(
+            self.rng.randn(*readings.shape) * dt ** 0.5, axis=0)
+
+        dt[0, 0] = dt[1, 0]
+        result = util.mv_prod(self.transform, readings)
+        if sensor_type == 'rate':
+            result += bias
+            result += self.noise * dt**-0.5 * self.rng.randn(*readings.shape)
+        elif sensor_type == 'increment':
+            result += bias * dt
+            result += self.noise * dt**0.5 * self.rng.randn(*readings.shape)
+        else:
+            raise ValueError("`sensor_type` must be either 'rate' or 'increment ")
+
+        self.dataframe = pd.DataFrame(index=readings.index)
+        for axis in range(3):
+            if self.bias[axis] != 0 or self.bias_walk[axis] != 0:
+                self.dataframe[f'bias_{INDEX_TO_XYZ[axis]}'] = bias[:, axis]
+        for axis_out in range(3):
+            for axis_in in range(3):
+                nominal = 1 if axis_out == axis_in else 0
+                actual = self.transform[axis_out, axis_in]
+                if actual != nominal:
+                    self.dataframe[(f"sm_{INDEX_TO_XYZ[axis_out]}"
+                                    f"{INDEX_TO_XYZ[axis_in]}")] = actual - nominal
+
+        return pd.DataFrame(data=result, index=readings.index, columns=readings.columns)
+
+
+def apply_imu_errors(imu, sensor_type, gyro_errors, accel_errors):
+    """Apply IMU errors.
+
+    Parameters
+    ----------
+    imu : DataFrame
+        IMU data.
+    sensor_type : 'rate' or 'increment'
+        IMU type.
+    gyro_errors : InertialSensorError
+        Errors for gyros.
+    accel_errors : InertialSensorError
+        Errors for accelerometers.
+
+    Returns
+    -------
+    DataFrame
+        IMU data after application of errors.
+    """
+    return pd.DataFrame(np.hstack([gyro_errors.apply(imu[GYRO_COLS], sensor_type),
+                                   accel_errors.apply(imu[ACCEL_COLS], sensor_type)]),
+                        index=imu.index, columns=GYRO_COLS + ACCEL_COLS)

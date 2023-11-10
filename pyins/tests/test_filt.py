@@ -1,5 +1,5 @@
 import numpy as np
-from pyins import imu_model, filt, sim, strapdown, transform, util
+from pyins import inertial_sensor, filt, sim, strapdown, transform, util
 
 
 def test_run_feedback_filter():
@@ -18,16 +18,18 @@ def test_run_feedback_filter():
         sim.generate_body_velocity_observations(trajectory_true.iloc[61::200], 0.2,
                                                 rng), 0.2)
 
-    gyro_errors = sim.ImuErrors(
+    gyro_errors = inertial_sensor.InertialSensorError(
         bias=np.array([-100, 50, 40]) * transform.DH_TO_RS,
         noise=1 * transform.DRH_TO_RRS, rng=rng)
-    accel_errors = sim.ImuErrors(bias=[0.1, -0.1, 0.2], noise=1.0 / 60, rng=rng)
+    accel_errors = inertial_sensor.InertialSensorError(bias=[0.1, -0.1, 0.2],
+                                                       noise=1.0 / 60, rng=rng)
 
-    gyro_model = imu_model.InertialSensor(bias_sd=100 * transform.DH_TO_RS,
-                                     noise=1 * transform.DRH_TO_RRS)
-    accel_model = imu_model.InertialSensor(bias_sd=0.1, noise=1.0 / 60)
+    gyro_model = inertial_sensor.InertialSensorModel(bias_sd=100 * transform.DH_TO_RS,
+                                                     noise=1 * transform.DRH_TO_RRS)
+    accel_model = inertial_sensor.InertialSensorModel(bias_sd=0.1, noise=1.0 / 60)
 
-    imu = sim.apply_imu_errors(imu_true.iloc[::2], 'rate', gyro_errors, accel_errors)
+    imu = inertial_sensor.apply_imu_errors(imu_true.iloc[::2], 'rate',
+                                           gyro_errors, accel_errors)
     increments = strapdown.compute_theta_and_dv(imu, 'rate')
 
     pos_sd = 10
@@ -76,17 +78,16 @@ def test_run_feedforward_filter():
         sim.generate_body_velocity_observations(trajectory.iloc[64::100 * factor], 0.2,
                                                 rng), 0.2)
 
-    gyro_errors = sim.ImuErrors(bias=np.array([-1, 2, 1]) * transform.DH_TO_RS,
-                                noise=0.001 * transform.DRH_TO_RRS,
-                                rng=rng)
-    accel_errors = sim.ImuErrors(bias=[0.01, -0.01, 0.02],
-                                 noise=0.01 / 60,
-                                 rng=rng)
-    gyro_model = imu_model.InertialSensor(bias_sd=1 * transform.DH_TO_RS,
-                                          noise=0.001 * transform.DRH_TO_RRS)
-    accel_model = imu_model.InertialSensor(bias_sd=0.01, noise=0.01 / 60)
+    gyro_errors = inertial_sensor.InertialSensorError(
+        bias=np.array([-1, 2, 1]) * transform.DH_TO_RS,
+        noise=0.001 * transform.DRH_TO_RRS, rng=rng)
+    accel_errors = inertial_sensor.InertialSensorError(bias=[0.01, -0.01, 0.02],
+                                                       noise=0.01 / 60, rng=rng)
+    gyro_model = inertial_sensor.InertialSensorModel(bias_sd=1 * transform.DH_TO_RS,
+                                                     noise=0.001 * transform.DRH_TO_RRS)
+    accel_model = inertial_sensor.InertialSensorModel(bias_sd=0.01, noise=0.01 / 60)
 
-    imu = sim.apply_imu_errors(imu_true, 'rate', gyro_errors, accel_errors)
+    imu = inertial_sensor.apply_imu_errors(imu_true, 'rate', gyro_errors, accel_errors)
     increments = strapdown.compute_theta_and_dv(imu, 'rate')
 
     pos_sd = 10
