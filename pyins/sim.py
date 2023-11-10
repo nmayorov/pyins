@@ -182,8 +182,8 @@ def sinusoid_velocity_motion(dt, total_time, lla0, velocity_mean,
                              velocity_change_amplitude=0,
                              velocity_change_period=60,
                              velocity_change_phase_offset=[0, 90, 0],
-                             sensor_type='increment'):
-    """Generate trajectory with NED velocity changing as sinus.
+                             sensor_type='rate'):
+    """Generate trajectory with NED velocity changing as sine.
 
     The NED velocity changes as::
 
@@ -210,22 +210,22 @@ def sinusoid_velocity_motion(dt, total_time, lla0, velocity_mean,
         Phase offset for sinusoid part in degrees. Default is [0, 90, 0]
         which will create an ellipse for latitude-longitude trajectory when
         the mean velocity is zero.
-    sensor_type: 'increment' or 'rate', optional
-        Type of sensor to generate. If 'increment' (default), then integrals
-        over sampling intervals are generated (in rad and m/s).
-        If 'rate', then instantaneous rate values are generated
-        (in rad/s and /m/s/s).
+    sensor_type: 'rate' or 'increment', optional
+        Type of sensor to generate. If 'rate' (default), then instantaneous
+        rate values are generated (in rad/s and m/s/s). If 'increment', then
+        integrals over sampling intervals are generated (in rad and m/s).
 
     Returns
     -------
-    trajectory : DataFrame
-        Trajectory. Contains n_points rows.
-    imu : DataFrame
-        IMU data.
+    trajectory : Trajectory
+        Trajectory dataframe with n_points rows.
+    imu : Imu
+        IMU dataframe with n_points rows. When `sensor_type` is 'increment' the first
+        sample is duplicated for more convenient future processing.
     """
     time = np.arange(0, total_time, dt)
-    phase = 2 * np.pi * time[:, None] / velocity_change_period + \
-            np.deg2rad(velocity_change_phase_offset)
+    phase = (2 * np.pi * time[:, None] / velocity_change_period +
+             np.deg2rad(velocity_change_phase_offset))
     velocity_n = (np.atleast_2d(velocity_mean) +
                   np.atleast_2d(velocity_change_amplitude) * np.sin(phase))
     rph = np.zeros_like(velocity_n)
