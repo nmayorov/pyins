@@ -106,7 +106,7 @@ def test_ImuErrors_from_inertial_sensor_model():
                                 scale_misal_sd=[[0.01, 0.0, 0.0],
                                                 [0.0, 0.0, 0.01],
                                                 [0.0, 0.01, 0.0]])
-    imu_errors = InertialSensorError.from_inertial_sensor_model(model, 0)
+    imu_errors = InertialSensorError.from_InertialSensorModel(model, 0)
     assert imu_errors.bias[0] == 0
     assert imu_errors.bias[1] != 0
     assert imu_errors.bias[2] != 0

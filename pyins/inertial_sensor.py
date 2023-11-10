@@ -199,33 +199,83 @@ class InertialSensorModel:
 
 
 class InertialSensorError:
-    def __init__(self, transform=None, bias=None, noise=None, bias_walk=None,
-                 rng=None):
-        if transform is None:
-            transform = np.identity(3)
-        if bias is None:
-            bias = 0
-        if bias_walk is None:
-            bias_walk = 0
-        if noise is None:
-            noise = 0
+    def __init__(self, transform=None, bias=None, noise=None, bias_walk=None, rng=None):
+        """Errors of inertial sensor triad.
 
-        bias = np.asarray(bias)
-        if bias.ndim == 0:
-            bias = np.resize(bias, 3)
-        bias_walk = np.asarray(bias_walk)
-        if bias_walk.ndim == 0:
-            bias_walk = np.resize(bias_walk, 3)
+        The following basic mode is used::
 
-        self.transform = np.asarray(transform)
-        self.bias = bias
-        self.bias_walk = bias_walk
-        self.noise = np.asarray(noise)
+            x_out = T @ x + b + n
+
+        where
+
+            - ``x`` is a true kinematic vector
+            - ``x_out`` is a measured vector
+            - ``T`` is a 3x3 transformation matrix representing scale factor errors
+              and axes misalignments. It is an identity matrix in the ideal case.
+            - ``b`` is a bias vector, possibly slowly changing in time
+            - ``n`` is a noise vector modeled as white Gaussian random process
+
+        Parameters
+        ----------
+        transform : array_like, shape (3, 3) or None, optional
+            Transformation matrix, typically close to an identity matrix.
+            If None (default), an identity transform will be used.
+        bias : array_like, shape (3,) or None, optional
+            Bias vector. None (default) corresponds to zero.
+        noise : float, array_like of shape (3,) or None, optional
+            Intensity of noise (root PSD). None (default) corresponds to zero.
+        bias_walk : float, array_like of shape (3,) or None, optional
+            Intensity of noise (root PSD) integrated into bias.
+            None (default) corresponds to zero.
+        rng : None, int or RandomState
+            Random seed.
+
+        Attributes
+        ----------
+        parameters : DataFrame or None
+            After calling `apply` will contain DataFrame indexed by time with columns
+            containing non-zero parameters of IMU error model in the format consistent
+            with `InertialSensorModel`.
+        """
+        self.transform = self._verify_parameter(transform, 'transform', (3, 3), False,
+                                                np.eye(3))
+        self.bias = self._verify_parameter(bias, 'bias', (3,), False)
+        self.noise = self._verify_parameter(noise, 'noise', (3,), True)
+        self.bias_walk = self._verify_parameter(bias_walk, 'bias_walk', (3,), True)
         self.rng = check_random_state(rng)
-        self.dataframe = None
+        self.parameters = None
+
+    @staticmethod
+    def _verify_parameter(parameter, name, shape, allow_float, default=None):
+        if parameter is None:
+            parameter = np.zeros(shape) if default is None else default
+        else:
+            parameter = np.asarray(parameter)
+        if allow_float and parameter.ndim == 0:
+            parameter = np.resize(parameter, shape)
+        if parameter.shape != shape:
+            raise ValueError(f"`{name}` is expected to have shape {shape}")
+        return parameter
 
     @classmethod
-    def from_inertial_sensor_model(cls, inertial_sensor_model, rng=None):
+    def from_InertialSensorModel(cls, inertial_sensor_model, rng=None):
+        """Create object from InertialSensorModel.
+
+        Parameters will be randomly generated according to values contained in
+        `inertial_sensor_model`.
+
+        Parameters
+        ----------
+        inertial_sensor_model : `InertialSensorModel`
+            Instance of `InertialSensorModel`
+        rng : None, int or RandomState, optional
+            Random seed.
+
+        Returns
+        -------
+        InertialSensorError
+            Constructed according to the model.
+        """
         rng = check_random_state(rng)
         transform = np.eye(3) + inertial_sensor_model.scale_misal_sd * rng.randn(3, 3)
         bias = inertial_sensor_model.bias_sd * rng.randn(3)
@@ -233,6 +283,20 @@ class InertialSensorError:
                    inertial_sensor_model.bias_walk, rng)
 
     def apply(self, readings, sensor_type):
+        """Apply errors to the readings.
+
+        Parameters
+        ----------
+        readings : DataFrame
+            Either gyro or accelerometer readings, must contain only 3 columns.
+        sensor_type : 'rate' or 'increment'
+            Sensor type.
+
+        Returns
+        -------
+        DataFrame
+            Readings after the errors were applied.
+        """
         dt = np.hstack([0, np.diff(readings.index)])[:, None]
         bias = self.bias + self.bias_walk * np.cumsum(
             self.rng.randn(*readings.shape) * dt ** 0.5, axis=0)
@@ -248,16 +312,16 @@ class InertialSensorError:
         else:
             raise ValueError("`sensor_type` must be either 'rate' or 'increment ")
 
-        self.dataframe = pd.DataFrame(index=readings.index)
+        self.parameters = pd.DataFrame(index=readings.index)
         for axis in range(3):
             if self.bias[axis] != 0 or self.bias_walk[axis] != 0:
-                self.dataframe[f'bias_{INDEX_TO_XYZ[axis]}'] = bias[:, axis]
+                self.parameters[f'bias_{INDEX_TO_XYZ[axis]}'] = bias[:, axis]
         for axis_out in range(3):
             for axis_in in range(3):
                 nominal = 1 if axis_out == axis_in else 0
                 actual = self.transform[axis_out, axis_in]
                 if actual != nominal:
-                    self.dataframe[(f"sm_{INDEX_TO_XYZ[axis_out]}"
+                    self.parameters[(f"sm_{INDEX_TO_XYZ[axis_out]}"
                                     f"{INDEX_TO_XYZ[axis_in]}")] = actual - nominal
 
         return pd.DataFrame(data=result, index=readings.index, columns=readings.columns)

@@ -49,11 +49,11 @@ def test_run_feedback_filter():
 
     assert (util.compute_rms(error / result.trajectory_sd) < 1.5).all()
 
-    gyro_error = transform.compute_state_difference(result.gyro, gyro_errors.dataframe)
+    gyro_error = transform.compute_state_difference(result.gyro, gyro_errors.parameters)
     assert ((gyro_error.iloc[-1] / result.gyro_sd.iloc[-1]).abs() < 2.0).all()
 
     accel_error = transform.compute_state_difference(result.accel,
-                                                     accel_errors.dataframe)
+                                                     accel_errors.parameters)
     assert ((accel_error.iloc[-1] / result.accel_sd.iloc[-1]).abs() < 2.0).all()
 
     assert (util.compute_rms(result.innovations['PositionObs']) < 3.0).all()
