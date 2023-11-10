@@ -6,14 +6,14 @@ from scipy.linalg import cholesky, cho_solve, solve_triangular, expm
 def compute_process_matrices(F, Q, dt, algorithm='first-order'):
     """Compute discrete process matrices for Kalman filter prediction.
 
-    Support first order approximation and the algorithm with matrix exponential
-    [1]_.
+    First order approximation and the algorithm with matrix exponential [1]_ are
+    available.
 
     Parameters
     ----------
-    F : array_like, shape (n_states, n_states)
+    F : ndarray, shape (n_states, n_states)
         Continuous process transition matrix.
-    Q : array_like, shape (n_states, n_states)
+    Q : ndarray, shape (n_states, n_states)
         Continuous process noise matrix.
     dt : float
         Time step.
@@ -27,8 +27,6 @@ def compute_process_matrices(F, Q, dt, algorithm='first-order'):
            Matrix Exponential", IEEE TRANSACTIONS ON AUTOMATIC CONTROL,
            VOL. AC-23, NO. 3, JUNE 1978.
     """
-    F = np.asarray(F)
-    Q = np.asarray(Q)
     n = len(F)
     if algorithm == 'first-order':
         return np.eye(n) + F * dt, Q * dt
@@ -40,7 +38,7 @@ def compute_process_matrices(F, Q, dt, algorithm='first-order'):
         H = expm(H * dt)
         return H[:n, :n], H[:n, n:] @ H[:n, :n].T
     else:
-        assert False
+        raise ValueError("`algorithm` must be 'first-order' or 'expm'")
 
 
 def correct(x, P, z, H, R):
@@ -62,7 +60,7 @@ def correct(x, P, z, H, R):
     H : ndarray, shape (n_obs, n_states)
         Matrix which relates state and observation vectors.
     R : ndarray, shape (n_obs, n_obs)
-        Positive definite observation noise matrix.
+        Positive semi-definite observation noise matrix.
 
     Returns
     -------
@@ -75,11 +73,10 @@ def correct(x, P, z, H, R):
 
     e = z - H.dot(x)
     L = cholesky(S, lower=True)
-    K = cho_solve((L, True), HP, overwrite_b=True).transpose()
+    K = cho_solve((L, True), HP, overwrite_b=True).T
 
-    U = -K.dot(H)
-    U[np.diag_indices_from(U)] += 1
     x += K.dot(z - H.dot(x))
+    U = np.eye(len(x)) - K.dot(H)
     P[:] = U.dot(P).dot(U.T) + K.dot(R).dot(K.T)
 
     return solve_triangular(L, e, lower=True)
