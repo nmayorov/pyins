@@ -7,17 +7,16 @@ from .util import INDEX_TO_XYZ, XYZ_TO_INDEX
 class InertialSensor:
     """Inertial sensor triad description.
 
-    Below all parameters might be floats or arrays. In the former case the parameter
-    is assumed to be the same for each of 3 sensors. In the latter case a non-positive
-    elements disables the effect for the corresponding axis (or axes in case of
-    `scale_misal`). Setting a parameter to None completely disables the effect for all
-    axes.
+    Below all parameters might be floats or arrays.In the former case the parameter is
+    assumed to be the same for each of 3 sensors. In the latter case a non-positive
+    elements disables the effect for the corresponding axis (or axes in case
+    of `scale_misal_sd`). Setting a parameter to None completely disables the effect
+    for all axes.
 
-    Note that all parameters are measured in International System of Units.
+    All parameters are measured in International System of Units.
 
     Generally this class is not intended for public usage except its
-    construction with desired parameters and passing it to a filter class
-    constructor.
+    construction with desired parameters and passing it to one of the filter functions.
 
     Parameters
     ----------
@@ -40,14 +39,14 @@ class InertialSensor:
     MAX_OUTPUT_NOISES = 3
 
     def __init__(self, bias_sd=None, noise=None, bias_walk=None, scale_misal_sd=None):
-        bias_sd = self._verify_param(bias_sd, (3,), "bias")
+        bias_sd = self._verify_param(bias_sd, (3,), "bias_sd")
         noise = self._verify_param(noise, (3,), "noise")
         bias_walk = self._verify_param(bias_walk, (3,), "bias_walk")
-        scale_misal_sd = self._verify_param(scale_misal_sd, (3, 3), "scale_misal")
+        scale_misal_sd = self._verify_param(scale_misal_sd, (3, 3), "scale_misal_sd")
 
         if np.any(bias_walk[bias_sd <= 0] > 0):
             raise ValueError(
-                "``bias_walk` can be enabled only for axes where `bias` enabled")
+                "``bias_walk` can be enabled only for axes where `bias_sd` is positive")
 
         F = np.zeros((self.MAX_STATES, self.MAX_STATES))
         G = np.zeros((self.MAX_STATES, self.MAX_NOISES))
@@ -78,18 +77,16 @@ class InertialSensor:
         output_axes = []
         input_axes = []
         scale_misal_states = []
-        if scale_misal_sd is not None:
-            for output_axis in range(3):
-                for input_axis in range(3):
-                    if scale_misal_sd[output_axis, input_axis] > 0:
-                        output_axes.append(output_axis)
-                        input_axes.append(input_axis)
-                        scale_misal_states.append(n_states)
-                        P[n_states, n_states] = scale_misal_sd[
-                            output_axis, input_axis] ** 2
-                        states.append(f"sm_{INDEX_TO_XYZ[output_axis]}"
-                                      f"{INDEX_TO_XYZ[input_axis]}")
-                        n_states += 1
+        for output_axis in range(3):
+            for input_axis in range(3):
+                if scale_misal_sd[output_axis, input_axis] > 0:
+                    output_axes.append(output_axis)
+                    input_axes.append(input_axis)
+                    scale_misal_states.append(n_states)
+                    P[n_states, n_states] = scale_misal_sd[output_axis, input_axis] ** 2
+                    states.append(
+                        f"sm_{INDEX_TO_XYZ[output_axis]}{INDEX_TO_XYZ[input_axis]}")
+                    n_states += 1
 
         n_output_noises = 0
         for axis in range(3):
@@ -114,7 +111,7 @@ class InertialSensor:
         self.bias_sd = bias_sd
         self.noise = noise
         self.bias_walk = bias_walk
-        self.readings_required = bool(output_axes)
+        self.scale_misal_modelled = bool(output_axes)
         self.scale_misal_sd = scale_misal_sd
         self.scale_misal_data = output_axes, input_axes, scale_misal_states
         self.P = P
@@ -135,20 +132,19 @@ class InertialSensor:
 
         param = np.asarray(param)
         if param.ndim == 0:
-            param = np.resize(param, 3)
-        if param.shape != shape:
+            param = np.resize(param, shape)
+        elif param.shape != shape:
             raise ValueError(f"`{name}` might be float or array with shape {shape}")
 
         return param
 
     def output_matrix(self, readings=None):
-        if not self.readings_required:
+        if not self.scale_misal_modelled:
             return self.H
 
         if readings is None:
-            raise ValueError(
-                "Inertial `readings` are required when " "`self.scale_misal` is set."
-            )
+            raise ValueError("`readings` are required when scale factor and "
+                             "misalignment errors are modeled.")
 
         readings = np.asarray(readings)
         output_axes, input_axes, states = self.scale_misal_data
@@ -181,25 +177,20 @@ class InertialSensor:
 
     def correct_increments(self, dt, increments):
         dt = np.asarray(dt).reshape(-1, 1)
-        result = np.linalg.solve(
-            self.transform,
-            (increments.values - self.bias * dt).transpose()).transpose()
-        result = np.ascontiguousarray(result)
-        return pd.DataFrame(result, index=increments.index, columns=increments.columns)
+        return pd.DataFrame(
+            np.linalg.solve(self.transform, (increments.values - self.bias * dt).T).T,
+            index=increments.index, columns=increments.columns)
 
     def get_estimates(self):
-        states = []
         estimates = []
         for state in self.states:
             items = state.split("_")
             if items[0] == 'bias':
                 axis = XYZ_TO_INDEX[items[1]]
-                states.append(state)
                 estimates.append(self.bias[axis])
             elif items[0] == 'sm':
                 axis_out = XYZ_TO_INDEX[items[1][0]]
                 axis_in = XYZ_TO_INDEX[items[1][1]]
-                states.append(state)
                 estimates.append(self.transform[axis_out, axis_in] -
                                  1 if axis_out == axis_in else 0)
-        return pd.Series(estimates, index=states)
+        return pd.Series(estimates, index=self.states)

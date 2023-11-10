@@ -564,8 +564,8 @@ def run_feedforward_filter(trajectory_nominal, trajectory, position_sd, velocity
     if observations is None:
         observations = []
 
-    if increments is None and (gyro_model.readings_required or
-                               accel_model.readings_required):
+    if increments is None and (gyro_model.scale_misal_modelled or
+                               accel_model.scale_misal_modelled):
         raise ValueError("When scale or misalignments errors are modelled, "
                          "`increments` must be provided")
 
