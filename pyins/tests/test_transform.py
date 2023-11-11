@@ -23,21 +23,6 @@ def test_perturb_ll():
     assert_allclose(lla_back, lla, rtol=1e-11)
 
 
-def test_phi_to_delta_rph():
-    rph = [10, -20, 30]
-    mat = transform.mat_from_rph(rph)
-    phi = np.array([-0.02, 0.01, -0.03])
-    mat_perturbed = Rotation.from_rotvec(-phi).as_matrix() @ mat
-
-    rph_perturbed = transform.mat_to_rph(mat_perturbed)
-    delta_rph_true = rph_perturbed - rph
-
-    T = transform.phi_to_delta_rph(rph)
-    delta_rph_linear = np.rad2deg(T @ phi)
-
-    assert_allclose(delta_rph_linear, delta_rph_true, rtol=1e-1)
-
-
 def test_mat_en_from_ll():
     A1 = np.eye(3)
     A2 = np.array([[0, 0, -1], [0, 1, 0], [1, 0, 0]])

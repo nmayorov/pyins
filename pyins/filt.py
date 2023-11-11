@@ -93,7 +93,7 @@ class PositionObs(Observation):
         if time not in self.data.index:
             return None
 
-        z = transform.difference_lla(pva[LLA_COLS], self.data.loc[time, LLA_COLS])
+        z = transform.compute_lla_difference(pva[LLA_COLS], self.data.loc[time, LLA_COLS])
         if self.imu_to_antenna_b is not None:
             mat_nb = transform.mat_from_rph(pva[RPH_COLS])
             z += mat_nb @ self.imu_to_antenna_b

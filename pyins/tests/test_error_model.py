@@ -2,11 +2,27 @@ import numpy as np
 import pandas as pd
 import pytest
 from numpy.testing import assert_allclose
+from scipy.spatial.transform import Rotation
 from pyins import earth, error_models, sim, transform
 from pyins.strapdown import compute_increments_from_imu, Integrator
 from pyins.transform import compute_state_difference
 from pyins.util import (VEL_COLS, RPH_COLS, NED_COLS, GYRO_COLS, ACCEL_COLS,
                         TRAJECTORY_ERROR_COLS)
+
+
+def test_phi_to_delta_rph():
+    rph = [10, -20, 30]
+    mat = transform.mat_from_rph(rph)
+    phi = np.array([-0.02, 0.01, -0.03])
+    mat_perturbed = Rotation.from_rotvec(-phi).as_matrix() @ mat
+
+    rph_perturbed = transform.mat_to_rph(mat_perturbed)
+    delta_rph_true = rph_perturbed - rph
+
+    T = error_models._phi_to_delta_rph(rph)
+    delta_rph_linear = np.rad2deg(T @ phi)
+
+    assert_allclose(delta_rph_linear, delta_rph_true, rtol=1e-1)
 
 
 @pytest.mark.parametrize("error_model", [error_models.ModifiedPhiModel,

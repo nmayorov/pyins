@@ -7,6 +7,26 @@ from .util import (LLA_COLS, VEL_COLS, RPH_COLS, RATE_COLS, NED_COLS,
                    TRAJECTORY_ERROR_COLS)
 
 
+def _phi_to_delta_rph(rph):
+    rph = np.asarray(rph)
+    single = rph.ndim == 1
+    rph = np.atleast_2d(rph)
+    result = np.zeros((len(rph), 3, 3))
+
+    sin = np.sin(np.deg2rad(rph))
+    cos = np.cos(np.deg2rad(rph))
+
+    result[:, 0, 0] = -cos[:, 2] / cos[:, 1]
+    result[:, 0, 1] = -sin[:, 2] / cos[:, 1]
+    result[:, 1, 0] = sin[:, 2]
+    result[:, 1, 1] = -cos[:, 2]
+    result[:, 2, 0] = -cos[:, 2] * sin[:, 1] / cos[:, 1]
+    result[:, 2, 1] = -sin[:, 2] * sin[:, 1] / cos[:, 1]
+    result[:, 2, 2] = -1
+
+    return result[0] if single else result
+
+
 class InsErrorModel:
     """INS error model interface.
 
@@ -243,7 +263,7 @@ class ModifiedPhiModel(InsErrorModel):
         T[np.ix_(samples, self.DV_OUT, self.DV)] = np.eye(3)
         T[np.ix_(samples, self.DV_OUT, self.PHI)] = util.skew_matrix(
             trajectory[VEL_COLS])
-        T[np.ix_(samples, self.DRPH, self.PHI)] = transform.phi_to_delta_rph(
+        T[np.ix_(samples, self.DRPH, self.PHI)] = _phi_to_delta_rph(
             trajectory[RPH_COLS])
 
         return T[0] if series else T
@@ -368,7 +388,7 @@ class ModifiedPsiModel(InsErrorModel):
         T[np.ix_(samples, self.DV_OUT, self.PSI)] = util.skew_matrix(
             trajectory[VEL_COLS])
 
-        T_rph_phi = transform.phi_to_delta_rph(trajectory[RPH_COLS])
+        T_rph_phi = _phi_to_delta_rph(trajectory[RPH_COLS])
         R = earth.curvature_matrix(trajectory.lat, trajectory.alt)
         T[np.ix_(samples, self.DRPH, self.PSI)] = T_rph_phi
         T[np.ix_(samples, self.DRPH, self.DR)] = util.mm_prod(T_rph_phi, R)

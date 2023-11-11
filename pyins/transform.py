@@ -19,7 +19,7 @@ DRH_TO_RRS = DEG_TO_RAD / 60
 
 
 def lla_to_ecef(lla):
-    """Convert latitude, longitude, altitude to ECEF Cartesian coordinates.
+    """Convert latitude, longitude, altitude into ECEF Cartesian coordinates.
 
     Parameters
     ----------
@@ -47,7 +47,7 @@ def lla_to_ecef(lla):
     return r_e.transpose()
 
 
-def perturb_lla(lla, delta_ned):
+def perturb_lla(lla, dr_n):
     """Perturb latitude, longitude and altitude.
 
     This function recomputes linear displacements in meters to changes in a
@@ -60,7 +60,7 @@ def perturb_lla(lla, delta_ned):
     ----------
     lla : array_like, shape (3,) or (n, 3)
         Latitude, longitude and altitude.
-    delta_ned : array_like, shape (3,) or (n, 3)
+    dr_n : array_like, shape (3,) or (n, 3)
         Perturbation values in meters resolved in NED frame.
 
     Returns
@@ -69,22 +69,22 @@ def perturb_lla(lla, delta_ned):
         Perturbed values of latitude, longitude and altitude.
     """
     lla = np.asarray(lla, dtype=float)
-    delta_ned = np.asarray(delta_ned)
-    return_single = lla.ndim == 1 and delta_ned.ndim == 1
+    dr_n = np.asarray(dr_n)
+    return_single = lla.ndim == 1 and dr_n.ndim == 1
 
     lla = np.atleast_2d(lla).copy()
-    delta_ned = np.atleast_2d(delta_ned)
+    dr_n = np.atleast_2d(dr_n)
 
     rn, _, rp = earth.principal_radii(lla[:, 0], lla[:, 2])
 
-    lla[:, 0] += np.rad2deg(delta_ned[:, 0] / rn)
-    lla[:, 1] += np.rad2deg(delta_ned[:, 1] / rp)
-    lla[:, 2] -= delta_ned[:, 2]
+    lla[:, 0] += np.rad2deg(dr_n[:, 0] / rn)
+    lla[:, 1] += np.rad2deg(dr_n[:, 1] / rp)
+    lla[:, 2] -= dr_n[:, 2]
 
     return lla[0] if return_single else lla
 
 
-def difference_lla(lla1, lla2):
+def compute_lla_difference(lla1, lla2):
     """Compute difference between lla points resolved in NED in meters.
 
     Parameters
@@ -94,7 +94,7 @@ def difference_lla(lla1, lla2):
 
     Returns
     -------
-    difference_ned : ndarray
+    dr_n : ndarray
         Difference in meters resolved in NED.
     """
     lla1 = np.asarray(lla1)
@@ -112,18 +112,37 @@ def difference_lla(lla1, lla2):
     return result[0] if single else result
 
 
-def to_180_degrees_range(angle):
-    angle = angle % 360.0
-    if isinstance(angle, (pd.Series, pd.DataFrame)):
-        angle = angle.copy()
-    else:
-        angle = np.asarray(angle)
-    angle[angle < -180.0] += 360.0
-    angle[angle > 180.0] -= 360.0
-    return angle
-
-
 def compute_state_difference(first, second):
+    """Compute difference between two state dataframes indexed by time.
+
+    The function synchronizes data to the common time index using piecewise linear
+    interpolation. The interpolation is done for the dataframe with more frequent
+    data (to reduce average interpolation period).
+
+    For columns 'lat', 'lon', 'alt', the difference is computed in meters
+    resolved in NED frame. For columns 'roll', 'pitch' and 'heading' the interpolation
+    is done in the rotation space using SLERP algorithm.
+
+    Parameters
+    ----------
+    first, second : DataFrame
+        State data to compute the difference between. Both must be indexed by time.
+
+    Returns
+    -------
+    DataFrame
+        Computed difference.
+    """
+    def to_180_degrees_range(angle):
+        angle = angle % 360.0
+        if isinstance(angle, (pd.Series, pd.DataFrame)):
+            angle = angle.copy()
+        else:
+            angle = np.asarray(angle)
+        angle[angle < -180.0] += 360.0
+        angle[angle > 180.0] -= 360.0
+        return angle
+
     def has_lla(data):
         return all(col in data for col in LLA_COLS)
 
@@ -209,73 +228,24 @@ def compute_state_difference(first, second):
             else pd.DataFrame(index=index))
 
 
-def phi_to_delta_rph(rph):
-    """Compute transformation matrix relating small phi angle and rph error.
-
-    This function computes matrix `T` which relates perturbation of roll,
-    pitch and heading angles to the perturbation of the matrix
-    `exp(-phi) @ C` as::
-
-        delta_rph = T @ phi
-
-    Parameters
-    ----------
-    rph : array_like, shape (3,) or (n, 3)
-        Roll, pitch and heading.
-
-    Returns
-    -------
-    ndarray, shape (3, 3) or (n, 3, 3)
-        Transformation matrix.
-    """
-
-    rph = np.asarray(rph)
-    single = rph.ndim == 1
-    rph = np.atleast_2d(rph)
-    result = np.zeros((len(rph), 3, 3))
-
-    sin = np.sin(np.deg2rad(rph))
-    cos = np.cos(np.deg2rad(rph))
-
-    result[:, 0, 0] = -cos[:, 2] / cos[:, 1]
-    result[:, 0, 1] = -sin[:, 2] / cos[:, 1]
-    result[:, 1, 0] = sin[:, 2]
-    result[:, 1, 1] = -cos[:, 2]
-    result[:, 2, 0] = -cos[:, 2] * sin[:, 1] / cos[:, 1]
-    result[:, 2, 1] = -sin[:, 2] * sin[:, 1] / cos[:, 1]
-    result[:, 2, 2] = -1
-
-    return result[0] if single else result
-
-
 def mat_en_from_ll(lat, lon):
-    """Create a direction cosine from ECEF to NED frame.
-
-    The sequence of elemental rotations is as follows::
-
-              lon      -90 - lat
-        E ----------> ----------> N
-               3           2
-
-    Here E denotes the ECEF frame and N denotes the local level
-    north-pointing frame. The resulting DCM projects from N frame to E frame.
+    """Create a rotation matrix projecting from ECEF to NED frame.
 
     Parameters
     ----------
-    lat, lon : float or array_like with shape (n,)
+    lat, lon : float or array_like, shape (n,)
         Latitude and longitude.
 
     Returns
     -------
-    dcm : ndarray, shape (3, 3) or (n, 3, 3)
-        Direction Cosine Matrices.
+    ndarray, shape (3, 3) or (n, 3, 3)
+        Rotation matrices.
     """
     lat = np.asarray(lat)
     lon = np.asarray(lon)
 
     if lat.ndim == 0 and lon.ndim == 0:
-        return Rotation.from_euler('ZY', [lon, -90 - lat],
-                                   degrees=True).as_matrix()
+        return Rotation.from_euler('ZY', [lon, -90 - lat], degrees=True).as_matrix()
 
     lat = np.atleast_1d(lat)
     lon = np.atleast_1d(lon)
@@ -290,14 +260,6 @@ def mat_en_from_ll(lat, lon):
 def mat_from_rph(rph):
     """Create a rotation matrix from roll, pitch and heading.
 
-    The sequence of elemental rotations is as follows::
-
-           heading    pitch   roll
-        N ---------> ------> -----> B
-              3         2       1
-
-    The resulting matrix projects from B frame to N frame.
-
     Parameters
     ----------
     rph : array_like, shape (3,) or (n, 3)
@@ -305,26 +267,23 @@ def mat_from_rph(rph):
 
     Returns
     -------
-    dcm : ndarray, shape (3, 3) or (n, 3, 3)
-        Direction cosine matrices.
+    ndarray, shape (3, 3) or (n, 3, 3)
+        Rotation matrices.
     """
     return Rotation.from_euler('xyz', rph, degrees=True).as_matrix()
 
 
 def mat_to_rph(mat):
-    """Convert a rotation matrix to roll, pitch, heading angles.
-
-    The returned heading is within [0, 360], the pitch is within [-90, 90]
-    and the roll is within [-90, 90].
+    """Convert a rotation matrix to roll, pitch and heading angles.
 
     Parameters
     ----------
     mat : array_like, shape (3, 3) or (n, 3, 3)
-        Direction cosine matrices.
+        Rotation matrices.
 
     Returns
     -------
-    rph : ndarray, with shape (3,) or (n, 3)
-        Heading, pitch and roll.
+    ndarray, with shape (3,) or (n, 3)
+        Roll, pitch and heading angles.
     """
     return Rotation.from_matrix(mat).as_euler('xyz', degrees=True)
