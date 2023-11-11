@@ -74,7 +74,7 @@ cdef double gravity(double lat, double alt):
 
 
 def integrate_fast(double[:] dt_array, double[:, :] lla, double[:, :] velocity_n,
-                   double[:, :, :] Cnb, double[:, ::1] theta, double[:, ::1] dv,
+                   double[:, :, :] mat_nb, double[:, ::1] theta, double[:, ::1] dv,
                    int offset, bint with_altitude):
     cdef int i, j
     cdef double lat, alt
@@ -85,7 +85,7 @@ def integrate_fast(double[:] dt_array, double[:, :] lla, double[:, :] velocity_n
     cdef double[:] xi = np.empty(3)
     cdef double[:] dv_n = np.empty(3)
 
-    cdef double[:, :] B = Cnb[offset].copy_fortran()
+    cdef double[:, :] B = mat_nb[offset].copy_fortran()
     cdef double[::1, :] C = np.empty((3, 3), order='F')
     cdef double[::1, :] dBn = np.empty((3, 3), order='F')
     cdef double[::1, :] dBb = np.empty((3, 3), order='F')
@@ -173,4 +173,4 @@ def integrate_fast(double[:] dt_array, double[:, :] lla, double[:, :] velocity_n
         dcm_from_rotvec(theta[i], dBb)
         mm(B, dBb, C)
         mm(dBn, C, B)
-        Cnb[j + 1] = B.copy()
+        mat_nb[j + 1] = B.copy()

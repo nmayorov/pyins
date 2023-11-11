@@ -218,7 +218,7 @@ class ModifiedPhiModel(InsErrorModel):
         Omega_n = earth.rate_n(trajectory.lat)
         rho_n = util.mv_prod(R, trajectory[VEL_COLS])
         g_n = earth.gravity_n(trajectory.lat, trajectory.alt)
-        Cnb = transform.mat_from_rph(trajectory[RPH_COLS])
+        mat_nb = transform.mat_from_rph(trajectory[RPH_COLS])
 
         F = np.zeros((n_samples, self.N_STATES, self.N_STATES))
         samples = np.arange(n_samples)
@@ -239,11 +239,11 @@ class ModifiedPhiModel(InsErrorModel):
             -util.skew_matrix(rho_n + Omega_n) + util.mm_prod(R, V_skew)
 
         B_gyro = np.zeros((n_samples, self.N_STATES, 3))
-        B_gyro[np.ix_(samples, self.DV, [0, 1, 2])] = util.mm_prod(V_skew, Cnb)
-        B_gyro[np.ix_(samples, self.PHI, [0, 1, 2])] = -Cnb
+        B_gyro[np.ix_(samples, self.DV, [0, 1, 2])] = util.mm_prod(V_skew, mat_nb)
+        B_gyro[np.ix_(samples, self.PHI, [0, 1, 2])] = -mat_nb
 
         B_accel = np.zeros((n_samples, self.N_STATES, 3))
-        B_accel[np.ix_(samples, self.DV, [0, 1, 2])] = Cnb
+        B_accel[np.ix_(samples, self.DV, [0, 1, 2])] = mat_nb
 
         if is_series:
             F = F[0]
@@ -296,9 +296,9 @@ class ModifiedPhiModel(InsErrorModel):
         return result
 
     def body_velocity_error_jacobian(self, pva):
-        Cnb = transform.mat_from_rph(pva[RPH_COLS])
+        mat_nb = transform.mat_from_rph(pva[RPH_COLS])
         result = np.zeros((3, self.N_STATES))
-        result[:, self.DV] = Cnb.transpose()
+        result[:, self.DV] = mat_nb.transpose()
         return result
 
 
@@ -344,7 +344,7 @@ class ModifiedPsiModel(InsErrorModel):
         rho_n = util.mv_prod(R, trajectory[VEL_COLS])
         g_n_skew = util.skew_matrix(earth.gravity_n(trajectory.lat,
                                                     trajectory.alt))
-        Cnb = transform.mat_from_rph(trajectory[RPH_COLS])
+        mat_nb = transform.mat_from_rph(trajectory[RPH_COLS])
 
         F = np.zeros((n_samples, self.N_STATES, self.N_STATES))
         samples = np.arange(n_samples)
@@ -363,11 +363,11 @@ class ModifiedPsiModel(InsErrorModel):
                                                                    Omega_n)
 
         B_gyro = np.zeros((n_samples, self.N_STATES, 3))
-        B_gyro[np.ix_(samples, self.DV, [0, 1, 2])] = util.mm_prod(V_skew, Cnb)
-        B_gyro[np.ix_(samples, self.PSI, [0, 1, 2])] = -Cnb
+        B_gyro[np.ix_(samples, self.DV, [0, 1, 2])] = util.mm_prod(V_skew, mat_nb)
+        B_gyro[np.ix_(samples, self.PSI, [0, 1, 2])] = -mat_nb
 
         B_accel = np.zeros((n_samples, self.N_STATES, 3))
-        B_accel[np.ix_(samples, self.DV, [0, 1, 2])] = Cnb
+        B_accel[np.ix_(samples, self.DV, [0, 1, 2])] = mat_nb
 
         if is_series:
             F = F[0]
@@ -431,9 +431,9 @@ class ModifiedPsiModel(InsErrorModel):
         return result
 
     def body_velocity_error_jacobian(self, pva):
-        Cnb = transform.mat_from_rph(pva[RPH_COLS])
+        mat_nb = transform.mat_from_rph(pva[RPH_COLS])
         result = np.zeros((3, self.N_STATES))
-        result[:, self.DV] = Cnb.transpose()
+        result[:, self.DV] = mat_nb.transpose()
         return result
 
 
