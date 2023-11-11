@@ -78,17 +78,15 @@ def compute_increments_from_imu(imu, sensor_type):
 
 
 class Integrator:
-    """Integrate inertial readings by strapdown algorithm.
+    """Strapdown INS integration algorithm.
 
     The algorithm described in [1]_ and [2]_ is used with slight
     simplifications. The position is updated using the trapezoid rule.
 
     Parameters
     ----------
-    dt : float
-        Sensors sampling period.
-    pva : pd.Series
-        Initial trajectory point.
+    pva : Pva
+        Initial position-velocity-attitude.
     with_altitude : bool, optional
         Whether to compute altitude and vertical velocity. Default is True.
         If False, then vertical velocity is set to zero and altitude is kept
@@ -96,12 +94,8 @@ class Integrator:
 
     Attributes
     ----------
-    trajectory : DataFrame
+    trajectory : Trajectory
         Computed trajectory so far.
-
-    See Also
-    --------
-    coning_sculling : Apply coning and sculling corrections.
 
     References
     ----------
@@ -115,45 +109,38 @@ class Integrator:
     INITIAL_SIZE = 10000
 
     def __init__(self, pva, with_altitude=True):
+        self.initial_pva = pva.copy()
         self.with_altitude = with_altitude
         if not with_altitude:
-            pva.VD = 0.0
+            self.initial_pva.VD = 0.0
 
         self.lla = np.empty((self.INITIAL_SIZE, 3))
         self.velocity_n = np.empty((self.INITIAL_SIZE, 3))
-        self.Cnb = np.empty((self.INITIAL_SIZE, 3, 3))
+        self.mat_nb = np.empty((self.INITIAL_SIZE, 3, 3))
 
-        self.trajectory = None
-
-        self._init_values = pva
-        self.reset()
-
-    def reset(self):
-        """Clear computed trajectory except the initial point."""
-        self.lla[0] = self._init_values[LLA_COLS]
-        self.velocity_n[0] = self._init_values[VEL_COLS]
-        self.Cnb[0] = transform.mat_from_rph(self._init_values[RPH_COLS])
-        self.trajectory = self._init_values.to_frame().transpose(copy=True)
+        self.lla[0] = self.initial_pva[LLA_COLS]
+        self.velocity_n[0] = self.initial_pva[VEL_COLS]
+        self.mat_nb[0] = transform.mat_from_rph(self.initial_pva[RPH_COLS])
+        self.trajectory = self.initial_pva.to_frame().transpose(copy=True)
         self.trajectory.index.name = 'time'
 
     def _integrate(self, increments, mode):
-        theta = np.ascontiguousarray(increments[['theta_x', 'theta_y', 'theta_z']])
-        dv = np.ascontiguousarray(increments[['dv_x', 'dv_y', 'dv_z']])
-
-        n_data = self.trajectory.shape[0]
-        n_readings = theta.shape[0]
-        size = self.lla.shape[0]
+        n_data = len(self.trajectory)
+        n_readings = len(increments)
+        size = len(self.lla)
 
         required_size = n_data + n_readings
         if required_size > size:
             new_size = max(2 * size, required_size)
             self.lla.resize((new_size, 3), refcheck=False)
             self.velocity_n.resize((new_size, 3), refcheck=False)
-            self.Cnb.resize((new_size, 3, 3), refcheck=False)
+            self.mat_nb.resize((new_size, 3, 3), refcheck=False)
 
-        integrate_fast(np.asarray(increments.dt), self.lla, self.velocity_n, self.Cnb,
-                       theta, dv, n_data - 1, self.with_altitude)
-        rph = transform.mat_to_rph(self.Cnb[n_data:n_data + n_readings])
+        theta = np.ascontiguousarray(increments[['theta_x', 'theta_y', 'theta_z']])
+        dv = np.ascontiguousarray(increments[['dv_x', 'dv_y', 'dv_z']])
+        integrate_fast(np.asarray(increments.dt), self.lla, self.velocity_n,
+                       self.mat_nb, theta, dv, n_data - 1, self.with_altitude)
+        rph = transform.mat_to_rph(self.mat_nb[n_data : n_data + n_readings])
         trajectory = pd.DataFrame(
             np.hstack([self.lla[n_data : n_data + n_readings],
                        self.velocity_n[n_data : n_data + n_readings],
@@ -169,51 +156,53 @@ class Integrator:
             assert False
 
     def integrate(self, increments):
-        """Integrate inertial readings.
+        """Update trajectory by given inertial increments.
 
-        The integration continues from the last computed value.
+        The integration continues from the last computed values.
 
         Parameters
         ----------
-        increments : pd.DataFrame
-            Rotation vectors and velocity increments computed from gyro and
-            accelerometer readings after applying coning and sculling
-            corrections.
+        increments : Increments
+            Attitude and velocity increments computed from gyro and accelerometer
+            readings.
 
         Returns
         -------
-        traj_last : DataFrame
-            Added chunk of the trajectory. It contains n_readings + 1 rows
-            including the last point before `theta` and `dv` where integrated.
+        Trajectory
+            Added chunk of the trajectory including the last point before
+            `increments` were integrated.
         """
         return self._integrate(increments, 'integrate')
 
     def predict(self, increment):
-        return self._integrate(increment.to_frame().transpose(), 'predict').iloc[0]
+        """Predict position-velocity-increment given a single increment.
 
-    def get_time(self):
-        return self.trajectory.index[-1]
-
-    def get_pva(self):
-        """Get current integrator state.
-
-        Returns
-        -------
-        pva : pd.Series
-            Trajectory point.
-        """
-        return self.trajectory.iloc[-1]
-
-    def set_pva(self, pva):
-        """Set (overwrite) the current integrator state.
+        The stored trajectory is not updated.
 
         Parameters
         ----------
-        pva : pd.Series
-            Trajectory point.
+        increment : Series
+            Single increment as a row of Increments DataFrame.
+
+        Returns
+        -------
+        Pva
+            Predicted position-velocity-attitude.
         """
+        return self._integrate(increment.to_frame().transpose(), 'predict').iloc[0]
+
+    def get_time(self):
+        """Get time of the latest position-velocity-attitude."""
+        return self.trajectory.index[-1]
+
+    def get_pva(self):
+        """Get the latest position-velocity-attitude."""
+        return self.trajectory.iloc[-1]
+
+    def set_pva(self, pva):
+        """Set (overwrite) the latest position-velocity-attitude."""
         i = len(self.trajectory) - 1
         self.lla[i] = pva[LLA_COLS]
         self.velocity_n[i] = pva[VEL_COLS]
-        self.Cnb[i] = transform.mat_from_rph(pva[RPH_COLS])
+        self.mat_nb[i] = transform.mat_from_rph(pva[RPH_COLS])
         self.trajectory.iloc[-1] = pva
