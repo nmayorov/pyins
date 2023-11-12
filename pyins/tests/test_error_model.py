@@ -1,9 +1,8 @@
 import numpy as np
 import pandas as pd
-import pytest
 from numpy.testing import assert_allclose
 from scipy.spatial.transform import Rotation
-from pyins import earth, error_models, sim, transform
+from pyins import earth, error_model, sim, transform
 from pyins.strapdown import compute_increments_from_imu, Integrator
 from pyins.transform import compute_state_difference
 from pyins.util import (VEL_COLS, RPH_COLS, NED_COLS, GYRO_COLS, ACCEL_COLS,
@@ -19,15 +18,13 @@ def test_phi_to_delta_rph():
     rph_perturbed = transform.mat_to_rph(mat_perturbed)
     delta_rph_true = rph_perturbed - rph
 
-    T = error_models._phi_to_delta_rph(rph)
+    T = error_model._phi_to_delta_rph(rph)
     delta_rph_linear = np.rad2deg(T @ phi)
 
     assert_allclose(delta_rph_linear, delta_rph_true, rtol=1e-1)
 
 
-@pytest.mark.parametrize("error_model", [error_models.ModifiedPhiModel,
-                                         error_models.ModifiedPsiModel])
-def test_propagate_errors(error_model):
+def test_propagate_errors():
     dt = 0.5
     t = 0.5 * 3600
 
@@ -53,9 +50,8 @@ def test_propagate_errors(error_model):
     traj_c = integrator.integrate(increments)
     error_true = compute_state_difference(traj_c, trajectory)
 
-    error_linear, _ = error_models.propagate_errors(trajectory, pva_error,
-                                                    gyro_bias, accel_bias,
-                                                    error_model=error_model())
+    error_linear, _ = error_model.propagate_errors(trajectory, pva_error,
+                                                   gyro_bias, accel_bias)
 
     error_scale = error_true.abs().mean()
     rel_diff = (error_linear - error_true) / error_scale
