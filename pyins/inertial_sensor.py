@@ -1,4 +1,11 @@
-"""Description of IMU sensors."""
+"""Description of inertial sensors.
+
+Module contains classes to describe inertial sensor statistical model and to define
+their error characteristics for simulation.
+
+Gyroscopes and accelerometers are treated as independent blocks, that is two objects
+are required to describe a full IMU.
+"""
 import pandas as pd
 import numpy as np
 from scipy._lib._util import check_random_state

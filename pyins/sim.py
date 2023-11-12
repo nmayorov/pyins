@@ -1,4 +1,9 @@
-"""Simulation of sensors."""
+"""Simulation of sensors.
+
+The main functionality provided by this module is synthesis of IMU readings from
+the given trajectory. It also contains some utility functions useful for aides INS
+simulation.
+"""
 import numpy as np
 import pandas as pd
 from scipy.interpolate import CubicSpline, CubicHermiteSpline

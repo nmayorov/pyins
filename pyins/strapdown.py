@@ -1,4 +1,18 @@
-"""Strapdown INS integration algorithms."""
+"""Strapdown INS integration algorithms.
+
+This module provides implementation of the classic "strapdown algorithm" to obtain
+position, velocity and attitude by integration of IMU readings.
+The implementation follows [1]_ and [2]_ with some simplifications.
+
+References
+----------
+.. [1] P. G. Savage, "Strapdown Inertial Navigation Integration Algorithm
+       Design Part 1: Attitude Algorithms", Journal of Guidance, Control,
+       and Dynamics 1998, Vol. 21, no. 2.
+.. [2] P. G. Savage, "Strapdown Inertial Navigation Integration Algorithm
+       Design Part 2: Velocity and Position Algorithms", Journal of
+       Guidance, Control, and Dynamics 1998, Vol. 21, no. 2.
+"""
 import numpy as np
 import pandas as pd
 from . import transform
@@ -33,15 +47,6 @@ def compute_increments_from_imu(imu, sensor_type):
     Increments
         DataFrame containing attitude and velocity increments with one less row than
         the passed `imu`.
-
-    References
-    ----------
-    .. [1] P. G. Savage, "Strapdown Inertial Navigation Integration Algorithm
-           Design Part 1: Attitude Algorithms", Journal of Guidance, Control,
-           and Dynamics 1998, Vol. 21, no. 2.
-    .. [2] P. G. Savage, "Strapdown Inertial Navigation Integration Algorithm
-           Design Part 2: Velocity and Position Algorithms", Journal of
-           Guidance, Control, and Dynamics 1998, Vol. 21, no. 2.
     """
     if sensor_type not in ['rate', 'increment']:
         raise ValueError("`sensor_type` must be either 'rate' or 'increment'")
@@ -96,15 +101,6 @@ class Integrator:
     ----------
     trajectory : Trajectory
         Computed trajectory so far.
-
-    References
-    ----------
-    .. [1] P. G. Savage, "Strapdown Inertial Navigation Integration Algorithm
-           Design Part 1: Attitude Algorithms", Journal of Guidance, Control,
-           and Dynamics 1998, Vol. 21, no. 2.
-    .. [2] P. G. Savage, "Strapdown Inertial Navigation Integration Algorithm
-           Design Part 2: Velocity and Position Algorithms", Journal of
-           Guidance, Control, and Dynamics 1998, Vol. 21, no. 2.
     """
     INITIAL_SIZE = 10000
 

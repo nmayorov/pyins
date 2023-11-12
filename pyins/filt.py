@@ -1,4 +1,16 @@
-"""INS Kalman filters."""
+"""Navigation Kalman filters.
+
+Module provides functions to run a navigation Kalman filter in feedback (EKF) and
+feedforward forms. It relies on functionality provided by `inertial_sensor`,
+`error_module` and `observation` modules.
+
+Refer to [1]_ for the discussion of Kalman filtering in context of inertial navigation.
+
+References
+----------
+.. [1] P. D. Groves, "Principles of GNSS, Inertial, and Multisensor Integrated
+       Navigation Systems, Second Edition"
+"""
 import numpy as np
 import pandas as pd
 from scipy.spatial.transform import Rotation

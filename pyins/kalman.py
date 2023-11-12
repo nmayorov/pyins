@@ -1,4 +1,13 @@
-"""Kalman filter functions."""
+"""Kalman filter functions.
+
+Module contains abstract functions for linear Kalman filter operations.
+
+Refer to [1]_ for the theory of Kalman filters.
+
+References
+----------
+.. [1] P. S. Maybeck, "Stochastic Models, Estimation and Control, Volume 1"
+"""
 import numpy as np
 from scipy.linalg import cholesky, cho_solve, solve_triangular, expm
 
@@ -23,9 +32,7 @@ def compute_process_matrices(F, Q, dt, algorithm='first-order'):
 
     References
     ----------
-    .. [1] CHARLES F. VAN LOAN, "Computing Integrals Involving the
-           Matrix Exponential", IEEE TRANSACTIONS ON AUTOMATIC CONTROL,
-           VOL. AC-23, NO. 3, JUNE 1978.
+    .. [1] Charles F. van Loan, "Computing Integrals Involving the Matrix Exponential"
     """
     n = len(F)
     if algorithm == 'first-order':
