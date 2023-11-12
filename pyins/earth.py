@@ -6,7 +6,7 @@ WGS84 parameters. All definitions and explanations for used models can be found 
 References
 ----------
 .. [1] P. D. Groves, "Principles of GNSS, Inertial, and Multisensor Integrated
-       Navigation Systems, Second Edition.".
+       Navigation Systems, Second Edition"
 """
 import numpy as np
 from . import transform, util

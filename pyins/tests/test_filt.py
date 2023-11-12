@@ -1,5 +1,5 @@
 import numpy as np
-from pyins import inertial_sensor, filt, sim, strapdown, transform, util
+from pyins import inertial_sensor, filt, sim, strapdown, transform, util, observations
 
 
 def test_run_feedback_filter():
@@ -9,12 +9,12 @@ def test_run_feedback_filter():
     trajectory_true, imu_true = sim.sinusoid_velocity_motion(
         0.5 * dt, 300, [50, 60, 100], [1, -1, 0.5], [3, 3, 0.5], sensor_type='rate')
 
-    position_obs = filt.PositionObs(
+    position_obs = observations.PositionObs(
         sim.generate_position_observations(trajectory_true.iloc[1::200], 1, rng), 1)
-    ned_velocity_obs = filt.NedVelocityObs(
+    ned_velocity_obs = observations.NedVelocityObs(
         sim.generate_ned_velocity_observations(trajectory_true.iloc[31::200], 0.5,
                                                rng), 0.5)
-    body_velocity_obs = filt.BodyVelocityObs(
+    body_velocity_obs = observations.BodyVelocityObs(
         sim.generate_body_velocity_observations(trajectory_true.iloc[61::200], 0.2,
                                                 rng), 0.2)
 
@@ -69,12 +69,12 @@ def test_run_feedforward_filter():
     trajectory, imu_true = sim.sinusoid_velocity_motion(dt / factor, 300, [50, 60, 100],
                                                         [1, -1, 0.5], [3, 3, 0.5])
 
-    position_obs = filt.PositionObs(
+    position_obs = observations.PositionObs(
         sim.generate_position_observations(trajectory.iloc[1::100 * factor], 1, rng), 1)
-    ned_velocity_obs = filt.NedVelocityObs(
+    ned_velocity_obs = observations.NedVelocityObs(
         sim.generate_ned_velocity_observations(trajectory.iloc[32::100 * factor], 0.5,
                                                rng), 0.5)
-    body_velocity_obs = filt.BodyVelocityObs(
+    body_velocity_obs = observations.BodyVelocityObs(
         sim.generate_body_velocity_observations(trajectory.iloc[64::100 * factor], 0.2,
                                                 rng), 0.2)
 

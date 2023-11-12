@@ -15,7 +15,7 @@ is that the velocity error is measured relative to the true velocity resolved in
 References
 ----------
 .. [1] Bruno M. Scherzinger and D.Blake Reid "Modified Strapdown Inertial Navigator
-       Error Models".
+       Error Models"
 """
 import numpy as np
 import pandas as pd

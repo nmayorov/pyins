@@ -3,169 +3,8 @@ import numpy as np
 import pandas as pd
 from scipy.spatial.transform import Rotation
 from . import earth, error_model, inertial_sensor, kalman, util, transform, strapdown
-from .util import (LLA_COLS, VEL_COLS, RPH_COLS, RATE_COLS, THETA_COLS, DV_COLS,
+from .util import (LLA_COLS, VEL_COLS, RPH_COLS, THETA_COLS, DV_COLS,
                    TRAJECTORY_ERROR_COLS)
-
-
-FIRST_ORDER_TIMESTEP_MAX = 0.1
-
-
-class Observation:
-    """Base class for observation models.
-
-    Documentation is given to explain how you can implement a new observation
-    model. All you need to do is to implement `compute_obs` function. See Also
-    section contains links to already implemented models.
-
-    Parameters
-    ----------
-    data : DataFrame
-        Observed values as a DataFrame indexed by time.
-
-    Attributes
-    ----------
-    data : DataFrame
-        Data saved from the constructor.
-
-    See Also
-    --------
-    PositionObs
-    NedVelocityObs
-    BodyVelocityObs
-    """
-    def __init__(self, data):
-        self.data = data
-
-    def compute_matrices(self, time, pva, error_model):
-        """Compute matrices for a single linearized observation.
-
-        It must compute the observation model (z, H, R) at a given time stamp.
-        If the observation is not available at the given `time`, it must return
-        None.
-
-        Parameters
-        ----------
-        time : float
-            Time.
-        pva : Pva
-            Position-velocity-attitude estimates from INS at `time`.
-        error_model : InsErrorModel
-            Error model object.
-
-        Returns
-        -------
-        z : ndarray, shape (n_obs,)
-            Observation vector. A difference between the value derived from `pva`
-            and an observed value.
-        H : ndarray, shape (n_obs, 9)
-            Observation model matrix. It relates the vector `z` to the INS error states.
-        R : ndarray, shape (n_obs, n_obs)
-            Covariance matrix of the observation error.
-        """
-        raise NotImplementedError
-
-
-class PositionObs(Observation):
-    """Observation of latitude, longitude and altitude (from GNSS or any other source).
-
-    Parameters
-    ----------
-    data : DataFrame
-        Must be indexed by time and contain columns 'lat', 'lon' and `alt` columns for
-        latitude, longitude and altitude.
-    sd : float
-        Measurement accuracy in meters.
-    imu_to_antenna_b : array_like, shape (3,) or None, optional
-        Vector from IMU to antenna (measurement point) expressed in body
-        frame. If None, assumed to be zero.
-
-    Attributes
-    ----------
-    data : DataFrame
-        Data saved from the constructor.
-    """
-    def __init__(self, data, sd, imu_to_antenna_b=None):
-        super(PositionObs, self).__init__(data)
-        self.R = sd**2 * np.eye(3)
-        self.imu_to_antenna_b = imu_to_antenna_b
-
-    def compute_matrices(self, time, pva, error_model):
-        if time not in self.data.index:
-            return None
-
-        z = transform.compute_lla_difference(pva[LLA_COLS], self.data.loc[time, LLA_COLS])
-        if self.imu_to_antenna_b is not None:
-            mat_nb = transform.mat_from_rph(pva[RPH_COLS])
-            z += mat_nb @ self.imu_to_antenna_b
-
-        H = error_model.position_error_jacobian(pva, self.imu_to_antenna_b)
-
-        return z, H, self.R
-
-
-class NedVelocityObs(Observation):
-    """Observation of velocity resolved in NED frame (typically from GNSS).
-
-    Parameters
-    ----------
-    data : DataFrame
-        Must be indexed by time and contain 'VN', 'VE' and 'VD' columns.
-    sd : float
-        Measurement accuracy in m/s.
-    imu_to_antenna_b : array_like, shape (3,) or None, optional
-        Vector from IMU to antenna (measurement point) expressed in body
-        frame. If None (default), assumed to be zero.
-
-    Attributes
-    ----------
-    data : DataFrame
-        Data saved from the constructor.
-    """
-    def __init__(self, data, sd, imu_to_antenna_b=None):
-        super(NedVelocityObs, self).__init__(data)
-        self.R = sd**2 * np.eye(3)
-        self.imu_to_antenna_b = imu_to_antenna_b
-
-    def compute_matrices(self, time, pva, error_model):
-        if time not in self.data.index:
-            return None
-
-        z = pva[VEL_COLS] - self.data.loc[time, VEL_COLS]
-        if self.imu_to_antenna_b is not None and all(col in pva for col in RATE_COLS):
-            mat_nb = transform.mat_from_rph(pva[RPH_COLS])
-            z += mat_nb @ np.cross(pva[RATE_COLS], self.imu_to_antenna_b)
-        H = error_model.ned_velocity_error_jacobian(pva)
-
-        return z, H, self.R
-
-
-class BodyVelocityObs(Observation):
-    """Observation of velocity resolved in body frame.
-
-    Parameters
-    ----------
-    data : DataFrame
-        Must be indexed by `time` and contain columns 'VX', 'VY' and 'VZ'.
-    sd : float
-        Measurement accuracy in m/s.
-
-    Attributes
-    ----------
-    data : DataFrame
-        Data saved from the constructor.
-    """
-    def __init__(self, data, sd):
-        super(BodyVelocityObs, self).__init__(data)
-        self.R = sd**2 * np.eye(3)
-
-    def compute_matrices(self, time, pva, error_model):
-        if time not in self.data.index:
-            return None
-
-        mat_nb = transform.mat_from_rph(pva[RPH_COLS])
-        z = mat_nb.T @ pva[VEL_COLS] - self.data.loc[time, ['VX', 'VY', 'VZ']]
-        H = error_model.body_velocity_error_jacobian(pva)
-        return z, H, self.R
 
 
 def _interpolate_pva(first, second, alpha):
@@ -433,7 +272,7 @@ def run_feedback_filter(initial_pva, position_sd, velocity_sd, level_sd, azimuth
             pva = integrator.predict((observation_time - time) / increment['dt'] *
                                      increment)
             for observation in observations:
-                ret = observation.compute_matrices(observation_time, pva, error_model)
+                ret = observation.compute_matrices(observation_time, pva)
                 if ret is not None:
                     z, H, R = ret
                     H_full = np.zeros((len(z), n_states))
@@ -604,7 +443,7 @@ def run_feedforward_filter(trajectory_nominal, trajectory, position_sd, velocity
             pva = _interpolate_pva(trajectory.iloc[index], trajectory.iloc[index + 1],
                                    (observation_time - time) / (next_time - time))
             for observation in observations:
-                ret = observation.compute_matrices(observation_time, pva, error_model)
+                ret = observation.compute_matrices(observation_time, pva)
                 if ret is not None:
                     z, H, R = ret
                     H_full = np.zeros((len(z), n_states))
