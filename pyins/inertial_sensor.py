@@ -1,4 +1,4 @@
-"""Statistical model for IMU."""
+"""Description of IMU sensors."""
 import pandas as pd
 import numpy as np
 from scipy._lib._util import check_random_state

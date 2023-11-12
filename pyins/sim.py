@@ -1,4 +1,4 @@
-"""Strapdown sensors simulator."""
+"""Simulation of sensors."""
 import numpy as np
 import pandas as pd
 from scipy.interpolate import CubicSpline, CubicHermiteSpline

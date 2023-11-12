@@ -1,4 +1,4 @@
-"""Navigation Kalman filters."""
+"""INS Kalman filters."""
 import numpy as np
 import pandas as pd
 from scipy.spatial.transform import Rotation
