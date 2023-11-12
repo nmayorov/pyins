@@ -59,7 +59,7 @@ def mm_prod(a, b, at=False, bt=False):
 def mm_prod_symmetric(a, b):
     """Compute symmetric product of stack of matrices.
 
-    The result is ``a @ b @ a.T`.
+    The result is ``a @ b @ a.T``.
 
     Parameters
     ----------
