@@ -6,8 +6,8 @@ from . import transform, util
 #: Rotation rate of Earth in rad/s.
 RATE = 7.292115e-5
 #: Approximate value of gravity.
-G0 = 9.8
-#: Semi major axis of Earth ellipsoid (or radius of Earth approximately).
+G = 9.8
+#: Semi major axis of Earth ellipsoid.
 A = 6378137.0
 #: Squared eccentricity of Earth ellipsoid
 E2 = 6.6943799901413e-3
@@ -52,7 +52,7 @@ def principal_radii(lat, alt):
 
 
 def gravity(lat, alt):
-    """Compute gravity according to a theoretical model.
+    """Compute gravity magnitude.
 
     Somigliana model used in WGS84 with linear vertical correction is
     implemented. See [1]_ for the discussion.
@@ -104,8 +104,8 @@ def gravity_n(lat, alt):
 def gravitation_ecef(lla):
     """Compute a vector of the gravitational force in ECEF frame.
 
-    It accounts only for Earth mass attraction. It is computed from
-    `gravity` model by eliminating the centrifugal force.
+    It accounts only for Earth mass attraction by eliminating the centrifugal force
+    from `gravity` model.
 
     Parameters
     ----------
@@ -138,9 +138,12 @@ def curvature_matrix(lat, alt):
     """Compute Earth curvature matrix.
 
     Curvature matrix ``F`` links linear displacement and angular rotation of
-    NED frame as ``rotation_n = F @ translation_n``, where `translation_n` is
-    linear translation in NED and `rotation_n` is the corresponding small
-    rotation vector of NED.
+    NED frame as::
+
+        rotation_n = F @ translation_n
+
+    Where ``translation_n`` is linear translation in NED and ``rotation_n`` is the
+    corresponding small rotation vector of NED.
 
     For example ``transport_rate_n = F @ velocity_n``.
 

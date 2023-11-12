@@ -31,14 +31,14 @@ class InsErrorModel:
     """INS error model interface.
 
     INS error model is a system of non-stationary linear differential equations
-    which describe time evolution on INS errors. The system matrix depends
+    which describe time evolution of INS errors. The system matrix depends
     on the trajectory.
 
-    We consider error models consisting of 9 total states: 3 for position,
-    velocity and attitude errors.
+    An error models consisting of 9 total states: 3 for position, velocity and attitude
+    errors.
 
-    The states can be selected in different  manners and several error models
-    were proposed in the literature.
+    The states can be selected in different ways and several error models were
+    proposed in the literature.
 
     The output error states are always NED position error, NED velocity error and errors
     of roll, pitch and heading angles.
@@ -450,8 +450,9 @@ def propagate_errors(trajectory, pva_error=None, gyro_error=np.zeros(3),
     gyro_error, accel_error : array_like
         Gyro and accelerometer errors (in SI units). Can be constant or
         specified for each time stamp in `trajectory`.
-    error_model : InsErrorModel
+    error_model : `InsErrorModel`, optional
         Error model object to use for the propagation.
+        `ModifiedPhiModel` is used by default.
 
     Returns
     -------

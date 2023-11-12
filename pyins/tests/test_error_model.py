@@ -46,7 +46,7 @@ def test_propagate_errors(error_model):
     pva_error = pd.Series(index=TRAJECTORY_ERROR_COLS)
     pva_error[NED_COLS] = [200, 100, 20]
     pva_error[VEL_COLS] = [0.1, -0.2, -0.05]
-    pva_error[RPH_COLS] = [np.rad2deg(-2 * b / earth.G0), np.rad2deg(b / earth.G0), 0.5]
+    pva_error[RPH_COLS] = [np.rad2deg(-2 * b / earth.G), np.rad2deg(b / earth.G), 0.5]
 
     initial = sim.perturb_pva(trajectory.iloc[0], pva_error)
     integrator = Integrator(initial)
