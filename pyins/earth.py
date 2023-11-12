@@ -1,4 +1,13 @@
-"""Earth geometry and gravity models according to WGS84."""
+"""Earth geometry and gravity models.
+
+This module contains constants and computation models for ellipsoidal Earth using
+WGS84 parameters. All definitions and explanations for used models can be found in [1]_.
+
+References
+----------
+.. [1] P. D. Groves, "Principles of GNSS, Inertial, and Multisensor Integrated
+       Navigation Systems, Second Edition.".
+"""
 import numpy as np
 from . import transform, util
 
@@ -20,8 +29,6 @@ GP = 9.8321849378
 def principal_radii(lat, alt):
     """Compute the principal radii of curvature of Earth ellipsoid.
 
-    See [1]_ (p. 41) for the definition and formulas.
-
     Parameters
     ----------
     lat, alt : array_like
@@ -35,11 +42,6 @@ def principal_radii(lat, alt):
         Principle radius in East direction.
     rp : float or ndarray
         Radius of cross-section along the parallel.
-
-    References
-    ----------
-    .. [1] P. D. Groves, "Principles of GNSS, Inertial, and Multisensor
-           Integrated Navigation Systems".
     """
     sin_lat = np.sin(np.deg2rad(lat))
     cos_lat = np.sqrt(1 - sin_lat**2)
@@ -54,8 +56,7 @@ def principal_radii(lat, alt):
 def gravity(lat, alt):
     """Compute gravity magnitude.
 
-    Somigliana model used in WGS84 with linear vertical correction is
-    implemented. See [1]_ for the discussion.
+    Somigliana model used in WGS84 with linear vertical correction is implemented.
 
     Parameters
     ----------
@@ -66,11 +67,6 @@ def gravity(lat, alt):
     -------
     gravity : float or ndarray
         Magnitude of the gravity.
-
-    References
-    ----------
-    .. [1] P. D. Groves, "Principles of GNSS, Inertial, and Multisensor
-           Integrated Navigation Systems".
     """
     sin_lat = np.sin(np.deg2rad(lat))
     alt = np.asarray(alt)
