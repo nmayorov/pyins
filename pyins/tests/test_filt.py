@@ -1,5 +1,5 @@
 import numpy as np
-from pyins import inertial_sensor, filt, sim, strapdown, transform, util, observations
+from pyins import inertial_sensor, filt, sim, strapdown, transform, util, measurements
 
 
 def test_run_feedback_filter():
@@ -9,13 +9,13 @@ def test_run_feedback_filter():
     trajectory_true, imu_true = sim.sinusoid_velocity_motion(
         0.5 * dt, 300, [50, 60, 100], [1, -1, 0.5], [3, 3, 0.5], sensor_type='rate')
 
-    position_obs = observations.PositionObs(
-        sim.generate_position_observations(trajectory_true.iloc[1::200], 1, rng), 1)
-    ned_velocity_obs = observations.NedVelocityObs(
-        sim.generate_ned_velocity_observations(trajectory_true.iloc[31::200], 0.5,
+    position_obs = measurements.Position(
+        sim.generate_position_measurements(trajectory_true.iloc[1::200], 1, rng), 1)
+    ned_velocity_obs = measurements.NedVelocity(
+        sim.generate_ned_velocity_measurements(trajectory_true.iloc[31::200], 0.5,
                                                rng), 0.5)
-    body_velocity_obs = observations.BodyVelocityObs(
-        sim.generate_body_velocity_observations(trajectory_true.iloc[61::200], 0.2,
+    body_velocity_obs = measurements.BodyVelocity(
+        sim.generate_body_velocity_measurements(trajectory_true.iloc[61::200], 0.2,
                                                 rng), 0.2)
 
     gyro_errors = inertial_sensor.InertialSensorError(
@@ -42,7 +42,7 @@ def test_run_feedback_filter():
 
     result = filt.run_feedback_filter(
         initial, pos_sd, vel_sd, level_sd, azimuth_sd, increments, gyro_model,
-        accel_model, observations=[position_obs, ned_velocity_obs, body_velocity_obs],
+        accel_model, measurements=[position_obs, ned_velocity_obs, body_velocity_obs],
         time_step=1)
 
     error = transform.compute_state_difference(result.trajectory, trajectory_true)
@@ -56,9 +56,9 @@ def test_run_feedback_filter():
                                                      accel_errors.parameters)
     assert ((accel_error.iloc[-1] / result.accel_sd.iloc[-1]).abs() < 2.0).all()
 
-    assert (util.compute_rms(result.innovations['PositionObs']) < 3.0).all()
-    assert (util.compute_rms(result.innovations['NedVelocityObs']) < 3.0).all()
-    assert (util.compute_rms(result.innovations['BodyVelocityObs']) < 3.0).all()
+    assert (util.compute_rms(result.innovations['Position']) < 3.0).all()
+    assert (util.compute_rms(result.innovations['NedVelocity']) < 3.0).all()
+    assert (util.compute_rms(result.innovations['BodyVelocity']) < 3.0).all()
 
 
 def test_run_feedforward_filter():
@@ -69,13 +69,13 @@ def test_run_feedforward_filter():
     trajectory, imu_true = sim.sinusoid_velocity_motion(dt / factor, 300, [50, 60, 100],
                                                         [1, -1, 0.5], [3, 3, 0.5])
 
-    position_obs = observations.PositionObs(
-        sim.generate_position_observations(trajectory.iloc[1::100 * factor], 1, rng), 1)
-    ned_velocity_obs = observations.NedVelocityObs(
-        sim.generate_ned_velocity_observations(trajectory.iloc[32::100 * factor], 0.5,
+    position_obs = measurements.Position(
+        sim.generate_position_measurements(trajectory.iloc[1::100 * factor], 1, rng), 1)
+    ned_velocity_obs = measurements.NedVelocity(
+        sim.generate_ned_velocity_measurements(trajectory.iloc[32::100 * factor], 0.5,
                                                rng), 0.5)
-    body_velocity_obs = observations.BodyVelocityObs(
-        sim.generate_body_velocity_observations(trajectory.iloc[64::100 * factor], 0.2,
+    body_velocity_obs = measurements.BodyVelocity(
+        sim.generate_body_velocity_measurements(trajectory.iloc[64::100 * factor], 0.2,
                                                 rng), 0.2)
 
     gyro_errors = inertial_sensor.InertialSensorError(
@@ -103,7 +103,7 @@ def test_run_feedforward_filter():
     result = filt.run_feedforward_filter(
         trajectory.iloc[::factor], trajectory_computed.iloc[::factor],
         pos_sd, vel_sd, level_sd, azimuth_sd, gyro_model, accel_model,
-        observations=[position_obs, ned_velocity_obs, body_velocity_obs], time_step=1)
+        measurements=[position_obs, ned_velocity_obs, body_velocity_obs], time_step=1)
 
     error = transform.compute_state_difference(result.trajectory, trajectory)
 
@@ -118,6 +118,6 @@ def test_run_feedforward_filter():
                                  / result.accel_sd.iloc[-1])
     assert (accel_bias_relative_error < 2.0).all()
 
-    assert (util.compute_rms(result.innovations['PositionObs']) < 3.0).all()
-    assert (util.compute_rms(result.innovations['NedVelocityObs']) < 3.0).all()
-    assert (util.compute_rms(result.innovations['BodyVelocityObs']) < 3.0).all()
+    assert (util.compute_rms(result.innovations['Position']) < 3.0).all()
+    assert (util.compute_rms(result.innovations['NedVelocity']) < 3.0).all()
+    assert (util.compute_rms(result.innovations['BodyVelocity']) < 3.0).all()

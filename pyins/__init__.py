@@ -25,8 +25,8 @@ Series). In this sense we define the following "types":
     - `PvaError` - Series representing errors of position-velocity-attitude - a single
       row of `TrajectoryError`
 
-All data (`Trajectory`, `Imu`, observations) are indexed by time in seconds measured by
-a common clock. This will achieve time synchronization of IMU and observations and allow
+All data (`Trajectory`, `Imu`, measurements) are indexed by time in seconds measured by
+a common clock. This will achieve time synchronization of IMU and measurements and allow
 comparison between trajectories and other states.
 
 Variable naming convention
@@ -65,7 +65,7 @@ Modules
    filt
    inertial_sensor
    kalman
-   observations
+   measurements
    sim
    strapdown
    transform

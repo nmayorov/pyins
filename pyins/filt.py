@@ -3,7 +3,7 @@
 Module provides functions to run a navigation Kalman filter in feedback
 (extended Kalman filter) and feedforward (linearized Kalman filter) forms. It relies on
 functionality provided by `pyins.inertial_sensor`, `pyins.error_model` and
-`pyins.observations` modules.
+`pyins.measurements` modules.
 
 Refer to [1]_ for the discussion of Kalman filtering in context of inertial navigation.
 
@@ -196,7 +196,7 @@ def _correct_increments(increments, gyro_model, accel_model):
 
 def run_feedback_filter(initial_pva, position_sd, velocity_sd, level_sd, azimuth_sd,
                         increments, gyro_model=None, accel_model=None,
-                        observations=None, time_step=0.1):
+                        measurements=None, time_step=0.1):
     """Run INS filter with feedback corrections.
 
     Also known as Extended Kalman Filter.
@@ -218,8 +218,8 @@ def run_feedback_filter(initial_pva, position_sd, velocity_sd, level_sd, azimuth
     gyro_model, accel_model : InertialSensorModel, optional
         Sensor models for gyros and accelerometers.
         If None (default), default models will be used.
-    observations : list of Observation. optional
-        Observations, empty by default.
+    measurements : list of `pyins.measurements.Measurement`, optional
+        Measurements, empty by default.
     time_step : float, optional
         Time step for error state propagation.
         The value typically should not exceed 1 second. Default is 0.1 second.
@@ -238,26 +238,26 @@ def run_feedback_filter(initial_pva, position_sd, velocity_sd, level_sd, azimuth
         accel, accel_sd : DataFrame
             Estimated accelerometer model parameters and its standard deviations.
         innovations : dict of DataFrame
-            For each observation class name contains DataFrame with measurement
+            For each mesaurement class name contains DataFrame with measurement
             innovations.
     """
     if gyro_model is None:
         gyro_model = inertial_sensor.InertialSensorModel()
     if accel_model is None:
         accel_model = inertial_sensor.InertialSensorModel()
-    if observations is None:
-        observations = []
+    if measurements is None:
+        measurements = []
 
-    observation_times = np.hstack([
-        np.asarray(observation.data.index) for observation in observations])
-    observation_times = np.sort(np.unique(observation_times))
+    measurement_times = np.hstack([
+        np.asarray(measurement.data.index) for measurement in measurements])
+    measurement_times = np.sort(np.unique(measurement_times))
 
     start_time = initial_pva.name
     end_time = increments.index[-1]
-    observation_times = observation_times[(observation_times >= start_time) &
-                                          (observation_times <= end_time)]
-    observation_times = np.append(observation_times, np.inf)
-    observation_times_index = 0
+    measurement_times = measurement_times[(measurement_times >= start_time) &
+                                          (measurement_times <= end_time)]
+    measurement_times = np.append(measurement_times, np.inf)
+    measurement_time_index = 0
 
     P = _initialize_covariance(initial_pva, position_sd, velocity_sd, level_sd,
                                azimuth_sd, gyro_model, accel_model)
@@ -278,36 +278,36 @@ def run_feedback_filter(initial_pva, position_sd, velocity_sd, level_sd, azimuth
 
     innovations = {}
     innovations_times = {}
-    for observation in observations:
-        name = observation.__class__.__name__
+    for measurement in measurements:
+        name = measurement.__class__.__name__
         innovations[name] = []
         innovations_times[name] = []
 
     increments_index = 0
     while integrator.get_time() < end_time:
         time = integrator.get_time()
-        observation_time = observation_times[observation_times_index]
+        measurement_time = measurement_times[measurement_time_index]
         increment = increments.iloc[increments_index]
-        if observation_time < increment.name:
+        if measurement_time < increment.name:
             x = np.zeros(n_states)
-            pva = integrator.predict((observation_time - time) / increment['dt'] *
+            pva = integrator.predict((measurement_time - time) / increment['dt'] *
                                      increment)
-            for observation in observations:
-                ret = observation.compute_matrices(observation_time, pva)
+            for measurement in measurements:
+                ret = measurement.compute_matrices(measurement_time, pva)
                 if ret is not None:
                     z, H, R = ret
                     H_full = np.zeros((len(z), n_states))
                     H_full[:, ins_block] = H
                     innovation = kalman.correct(x, P, z, H_full, R)
-                    name = observation.__class__.__name__
+                    name = measurement.__class__.__name__
                     innovations[name].append(innovation)
-                    innovations_times[name].append(observation_time)
+                    innovations_times[name].append(measurement_time)
 
             integrator.set_pva(
                 error_model.correct_pva(integrator.get_pva(), x[ins_block]))
             gyro_model.update_estimates(x[gyro_block])
             accel_model.update_estimates(x[accel_block])
-            observation_times_index += 1
+            measurement_time_index += 1
 
         times_result.append(time)
         gyro_result.append(gyro_model.get_estimates())
@@ -315,7 +315,7 @@ def run_feedback_filter(initial_pva, position_sd, velocity_sd, level_sd, azimuth
         P_result.append(P)
 
         next_time = min(time + time_step,
-                        observation_times[observation_times_index])
+                        measurement_times[measurement_time_index])
         next_increment_index = np.searchsorted(increments.index, next_time,
                                                side='right')
         increments_batch = _correct_increments(
@@ -340,10 +340,10 @@ def run_feedback_filter(initial_pva, position_sd, velocity_sd, level_sd, azimuth
     trajectory_sd, gyro_sd, accel_sd = _compute_sd(
         P_result,  integrator.trajectory.loc[times_result], gyro_model, accel_model)
 
-    for observation in observations:
-        name = observation.__class__.__name__
+    for measurement in measurements:
+        name = measurement.__class__.__name__
         innovations[name] = pd.DataFrame(innovations[name], innovations_times[name],
-                                         columns=observation.data.columns)
+                                         columns=measurement.data.columns)
 
     return util.Bunch(
         trajectory=integrator.trajectory,
@@ -357,7 +357,7 @@ def run_feedback_filter(initial_pva, position_sd, velocity_sd, level_sd, azimuth
 
 def run_feedforward_filter(trajectory_nominal, trajectory, position_sd, velocity_sd,
                            level_sd, azimuth_sd, gyro_model=None, accel_model=None,
-                           observations=None, increments=None, time_step=0.1):
+                           measurements=None, increments=None, time_step=0.1):
     """Run INS filter with output errors compensation.
 
     Also known as a linearized Kalman filter.
@@ -383,8 +383,8 @@ def run_feedforward_filter(trajectory_nominal, trajectory, position_sd, velocity
     gyro_model, accel_model : InertialSensorModel, optional
         Sensor models for gyros and accelerometers.
          If None (default), default models will be used.
-    observations : list of Observation. optional
-        Observations, empty by default.
+    measurements : list of `pyins.measurements.Measurement`, optional
+        Measurements, empty by default.
     increments : Increments or None, optional
         IMU increments to be used when gyro or accelerometers scale factor errors or
         misalignment are modelled. Not necessary otherwise.
@@ -406,7 +406,7 @@ def run_feedforward_filter(trajectory_nominal, trajectory, position_sd, velocity
         accel, accel_sd : DataFrame
             Estimated accelerometer model parameters and its standard deviations.
         innovations : dict of DataFrame
-            For each observation class name contains DataFrame with measurement
+            For each measurement class name contains DataFrame with measurement
             innovations.
     """
     if (trajectory_nominal.index != trajectory.index).any():
@@ -418,24 +418,24 @@ def run_feedforward_filter(trajectory_nominal, trajectory, position_sd, velocity
         gyro_model = inertial_sensor.InertialSensorModel()
     if accel_model is None:
         accel_model = inertial_sensor.InertialSensorModel()
-    if observations is None:
-        observations = []
+    if measurements is None:
+        measurements = []
 
     if increments is None and (gyro_model.scale_misal_modelled or
                                accel_model.scale_misal_modelled):
         raise ValueError("When scale or misalignments errors are modelled, "
                          "`increments` must be provided")
 
-    observation_times = np.hstack([
-        np.asarray(observation.data.index) for observation in observations])
-    observation_times = np.sort(np.unique(observation_times))
+    measurement_times = np.hstack([
+        np.asarray(measurement.data.index) for measurement in measurements])
+    measurement_times = np.sort(np.unique(measurement_times))
 
     start_time = times[0]
     end_time = times[-1]
-    observation_times = observation_times[(observation_times >= start_time) &
-                                          (observation_times <= end_time)]
-    observation_times = np.append(observation_times, np.inf)
-    observation_times_index = 0
+    measurement_times = measurement_times[(measurement_times >= start_time) &
+                                          (measurement_times <= end_time)]
+    measurement_times = np.append(measurement_times, np.inf)
+    measurement_time_index = 0
 
     P = _initialize_covariance(trajectory_nominal.iloc[0], position_sd, velocity_sd,
                                level_sd, azimuth_sd, gyro_model, accel_model)
@@ -450,8 +450,8 @@ def run_feedforward_filter(trajectory_nominal, trajectory, position_sd, velocity
 
     innovations = {}
     innovations_times = {}
-    for observation in observations:
-        name = observation.__class__.__name__
+    for measurement in measurements:
+        name = measurement.__class__.__name__
         innovations[name] = []
         innovations_times[name] = []
 
@@ -459,29 +459,29 @@ def run_feedforward_filter(trajectory_nominal, trajectory, position_sd, velocity
     while index + 1 < len(trajectory):
         time = times[index]
         next_time = times[index + 1]
-        observation_time = observation_times[observation_times_index]
-        if observation_time < next_time:
+        measurement_time = measurement_times[measurement_time_index]
+        if measurement_time < next_time:
             pva = _interpolate_pva(trajectory.iloc[index], trajectory.iloc[index + 1],
-                                   (observation_time - time) / (next_time - time))
-            for observation in observations:
-                ret = observation.compute_matrices(observation_time, pva)
+                                   (measurement_time - time) / (next_time - time))
+            for measurement in measurements:
+                ret = measurement.compute_matrices(measurement_time, pva)
                 if ret is not None:
                     z, H, R = ret
                     H_full = np.zeros((len(z), n_states))
                     H_full[:, inertial_block] = H
                     innovation = kalman.correct(x, P, z, H_full, R)
-                    name = observation.__class__.__name__
+                    name = measurement.__class__.__name__
                     innovations[name].append(innovation)
                     innovations_times[name].append(time)
 
-            observation_times_index += 1
+            measurement_time_index += 1
 
         times_result.append(time)
         x_result.append(x)
         P_result.append(P)
 
         next_time = min(time + time_step,
-                        observation_times[observation_times_index])
+                        measurement_times[measurement_time_index])
         next_index = np.searchsorted(times, next_time, side='right') - 1
         next_time = times[next_index]
         time_delta = next_time - time
@@ -514,10 +514,10 @@ def run_feedforward_filter(trajectory_nominal, trajectory, position_sd, velocity
         _compute_feedforward_result(x_result, P_result, trajectory_nominal, trajectory,
                                     gyro_model, accel_model))
 
-    for observation in observations:
-        name = observation.__class__.__name__
+    for measurement in measurements:
+        name = measurement.__class__.__name__
         innovations[name] = pd.DataFrame(innovations[name], innovations_times[name],
-                                         columns=observation.data.columns)
+                                         columns=measurement.data.columns)
 
     return util.Bunch(
         trajectory=trajectory,

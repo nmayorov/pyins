@@ -60,7 +60,7 @@ def compute_process_matrices(F, Q, dt, algorithm='first-order'):
 def correct(x, P, z, H, R):
     """Perform Kalman correction.
 
-    The correction obtains a posteriori state and covariance given observation
+    The correction obtains a posteriori state and covariance given measurement
     of the form::
 
         z = H @ x + v, with v ~ N(0, R)
@@ -74,9 +74,9 @@ def correct(x, P, z, H, R):
     z : ndarray, shape (n_obs,)
         Observation vector.
     H : ndarray, shape (n_obs, n_states)
-        Matrix which relates state and observation vectors.
+        Matrix which relates state and measurement vectors.
     R : ndarray, shape (n_obs, n_obs)
-        Positive semi-definite observation noise matrix.
+        Positive semi-definite measurement noise matrix.
 
     Returns
     -------

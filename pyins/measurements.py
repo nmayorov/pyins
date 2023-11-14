@@ -1,7 +1,7 @@
-"""Observation models for navigation Kalman filters.
+"""Measurement models for navigation Kalman filters.
 
-In context of inertial navigation observations are obtained from sensors other than
-IMU. In a Kalman filter an observation is processed by forming a difference between
+In context of inertial navigation measurements are obtained from sensors other than
+IMU. In a Kalman filter a measurement is processed by forming a difference between
 the predicted and the measured vectors and linearly relating it to the error vector::
 
     z = Z_ins - Z = H @ x + v
@@ -15,10 +15,10 @@ Where
     - ``H`` - measurement Jacobian
     - ``v`` - noise vector, typically assumed to have zero mean and known variance
 
-The module provides a base class `Observation` which abstracts this concept and
-implementations for common observations.
+The module provides a base class `Measurement` which abstracts this concept and
+implementations for common measurements.
 
-Refer to [1]_ and [2]_ for the discussion of the observations in navigation and in
+Refer to [1]_ and [2]_ for the discussion of measurements in navigation and in
 Kalman filtering in general.
 
 Classes
@@ -26,10 +26,10 @@ Classes
 .. autosummary::
     :toctree: generated/
 
-    Observation
-    PositionObs
-    NedVelocityObs
-    BodyVelocityObs
+    Measurement
+    Position
+    NedVelocity
+    BodyVelocity
 
 References
 ----------
@@ -43,17 +43,16 @@ from . import error_model, transform
 from .util import LLA_COLS, VEL_COLS, RPH_COLS, RATE_COLS
 
 
-class Observation:
-    """Base class for observation models.
+class Measurement:
+    """Base class for measurement models.
 
-    Documentation is given to explain how you can implement a new observation
-    model. All you need to do is to implement `compute_obs` function. See Also
-    section contains links to already implemented models.
+    To introduce a new measurement `compute_matrices` method needs to be implemented.
+    See Also section contains links to already implemented measurements.
 
     Parameters
     ----------
     data : DataFrame
-        Observed values as a DataFrame indexed by time.
+        Measured values as a DataFrame indexed by time.
 
     Attributes
     ----------
@@ -62,18 +61,18 @@ class Observation:
 
     See Also
     --------
-    PositionObs
-    NedVelocityObs
-    BodyVelocityObs
+    Position
+    NedVelocity
+    BodyVelocity
     """
     def __init__(self, data):
         self.data = data
 
     def compute_matrices(self, time, pva):
-        """Compute matrices for a single linearized observation.
+        """Compute matrices for a single linearized measurement.
 
-        It must compute the observation model (z, H, R) at a given time stamp.
-        If the observation is not available at the given `time`, it must return
+        It must compute the linearized measurement model (z, H, R) at a given time.
+        If the measurement is not available at the given `time`, it must return
         None.
 
         Parameters
@@ -91,13 +90,13 @@ class Observation:
         H : ndarray, shape (n_obs, 9)
             Observation model matrix. It relates the vector `z` to the INS error states.
         R : ndarray, shape (n_obs, n_obs)
-            Covariance matrix of the observation error.
+            Covariance matrix of the measurement error.
         """
         raise NotImplementedError
 
 
-class PositionObs(Observation):
-    """Observation of latitude, longitude and altitude (from GNSS or any other source).
+class Position(Measurement):
+    """Measurement of latitude, longitude and altitude (from GNSS or any other source).
 
     Parameters
     ----------
@@ -116,7 +115,7 @@ class PositionObs(Observation):
         Data saved from the constructor.
     """
     def __init__(self, data, sd, imu_to_antenna_b=None):
-        super(PositionObs, self).__init__(data)
+        super(Position, self).__init__(data)
         self.R = sd**2 * np.eye(3)
         self.imu_to_antenna_b = imu_to_antenna_b
 
@@ -135,8 +134,8 @@ class PositionObs(Observation):
         return z, H, self.R
 
 
-class NedVelocityObs(Observation):
-    """Observation of velocity resolved in NED frame (from GNSS or any other source).
+class NedVelocity(Measurement):
+    """Measurement of velocity resolved in NED frame (from GNSS or any other source).
 
     Parameters
     ----------
@@ -154,7 +153,7 @@ class NedVelocityObs(Observation):
         Data saved from the constructor.
     """
     def __init__(self, data, sd, imu_to_antenna_b=None):
-        super(NedVelocityObs, self).__init__(data)
+        super(NedVelocity, self).__init__(data)
         self.R = sd**2 * np.eye(3)
         self.imu_to_antenna_b = imu_to_antenna_b
 
@@ -171,8 +170,8 @@ class NedVelocityObs(Observation):
         return z, H, self.R
 
 
-class BodyVelocityObs(Observation):
-    """Observation of velocity resolved in body frame (from odometry, radar, etc.)
+class BodyVelocity(Measurement):
+    """Measurement of velocity resolved in body frame (from odometry, radar, etc.)
 
     Parameters
     ----------
@@ -187,7 +186,7 @@ class BodyVelocityObs(Observation):
         Data saved from the constructor.
     """
     def __init__(self, data, sd):
-        super(BodyVelocityObs, self).__init__(data)
+        super(BodyVelocity, self).__init__(data)
         self.R = sd**2 * np.eye(3)
 
     def compute_matrices(self, time, pva):

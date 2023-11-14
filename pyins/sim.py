@@ -10,9 +10,9 @@ Functions
 
     generate_imu
     sinusoid_velocity_motion
-    generate_position_observations
-    generate_ned_velocity_observations
-    generate_body_velocity_observations
+    generate_position_measurements
+    generate_ned_velocity_measurements
+    generate_body_velocity_measurements
     generate_pva_error
     perturb_pva
 """
@@ -252,10 +252,10 @@ def sinusoid_velocity_motion(dt, total_time, lla0, velocity_mean,
     return generate_imu(time, lla0, rph, velocity_n, sensor_type)
 
 
-def generate_position_observations(trajectory, error_sd, rng=None):
-    """Generate data with latitude-longitude-altitude position observations.
+def generate_position_measurements(trajectory, error_sd, rng=None):
+    """Generate data with latitude-longitude-altitude position measurements.
 
-    The observations are computed as given (true) values perturbed by normal random
+    The measurements are computed as given (true) values perturbed by normal random
     errors.
 
     Parameters
@@ -278,10 +278,10 @@ def generate_position_observations(trajectory, error_sd, rng=None):
     return pd.DataFrame(data=lla, index=trajectory.index, columns=LLA_COLS)
 
 
-def generate_ned_velocity_observations(trajectory, error_sd, rng=None):
-    """Generate data with NED velocity observations.
+def generate_ned_velocity_measurements(trajectory, error_sd, rng=None):
+    """Generate data with NED velocity measurements.
 
-    The observations are computed as given (true) values perturbed by normal random
+    The measurements are computed as given (true) values perturbed by normal random
     errors.
 
     Parameters
@@ -304,10 +304,10 @@ def generate_ned_velocity_observations(trajectory, error_sd, rng=None):
     return pd.DataFrame(data=velocity_n, index=trajectory.index, columns=VEL_COLS)
 
 
-def generate_body_velocity_observations(trajectory, error_sd, rng=None):
-    """Generate data with velocity observations expressed in body frame.
+def generate_body_velocity_measurements(trajectory, error_sd, rng=None):
+    """Generate data with velocity measurements expressed in body frame.
 
-    The observations are computed by first projecting NED velocity into the body frame
+    The measurements are computed by first projecting NED velocity into the body frame
     and then adding normal random errors to it.
 
     Parameters
