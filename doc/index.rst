@@ -1,37 +1,48 @@
-PyINS
+=====
+pyins
 =====
 
-PyINS is a Python package for data processing commonly done in Strapdown
-Inertial Navigation Systems integrated with other aiding sensors.
+pyins is a Python package which provides common basic algorithms used in aided
+Inertial Navigation Systems (INS). The package has rather limited scope and purposes,
+it may serve as:
 
-Existing MATLAB codes for INS modeling and analysis are either proprietary or
-unstructured and poorly documented. This package is intended to be open-source
-and follow established conventions in scientific Python, including code quality,
-documentation and testing. It is hoped that PyINS will offer an educational as
-well as a practical value.
+- Reasonably well written and tested code implementing basic algorithms in aides INS
+  for people studying the subject
+- Modelling toolkit to verify achievable performance depending on IMU
+  specification, test observability properties, etc.
+- For *basic* processing of real sensor data in case there are no better alternatives
+- As a starting reference point for developing practical aided INS algorithms
 
-The main features currently available:
-    
-    - State of the art algorithm for integrating inertial readings.
-    - Linear model for INS errors propagation.
-    - Feedforward and feedback Kalman filters on top of the INS error model. 
-      Any number of external aiding sources can be considered and users
-      can easily define their own observation models.
-    - Convenient class for representing errors of an Inertial Measurement Unit 
-      in the Kalman filter. It includes bias, scale factor, random walk,
-      white and time correlated noises.
-    - Simulator of strapdown inertial readings given a vehicle trajectory. 
-      The algorithm doesn't rely on reversing the strapdown integration
-      algorithm, but provides accurate and realistic measurements nevertheless.
+The package is not meant to achieve robust state of the art performance on real sensor
+data. Also it is not planned to further extend its functionality besides what's
+currently implemented.
 
-It is highly recommended to start with reading :ref:`design`.
+The following core features are available:
+
+- Synthesis of incremental and rate IMU sensors for modelling purposes
+- Strapdown INS integration algorithm
+- INS error model
+- Feedforward and feedback INS Kalman filters with customizable IMU model and set of
+  measurements
+
+Tutorial
+========
+
+There is no extensive dedicated tutorial for the package.
+The :doc:`api` describes available modules with some additional context information.
+The examples of usage in jupyter notebooks are available in :doc:`examples`.
+
+The following books are recommended to understand pyins functionality and the
+field in general:
+
+- P. D. Groves, "Principles of GNSS, Inertial, and Multisensor Integrated Navigation
+  Systems, Second Edition"
+- P\. G\. Savage, "Strapdown analytics"
+- P\. S\. Maybeck, "Stochastic Models, Estimation and Control", volumes 1 and 2
 
 .. toctree::
-   :caption: Context
-   :maxdepth: 1
+    :caption: Context
+    :maxdepth: 1
 
-   design
-   tutorial
-   examples
-   api
-   todo
+    api
+    examples
