@@ -1,4 +1,16 @@
-"""Utility functions and definitions."""
+"""Utility functions.
+
+Functions
+---------
+.. autosummary::
+    :toctree: generated
+
+    mm_prod
+    mm_prod_symmetric
+    mv_prod
+    skew_matrix
+    compute_rms
+"""
 import numpy as np
 
 

@@ -5,6 +5,21 @@ their error characteristics for simulation.
 
 Gyroscopes and accelerometers are treated as independent blocks, that is two objects
 are required to describe a full IMU.
+
+Classes
+-------
+.. autosummary::
+    :toctree: generated/
+
+    InertialSensorModel
+    InertialSensorError
+
+Functions
+---------
+.. autosummary::
+    :toctree: generated/
+
+    apply_imu_errors
 """
 import pandas as pd
 import numpy as np
@@ -14,7 +29,7 @@ from .util import GYRO_COLS, ACCEL_COLS, INDEX_TO_XYZ, XYZ_TO_INDEX
 
 
 class InertialSensorModel:
-    """Description of inertial sensor model.
+    """Description of inertial sensor statistical model.
 
     Below all parameters might be floats or arrays.In the former case the parameter is
     assumed to be the same for each of 3 sensors. In the latter case a non-positive
@@ -206,44 +221,44 @@ class InertialSensorModel:
 
 
 class InertialSensorError:
+    """Errors of inertial sensor triad.
+
+    The following basic mode is used::
+
+        x_out = T @ x + b + n
+
+    where
+
+        - ``x`` is a true kinematic vector
+        - ``x_out`` is a measured vector
+        - ``T`` is a 3x3 transformation matrix representing scale factor errors
+          and axes misalignment. It is an identity matrix in the ideal case
+        - ``b`` is a bias vector, possibly slowly changing with time
+        - ``n`` is a noise vector modeled as white Gaussian random process
+
+    Parameters
+    ----------
+    transform : array_like, shape (3, 3) or None, optional
+        Transformation matrix, typically close to an identity matrix.
+        If None (default), an identity matrix will be used.
+    bias : array_like, shape (3,) or None, optional
+        Bias vector. None (default) corresponds to zero.
+    noise : float, array_like of shape (3,) or None, optional
+        Intensity of noise (root PSD). None (default) corresponds to zero.
+    bias_walk : float, array_like of shape (3,) or None, optional
+        Intensity of noise (root PSD) integrated into bias.
+        None (default) corresponds to zero.
+    rng : None, int or RandomState
+        Random seed.
+
+    Attributes
+    ----------
+    parameters : DataFrame or None
+        After calling `apply` will contain DataFrame indexed by time with columns
+        containing non-zero parameters of IMU error model in the format consistent
+        with `pyins.filt` results.
+    """
     def __init__(self, transform=None, bias=None, noise=None, bias_walk=None, rng=None):
-        """Errors of inertial sensor triad.
-
-        The following basic mode is used::
-
-            x_out = T @ x + b + n
-
-        where
-
-            - ``x`` is a true kinematic vector
-            - ``x_out`` is a measured vector
-            - ``T`` is a 3x3 transformation matrix representing scale factor errors
-              and axes misalignments. It is an identity matrix in the ideal case.
-            - ``b`` is a bias vector, possibly slowly changing in time
-            - ``n`` is a noise vector modeled as white Gaussian random process
-
-        Parameters
-        ----------
-        transform : array_like, shape (3, 3) or None, optional
-            Transformation matrix, typically close to an identity matrix.
-            If None (default), an identity transform will be used.
-        bias : array_like, shape (3,) or None, optional
-            Bias vector. None (default) corresponds to zero.
-        noise : float, array_like of shape (3,) or None, optional
-            Intensity of noise (root PSD). None (default) corresponds to zero.
-        bias_walk : float, array_like of shape (3,) or None, optional
-            Intensity of noise (root PSD) integrated into bias.
-            None (default) corresponds to zero.
-        rng : None, int or RandomState
-            Random seed.
-
-        Attributes
-        ----------
-        parameters : DataFrame or None
-            After calling `apply` will contain DataFrame indexed by time with columns
-            containing non-zero parameters of IMU error model in the format consistent
-            with `InertialSensorModel`.
-        """
         self.transform = self._verify_parameter(transform, 'transform', (3, 3), False,
                                                 np.eye(3))
         self.bias = self._verify_parameter(bias, 'bias', (3,), False)
@@ -266,10 +281,10 @@ class InertialSensorError:
 
     @classmethod
     def from_InertialSensorModel(cls, inertial_sensor_model, rng=None):
-        """Create object from InertialSensorModel.
+        """Create object from `InertialSensorModel`.
 
-        Parameters will be randomly generated according to values contained in
-        `inertial_sensor_model`.
+        Parameters will be randomly generated according to standard deviation values
+        contained in `inertial_sensor_model`.
 
         Parameters
         ----------

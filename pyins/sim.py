@@ -1,8 +1,20 @@
 """Simulation of sensors.
 
-The main functionality provided by this module is synthesis of IMU readings from
-the given trajectory. It also contains some utility functions useful for aides INS
-simulation.
+The main functionality is synthesis of IMU readings from the given trajectory.
+It also contains some utility functions useful for aides INS simulation.
+
+Functions
+---------
+.. autosummary::
+    :toctree: generated/
+
+    generate_imu
+    sinusoid_velocity_motion
+    generate_position_observations
+    generate_ned_velocity_observations
+    generate_body_velocity_observations
+    generate_pva_error
+    perturb_pva
 """
 import numpy as np
 import pandas as pd

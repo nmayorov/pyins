@@ -13,19 +13,30 @@ Where
     - ``z`` - innovation vector
     - ``x`` - error state vector
     - ``H`` - measurement Jacobian
-    - ``v`` - noise vector. typically assumed to have zero mean and known variance
+    - ``v`` - noise vector, typically assumed to have zero mean and known variance
 
-The module provides a base class `Observation` which conceptualises this concept and
+The module provides a base class `Observation` which abstracts this concept and
 implementations for common observations.
 
 Refer to [1]_ and [2]_ for the discussion of the observations in navigation and in
 Kalman filtering in general.
 
+Classes
+-------
+.. autosummary::
+    :toctree: generated/
+
+    Observation
+    PositionObs
+    NedVelocityObs
+    BodyVelocityObs
+
 References
 ----------
 .. [1] P. D. Groves, "Principles of GNSS, Inertial, and Multisensor Integrated
        Navigation Systems, Second Edition"
-.. [2] P. S. Maybeck, "Stochastic Models, Estimation and Control, Volume 1"
+.. [2] P. S. Maybeck,
+       "Stochastic Models, Estimation and Control, Volume 1"
 """
 import numpy as np
 from . import error_model, transform
@@ -125,7 +136,7 @@ class PositionObs(Observation):
 
 
 class NedVelocityObs(Observation):
-    """Observation of velocity resolved in NED frame (typically from GNSS).
+    """Observation of velocity resolved in NED frame (from GNSS or any other source).
 
     Parameters
     ----------
@@ -161,12 +172,12 @@ class NedVelocityObs(Observation):
 
 
 class BodyVelocityObs(Observation):
-    """Observation of velocity resolved in body frame.
+    """Observation of velocity resolved in body frame (from odometry, radar, etc.)
 
     Parameters
     ----------
     data : DataFrame
-        Must be indexed by `time` and contain columns 'VX', 'VY' and 'VZ'.
+        Must be indexed by time and contain columns 'VX', 'VY' and 'VZ'.
     sd : float
         Measurement accuracy in m/s.
 

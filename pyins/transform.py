@@ -1,4 +1,29 @@
-"""Coordinate and attitude transformations."""
+"""Coordinate and attitude transformations.
+
+Constants
+----------
+.. autosummary::
+    :toctree: generated
+
+    DEG_TO_RAD
+    RAD_TO_DEG
+    DH_TO_RS
+    RS_TO_DH
+    DRH_TO_RRS
+
+Functions
+---------
+.. autosummary::
+    :toctree: generated
+
+    lla_to_ecef
+    perturb_lla
+    compute_lla_difference
+    compute_state_difference
+    mat_en_from_ll
+    mat_from_rph
+    mat_to_rph
+"""
 import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d

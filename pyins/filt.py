@@ -1,10 +1,19 @@
 """Navigation Kalman filters.
 
-Module provides functions to run a navigation Kalman filter in feedback (EKF) and
-feedforward forms. It relies on functionality provided by `inertial_sensor`,
-`error_module` and `observation` modules.
+Module provides functions to run a navigation Kalman filter in feedback
+(extended Kalman filter) and feedforward (linearized Kalman filter) forms. It relies on
+functionality provided by `pyins.inertial_sensor`, `pyins.error_model` and
+`pyins.observations` modules.
 
 Refer to [1]_ for the discussion of Kalman filtering in context of inertial navigation.
+
+Functions
+---------
+.. autosummary::
+    :toctree: generated/
+
+    run_feedback_filter
+    run_feedforward_filter
 
 References
 ----------

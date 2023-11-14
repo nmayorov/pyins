@@ -4,6 +4,20 @@ This module provides implementation of the classic "strapdown algorithm" to obta
 position, velocity and attitude by integration of IMU readings.
 The implementation follows [1]_ and [2]_ with some simplifications.
 
+Functions
+---------
+.. autosummary::
+    :toctree: generated/
+
+    compute_increments_from_imu
+
+Classes
+-------
+.. autosummary::
+    :toctree: generated/
+
+    Integrator
+
 References
 ----------
 .. [1] P. G. Savage, "Strapdown Inertial Navigation Integration Algorithm
@@ -28,12 +42,12 @@ def compute_increments_from_imu(imu, sensor_type):
     corrections and accounting for IMU rotation during a sampling period.
 
     The algorithm assumes a linear model for the angular velocity and the
-    specific force described in [1]_ and [2]_.
+    specific force.
 
     The number of returned increments is always one less than the number
     of IMU readings, even for increment-type sensors (by convention). It means that
     for increment sensors you need to supply an additional "before" sample.
-    The function `sim.generate_imu` already does that.
+    The function `pyins.sim.generate_imu` already does that.
 
     Parameters
     ----------
@@ -85,8 +99,7 @@ def compute_increments_from_imu(imu, sensor_type):
 class Integrator:
     """Strapdown INS integration algorithm.
 
-    The algorithm described in [1]_ and [2]_ is used with slight
-    simplifications. The position is updated using the trapezoid rule.
+    The position is updated using the trapezoid rule.
 
     Parameters
     ----------

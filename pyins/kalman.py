@@ -4,9 +4,18 @@ Module contains abstract functions for linear Kalman filter operations.
 
 Refer to [1]_ for the theory of Kalman filters.
 
+Functions
+---------
+.. autosummary::
+    :toctree: generated/
+
+    compute_process_matrices
+    correct
+
 References
 ----------
-.. [1] P. S. Maybeck, "Stochastic Models, Estimation and Control, Volume 1"
+.. [1] P. S. Maybeck,
+       "Stochastic Models, Estimation and Control, Volume 1"
 """
 import numpy as np
 from scipy.linalg import cholesky, cho_solve, solve_triangular, expm

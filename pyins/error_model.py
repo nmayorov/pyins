@@ -1,16 +1,27 @@
 """INS error model to use in navigation Kalman filters.
 
-An INS error model is a system of non-stationary linear differential equations
-which describe time evolution of INS errors. The system matrix depends on the
-current position, velocity and attitude.
+An INS error model is a system of non-stationary (depends on trajectory) linear
+differential equations which describe time evolution of INS errors.
 
-An error models consisting of 9 total states: 3 for position, velocity and attitude
+An error model vector has 9 total states: 3 for position, velocity and attitude
 errors. The states can be selected in different ways and several error models were
-proposed in the literature.
+proposed in the literature. Here the "modified phi-angle" model proposed in [1]_ is
+used. The key feature of it is that the velocity error is measured relative to the true
+velocity resolved in the "platform" frame which eliminates specific force from the
+system matrix.
 
-Here the "modified phi-angle" model proposed in [1]_ is used. The key feature of it
-is that the velocity error is measured relative to the true velocity resolved in the
-"platform" frame which eliminates specific force from the system matrix.
+Functions
+---------
+.. autosummary::
+    :toctree: generated/
+
+    system_matrices
+    transform_matrix
+    correct_pva
+    position_error_jacobian
+    ned_velocity_error_jacobian
+    body_velocity_error_jacobian
+    propagate_errors
 
 References
 ----------

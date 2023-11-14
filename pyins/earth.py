@@ -1,7 +1,32 @@
 """Earth geometry and gravity models.
 
-This module contains constants and computation models for ellipsoidal Earth using
+This module defines constants and computation models for ellipsoidal Earth using
 WGS84 parameters. All definitions and explanations for used models can be found in [1]_.
+
+
+Constants
+---------
+.. autosummary::
+    :toctree: generated
+
+    RATE
+    G
+    A
+    E2
+    GE
+    GP
+
+Functions
+---------
+.. autosummary::
+    :toctree: generated/
+
+    principal_radii
+    gravity
+    gravity_n
+    gravitation_ecef
+    curvature_matrix
+    rate_n
 
 References
 ----------
@@ -20,7 +45,7 @@ G = 9.8
 A = 6378137.0
 #: Squared eccentricity of Earth ellipsoid
 E2 = 6.6943799901413e-3
-#: Gravity at the equator
+#: Gravity at the equator.
 GE = 9.7803253359
 #: Gravity at the pole.
 GP = 9.8321849378
