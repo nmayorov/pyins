@@ -1,5 +1,6 @@
 import numpy as np
-from pyins import inertial_sensor, filt, sim, strapdown, transform, util, measurements
+from pyins import (inertial_sensor, filters, sim, strapdown, transform, util,
+                   measurements)
 
 
 def test_run_feedback_filter():
@@ -40,7 +41,7 @@ def test_run_feedback_filter():
     pva_error = sim.generate_pva_error(pos_sd, vel_sd, level_sd, azimuth_sd, rng=rng)
     initial = sim.perturb_pva(trajectory_true.iloc[0], pva_error)
 
-    result = filt.run_feedback_filter(
+    result = filters.run_feedback_filter(
         initial, pos_sd, vel_sd, level_sd, azimuth_sd, increments, gyro_model,
         accel_model, measurements=[position_obs, ned_velocity_obs, body_velocity_obs],
         time_step=1)
@@ -100,7 +101,7 @@ def test_run_feedforward_filter():
     integrator = strapdown.Integrator(initial)
     trajectory_computed = integrator.integrate(increments)
 
-    result = filt.run_feedforward_filter(
+    result = filters.run_feedforward_filter(
         trajectory.iloc[::factor], trajectory_computed.iloc[::factor],
         pos_sd, vel_sd, level_sd, azimuth_sd, gyro_model, accel_model,
         measurements=[position_obs, ned_velocity_obs, body_velocity_obs], time_step=1)

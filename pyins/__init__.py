@@ -62,7 +62,7 @@ Modules
 
    earth
    error_model
-   filt
+   filters
    inertial_sensor
    kalman
    measurements
@@ -78,6 +78,7 @@ References
 .. [2] P. S. Maybeck,
        "Stochastic Models, Estimation and Control, Volume 1"
 """
-from . import earth, error_model, kalman, sim, strapdown, filt, util
+from . import (earth, error_model, filters, inertial_sensor, kalman, measurements, sim,
+               strapdown, transform, util)
 
 __version__ = "0.1"
