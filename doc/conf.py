@@ -30,8 +30,15 @@ author = 'Nikolay Mayorov'
 extensions = [
     'sphinx.ext.autodoc',
     'numpydoc',
-    'sphinx.ext.autosummary'
+    'sphinx.ext.autosummary',
+    'sphinx.ext.intersphinx'
 ]
+
+intersphinx_mapping = {
+    'scipy': ('https://docs.scipy.org/doc/scipy/reference/', None),
+    'python': ('https://docs.python.org/3', None),
+    'numpy': ('https://numpy.org/devdocs', None),
+}
 
 default_role = "autolink"
 autodoc_default_options = {"members": False}
