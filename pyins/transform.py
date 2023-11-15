@@ -19,12 +19,12 @@ Functions
     lla_to_ecef
     perturb_lla
     compute_lla_difference
+    resample_state
     compute_state_difference
     mat_en_from_ll
     mat_from_rph
     mat_to_rph
     smooth_rotations
-    resample_state
 """
 import numpy as np
 import pandas as pd
@@ -144,12 +144,45 @@ def _has_rph(data):
     return all(col in data for col in RPH_COLS)
 
 
+def resample_state(state, times):
+    """Compute state values at new set of time values.
+
+    Piecewise linear interpolation is used with special care for rotation
+    ('roll', 'pitch', 'heading' columns), for which SLERP is used.
+
+    Parameters
+    ----------
+    state : DataFrame
+        State data indexed by time.
+    times : array_like
+        Values of time at which compute new state values. Values outside the original
+        time span of `state` will be discarded.
+
+    Returns
+    -------
+    DataFrame
+        Resampled state values.
+    """
+    times = np.sort(times)
+    times = times[(times >= state.index[0]) & (times <= state.index[-1])]
+
+    result = pd.DataFrame(index=times)
+    if _has_rph(state):
+        slerp = Slerp(state.index, Rotation.from_euler('xyz', state[RPH_COLS], True))
+        result[RPH_COLS] = slerp(times).as_euler('xyz', True)
+
+    other_columns = state.columns.difference(RPH_COLS)
+    interpolator = interp1d(state.index, state[other_columns].values, axis=0)
+    result[other_columns] = interpolator(times)
+    return result[state.columns]
+
+
 def compute_state_difference(first, second):
     """Compute difference between two state dataframes indexed by time.
 
-    The function synchronizes data to the common time index using piecewise linear
-    interpolation. The interpolation is done for the dataframe with more frequent
-    data (to reduce average interpolation period).
+    The function synchronizes data to the common time index using `resample_state`.
+    The interpolation is done for the dataframe with more frequent data (to reduce
+    average interpolation period).
 
     For columns 'lat', 'lon', 'alt', the difference is computed in meters
     resolved in NED frame. For columns 'roll', 'pitch' and 'heading' the interpolation
@@ -178,83 +211,33 @@ def compute_state_difference(first, second):
     def has_lla(data):
         return all(col in data for col in LLA_COLS)
 
-    def has_velocity(data):
-        return all(col in data for col in VEL_COLS)
-
     if np.median(np.diff(first.index)) < np.median(np.diff(second.index)):
         result_sign = -1.0
         first, second = second, first
     else:
         result_sign = 1.0
 
-    first = first[~first.index.duplicated()]
-
     index = first.index
     index = index[(index >= second.index[0]) & (index <= second.index[-1])]
+    columns = first.columns.intersection(second.columns)
 
-    results = []
+    first = first.loc[index, columns]
+    second = resample_state(second[columns], index)
 
-    if has_lla(first) and has_lla(second):
-        lla_second_interpolator = interp1d(second.index, second[LLA_COLS], axis=0)
-        lla_second = pd.DataFrame(lla_second_interpolator(index),
-                                  index=index, columns=LLA_COLS)
+    difference = first - second
+    if has_lla(difference):
+        rn, _, rp = earth.principal_radii(0.5 * (first.lat + second.lat),
+                                          0.5 * (first.alt + second.alt))
+        difference.lat *= rn * DEG_TO_RAD
+        difference.lon *= rp * DEG_TO_RAD
+        difference.alt *= -1
+        difference.rename(columns={'lat': 'north', 'lon': 'east', 'alt': 'down'},
+                          inplace=True)
 
-        rn, _, rp = earth.principal_radii(0.5 * (first.lat + lla_second.lat),
-                                          0.5 * (first.alt + lla_second.alt))
-        difference = pd.DataFrame(index=index, columns=NED_COLS)
-        difference['north'] = (first.lat - lla_second.lat) * rn * DEG_TO_RAD
-        difference['east'] = (first.lon - lla_second.lon) * rp * DEG_TO_RAD
-        difference['down'] = -(first.alt - lla_second.alt)
-        results.append(difference)
+    if _has_rph(difference):
+        difference[RPH_COLS] = to_180_degrees_range(difference[RPH_COLS])
 
-    if has_velocity(first) and has_velocity(second):
-        velocity_second_interpolator = interp1d(second.index, second[VEL_COLS], axis=0)
-        velocity_second_at_first = velocity_second_interpolator(index)
-        difference = pd.DataFrame(
-            first.loc[index, VEL_COLS].values - velocity_second_at_first,
-            index=index, columns=VEL_COLS)
-        results.append(difference)
-
-    if _has_rph(first) and _has_rph(second):
-        rpy_second_interpolator = Slerp(
-            second.index, Rotation.from_euler('xyz', second[RPH_COLS], True))
-        rpy_second_at_first = rpy_second_interpolator(index).as_euler('xyz', True)
-        difference = pd.DataFrame(
-            to_180_degrees_range(first.loc[index, RPH_COLS].values -
-                                 rpy_second_at_first), index=index, columns=RPH_COLS)
-        results.append(difference)
-    else:
-        if 'heading' in first and 'heading' in second:
-            heading_second_interpolator = Slerp(
-                second.index, Rotation.from_euler('z', second.heading, True))
-            heading_second_at_first = heading_second_interpolator(index).as_euler(
-                'xyz', True)[:, 2]
-            difference = pd.DataFrame(
-                to_180_degrees_range(first.loc[index, 'heading'].values -
-                                     heading_second_at_first),
-                index=index, columns=['heading'])
-            results.append(difference)
-        if 'pitch' in first and 'pitch' in second:
-            pitch_second_interpolator = Slerp(
-                second.index, Rotation.from_euler('y', second.pitch, True))
-            pitch_second_at_first = pitch_second_interpolator(index).as_euler(
-                'xyz', True)[:, 1]
-            difference = pd.DataFrame(first.loc[index, 'pitch'].values -
-                                      pitch_second_at_first,
-                                      index=index, columns=['pitch'])
-            results.append(difference)
-
-    other_columns = first.columns.intersection(second.columns).difference(
-        TRAJECTORY_COLS)
-    if not other_columns.empty:
-        second_interpolator = interp1d(second.index, second[other_columns], axis=0)
-        difference = pd.DataFrame(
-            first.loc[index, other_columns].values - second_interpolator(index),
-            index=index, columns=other_columns)
-        results.append(difference)
-
-    return (result_sign * pd.concat(results, axis=1) if results
-            else pd.DataFrame(index=index))
+    return result_sign * difference
 
 
 def mat_en_from_ll(lat, lon):
@@ -358,36 +341,3 @@ def smooth_rotations(rotations, T, T_smooth):
                                    method='gust').reshape(-1, 4, 4)
     _, v = np.linalg.eigh(coefficients)
     return Rotation.from_quat(v[:, :, -1])
-
-
-def resample_state(state, times):
-    """Compute state values at new set of time values.
-
-    Piecewise linear interpolation is used with special care for rotation (
-    'roll', 'pitch', 'heading'), for which SLERP is used.
-
-    Parameters
-    ----------
-    state : DataFrame
-        State data indexed by time.
-    times : array_like
-        Values of time at which compute new state values. Values outside the original
-        time span of `state` will be discarded.
-
-    Returns
-    -------
-    DataFrame
-        Resampled state values.
-    """
-    times = np.sort(times)
-    times = times[(times >= state.index[0]) & (times <= state.index[-1])]
-
-    result = pd.DataFrame(index=times)
-    if _has_rph(state):
-        slerp = Slerp(state.index, Rotation.from_euler('xyz', state[RPH_COLS], True))
-        result[RPH_COLS] = slerp(times).as_euler('xyz', True)
-
-    other_columns = state.columns.difference(RPH_COLS)
-    interpolator = interp1d(state.index, state[other_columns].values, axis=0)
-    result[other_columns] = interpolator(times)
-    return result[state.columns]
