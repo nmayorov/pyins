@@ -310,7 +310,7 @@ def smooth_state(state, T_smooth):
     """
     T = np.min(np.diff(state.index))
     resampled_state = resample_state(state, np.arange(0, state.index[-1], T))
-    smoothed = pd.DataFrame(index=state.index)
+    smoothed = pd.DataFrame(index=resampled_state.index)
     if _has_rph(state):
         rotations = Rotation.from_euler('xyz', resampled_state[RPH_COLS], True)
         smoothed[RPH_COLS] = smooth_rotations(
