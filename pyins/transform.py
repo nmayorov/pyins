@@ -24,6 +24,7 @@ Functions
     mat_from_rph
     mat_to_rph
     smooth_rotations
+    resample_state
 """
 import numpy as np
 import pandas as pd
@@ -139,6 +140,10 @@ def compute_lla_difference(lla1, lla2):
     return result[0] if single else result
 
 
+def _has_rph(data):
+    return all(col in data for col in RPH_COLS)
+
+
 def compute_state_difference(first, second):
     """Compute difference between two state dataframes indexed by time.
 
@@ -176,9 +181,6 @@ def compute_state_difference(first, second):
     def has_velocity(data):
         return all(col in data for col in VEL_COLS)
 
-    def has_rph(data):
-        return all(col in data for col in RPH_COLS)
-
     if np.median(np.diff(first.index)) < np.median(np.diff(second.index)):
         result_sign = -1.0
         first, second = second, first
@@ -213,7 +215,7 @@ def compute_state_difference(first, second):
             index=index, columns=VEL_COLS)
         results.append(difference)
 
-    if has_rph(first) and has_rph(second):
+    if _has_rph(first) and _has_rph(second):
         rpy_second_interpolator = Slerp(
             second.index, Rotation.from_euler('xyz', second[RPH_COLS], True))
         rpy_second_at_first = rpy_second_interpolator(index).as_euler('xyz', True)
@@ -356,3 +358,36 @@ def smooth_rotations(rotations, T, T_smooth):
                                    method='gust').reshape(-1, 4, 4)
     _, v = np.linalg.eigh(coefficients)
     return Rotation.from_quat(v[:, :, -1])
+
+
+def resample_state(state, times):
+    """Compute state values at new set of time values.
+
+    Piecewise linear interpolation is used with special care for rotation (
+    'roll', 'pitch', 'heading'), for which SLERP is used.
+
+    Parameters
+    ----------
+    state : DataFrame
+        State data indexed by time.
+    times : array_like
+        Values of time at which compute new state values. Values outside the original
+        time span of `state` will be discarded.
+
+    Returns
+    -------
+    DataFrame
+        Resampled state values.
+    """
+    times = np.sort(times)
+    times = times[(times >= state.index[0]) & (times <= state.index[-1])]
+
+    result = pd.DataFrame(index=times)
+    if _has_rph(state):
+        slerp = Slerp(state.index, Rotation.from_euler('xyz', state[RPH_COLS], True))
+        result[RPH_COLS] = slerp(times).as_euler('xyz', True)
+
+    other_columns = state.columns.difference(RPH_COLS)
+    interpolator = interp1d(state.index, state[other_columns].values, axis=0)
+    result[other_columns] = interpolator(times)
+    return result[state.columns]
