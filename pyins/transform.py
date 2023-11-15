@@ -21,10 +21,11 @@ Functions
     compute_lla_difference
     resample_state
     compute_state_difference
+    smooth_rotations
+    smooth_state
     mat_en_from_ll
     mat_from_rph
     mat_to_rph
-    smooth_rotations
 """
 import numpy as np
 import pandas as pd
@@ -240,6 +241,86 @@ def compute_state_difference(first, second):
     return result_sign * difference
 
 
+def _apply_smoothing(data, T, T_smooth):
+    num_taps = int(3 * np.round(T_smooth / T))
+    h = signal.firwin(num_taps, 1 / T_smooth, fs=1 / T)
+    return signal.filtfilt(h, 1, data, axis=0, method='gust')
+
+
+def smooth_rotations(rotations, T, T_smooth):
+    """Smooth rotations.
+
+    The function applies a FIR filter (in forward and backward directions) to the
+    elements of outer products of quaternion representation of the rotations.
+    The smoothed quaternion is constructed as the eigenvector of the matrix with
+    the smoothed coefficients.
+
+    A FIR filter is constructed using `scipy.signal.firwin` with the number of
+    coefficients selected as 3 times ratio between the smoothing time and the sampling
+    period.
+
+    Parameters
+    ----------
+    rotations : `scipy.spatial.transform.Rotation`
+        Rotation objects with multiple rotations. All rotations are supposed to be
+        equispaced in time.
+    T : float
+        Time interval between rotations.
+    T_smooth : float
+        Smoothing time.
+
+    Returns
+    -------
+    `scipy.spatial.transform.Rotation`
+        Smoothed rotations.
+    """
+    if rotations.single:
+        raise ValueError("`rotations` must contain multiple rotations.")
+    q = rotations.as_quat()
+    coefficients = np.einsum('...i,...j->...ij', q, q).reshape(-1, 16)
+    coefficients = _apply_smoothing(coefficients, T, T_smooth).reshape(-1, 4, 4)
+    _, v = np.linalg.eigh(coefficients)
+    return Rotation.from_quat(v[:, :, -1])
+
+
+def smooth_state(state, T_smooth):
+    """Smooth state data.
+
+    Smoothing is done in 3 steps: first the state is resampled to the constant time
+    step using `resample_state`, then the data is smoothed with FIR filter and then the
+    smoothed data is resampled back to the original time.
+
+    The smoothing is done by applying FIR filter (in forward and backward directions)
+    constructed using `scipy.signal.firwin` with the number of coefficients selected as
+    3 times ratio between the smoothing time and the sampling period.
+
+    Rotations ('roll', 'pitch', 'heading' columns) are smoothed by `smooth_rotations`.
+
+    Parameters
+    ----------
+    state : DataFrame
+        State date indexed by time.
+    T_smooth : float
+        Smoothing time.
+
+    Returns
+    -------
+    DataFrame
+        Smoothed data.
+    """
+    T = np.min(np.diff(state.index))
+    resampled_state = resample_state(state, np.arange(0, state.index[-1], T))
+    smoothed = pd.DataFrame(index=state.index)
+    if _has_rph(state):
+        rotations = Rotation.from_euler('xyz', resampled_state[RPH_COLS], True)
+        smoothed[RPH_COLS] = smooth_rotations(
+            rotations, T, T_smooth).as_euler('xyz', True)
+    other_columns = state.columns.difference(RPH_COLS)
+    smoothed[other_columns] = _apply_smoothing(resampled_state[other_columns].values,
+                                               T, T_smooth)
+    return resample_state(smoothed[state.columns], state.index)
+
+
 def mat_en_from_ll(lat, lon):
     """Create a rotation matrix projecting from ECEF to NED frame.
 
@@ -299,45 +380,3 @@ def mat_to_rph(mat):
         Roll, pitch and heading angles.
     """
     return Rotation.from_matrix(mat).as_euler('xyz', degrees=True)
-
-
-def smooth_rotations(rotations, T, T_smooth):
-    """Apply smoothing filter to rotations.
-
-    The function applies a FIR filter (in forward and backward directions) to the
-    elements of outer products of quaternion representation of the rotations.
-    The smoothed quaternion is constructed as the eigenvector of the matrixed with
-    the smoothed coefficients.
-
-    A FIR filter is contructed using `scipy.signal.firwin` with the number of
-    coefficients selected as 3 times ratio between the smoothing time and the sampling
-    period.
-
-    Parameters
-    ----------
-    rotations : `scipy.spatial.transform.Rotation`
-        Rotation objects with multiple rotations. All rotations are supposed to be
-        equispaced in time.
-    T : float
-        Time interval between rotations.
-    T_smooth : float
-        Smoothing time.
-
-    Returns
-    -------
-    `scipy.spatial.transform.Rotation`
-        Smoothed rotations.
-    """
-    if rotations.single:
-        raise ValueError("`rotations` must contain multiple rotations.")
-
-    q = rotations.as_quat()
-    coefficients = np.einsum('...i,...j->...ij', q, q).reshape(-1, 16)
-
-    num_taps = int(3 * np.round(T_smooth / T))
-    h = signal.firwin(num_taps, 1 / T_smooth, fs=1 / T)
-
-    coefficients = signal.filtfilt(h, 1, coefficients, axis=0,
-                                   method='gust').reshape(-1, 4, 4)
-    _, v = np.linalg.eigh(coefficients)
-    return Rotation.from_quat(v[:, :, -1])
