@@ -24,6 +24,7 @@ The following core features are available:
 - INS error model
 - Feedforward and feedback INS Kalman filters with customizable IMU model and set of
   measurements
+- Trajectory interpolation, smoothing and comparison functions
 
 Tutorial
 ========
