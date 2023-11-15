@@ -23,10 +23,12 @@ Functions
     mat_en_from_ll
     mat_from_rph
     mat_to_rph
+    smooth_rotations
 """
 import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
+from scipy import signal
 from scipy.spatial.transform import Rotation, Slerp
 from .util import LLA_COLS, VEL_COLS, RPH_COLS, NED_COLS, TRAJECTORY_COLS
 from . import earth
@@ -312,3 +314,45 @@ def mat_to_rph(mat):
         Roll, pitch and heading angles.
     """
     return Rotation.from_matrix(mat).as_euler('xyz', degrees=True)
+
+
+def smooth_rotations(rotations, T, T_smooth):
+    """Apply smoothing filter to rotations.
+
+    The function applies a FIR filter (in forward and backward directions) to the
+    elements of outer products of quaternion representation of the rotations.
+    The smoothed quaternion is constructed as the eigenvector of the matrixed with
+    the smoothed coefficients.
+
+    A FIR filter is contructed using `scipy.signal.firwin` with the number of
+    coefficients selected as 3 times ratio between the smoothing time and the sampling
+    period.
+
+    Parameters
+    ----------
+    rotations : `scipy.spatial.transform.Rotation`
+        Rotation objects with multiple rotations. All rotations are supposed to be
+        equispaced in time.
+    T : float
+        Time interval between rotations.
+    T_smooth : float
+        Smoothing time.
+
+    Returns
+    -------
+    `scipy.spatial.transform.Rotation`
+        Smoothed rotations.
+    """
+    if rotations.single:
+        raise ValueError("`rotations` must contain multiple rotations.")
+
+    q = rotations.as_quat()
+    coefficients = np.einsum('...i,...j->...ij', q, q).reshape(-1, 16)
+
+    num_taps = int(3 * np.round(T_smooth / T))
+    h = signal.firwin(num_taps, 1 / T_smooth, fs=1 / T)
+
+    coefficients = signal.filtfilt(h, 1, coefficients, axis=0,
+                                   method='gust').reshape(-1, 4, 4)
+    _, v = np.linalg.eigh(coefficients)
+    return Rotation.from_quat(v[:, :, -1])
