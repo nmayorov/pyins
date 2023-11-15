@@ -242,22 +242,27 @@ def compute_state_difference(first, second):
 
 
 def _apply_smoothing(data, T, T_smooth):
-    num_taps = int(3 * np.round(T_smooth / T))
+    num_taps = 2 * round(T_smooth / T) + 1
     h = signal.firwin(num_taps, 1 / T_smooth, fs=1 / T)
-    return signal.filtfilt(h, 1, data, axis=0, method='gust')
+    filtered = signal.lfilter(h, 1, data, axis=0)
+    filtered = filtered[num_taps - 1 : -num_taps + 1]
+    return filtered, num_taps
 
 
 def smooth_rotations(rotations, T, T_smooth):
     """Smooth rotations.
 
-    The function applies a FIR filter (in forward and backward directions) to the
-    elements of outer products of quaternion representation of the rotations.
-    The smoothed quaternion is constructed as the eigenvector of the matrix with
-    the smoothed coefficients.
+    The function applies a FIR filter to the elements of outer products of quaternion
+    representation of the rotations. The smoothed quaternion is constructed as the
+    eigenvector of the matrix with the smoothed coefficients.
 
     A FIR filter is constructed using `scipy.signal.firwin` with the number of
-    coefficients selected as 3 times ratio between the smoothing time and the sampling
-    period.
+    coefficients selected as
+
+        num_taps = 2 * round(T_smooth / T) + 1
+
+    The first and last ``num_taps - 1`` filtered samples are removed as they cannot
+    be computed using actual data and the edge effects are hard to eliminate.
 
     Parameters
     ----------
@@ -278,7 +283,7 @@ def smooth_rotations(rotations, T, T_smooth):
         raise ValueError("`rotations` must contain multiple rotations.")
     q = rotations.as_quat()
     coefficients = np.einsum('...i,...j->...ij', q, q).reshape(-1, 16)
-    coefficients = _apply_smoothing(coefficients, T, T_smooth).reshape(-1, 4, 4)
+    coefficients  = _apply_smoothing(coefficients, T, T_smooth)[0].reshape(-1, 4, 4)
     _, v = np.linalg.eigh(coefficients)
     return Rotation.from_quat(v[:, :, -1])
 
@@ -290,9 +295,14 @@ def smooth_state(state, T_smooth):
     step using `resample_state`, then the data is smoothed with FIR filter and then the
     smoothed data is resampled back to the original time.
 
-    The smoothing is done by applying FIR filter (in forward and backward directions)
-    constructed using `scipy.signal.firwin` with the number of coefficients selected as
-    3 times ratio between the smoothing time and the sampling period.
+    The smoothing is done by applying FIR filter constructed using
+    `scipy.signal.firwin` with the number of coefficients computed as::
+
+        num_taps = 2 * round(T_smooth / T) + 1
+
+    The first and last ``num_taps - 1`` filtered samples are removed as they cannot
+    be computed using actual data and the edge effects are hard to eliminate.
+    The group delay is compensated by approriately adjusting time index.
 
     Rotations ('roll', 'pitch', 'heading' columns) are smoothed by `smooth_rotations`.
 
@@ -309,15 +319,18 @@ def smooth_state(state, T_smooth):
         Smoothed data.
     """
     T = np.min(np.diff(state.index))
-    resampled_state = resample_state(state, np.arange(0, state.index[-1], T))
-    smoothed = pd.DataFrame(index=resampled_state.index)
+    resampled_state = resample_state(state,
+                                     np.arange(state.index[0], state.index[-1], T))
+    smoothed = pd.DataFrame()
     if _has_rph(state):
         rotations = Rotation.from_euler('xyz', resampled_state[RPH_COLS], True)
         smoothed[RPH_COLS] = smooth_rotations(
             rotations, T, T_smooth).as_euler('xyz', True)
     other_columns = state.columns.difference(RPH_COLS)
-    smoothed[other_columns] = _apply_smoothing(resampled_state[other_columns].values,
-                                               T, T_smooth)
+    smoothed[other_columns], num_taps = _apply_smoothing(
+        resampled_state[other_columns].values, T, T_smooth)
+    smoothed.index = (resampled_state.index[num_taps - 1 : -num_taps + 1] -
+                      T * (num_taps // 2))
     return resample_state(smoothed[state.columns], state.index)
 
 
