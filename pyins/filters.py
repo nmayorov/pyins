@@ -318,6 +318,8 @@ def run_feedback_filter(initial_pva, position_sd, velocity_sd, level_sd, azimuth
                         measurement_times[measurement_time_index])
         next_increment_index = np.searchsorted(increments.index, next_time,
                                                side='right')
+        if next_increment_index == increments_index:
+            next_increment_index += 1
         increments_batch = _correct_increments(
             increments.iloc[increments_index : next_increment_index],
             gyro_model, accel_model)
