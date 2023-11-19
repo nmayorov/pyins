@@ -216,7 +216,7 @@ class InertialSensorModel:
                 axis_out = XYZ_TO_INDEX[items[1][0]]
                 axis_in = XYZ_TO_INDEX[items[1][1]]
                 estimates.append(self.transform[axis_out, axis_in] -
-                                 1 if axis_out == axis_in else 0)
+                                 (1 if axis_out == axis_in else 0))
         return pd.Series(estimates, index=self.states)
 
 
