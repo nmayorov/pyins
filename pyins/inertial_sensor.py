@@ -195,8 +195,8 @@ class InertialSensorModel:
                 axis = XYZ_TO_INDEX[items[1]]
                 self.bias[axis] += xi
             elif items[0] == 'sm':
-                axis_out = XYZ_TO_INDEX(items[1][0])
-                axis_in = XYZ_TO_INDEX(items[2][1])
+                axis_out = XYZ_TO_INDEX[items[1][0]]
+                axis_in = XYZ_TO_INDEX[items[1][1]]
                 self.transform[axis_out, axis_in] += xi
 
     def correct_increments(self, dt, increments):
