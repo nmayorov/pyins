@@ -17,6 +17,7 @@ Functions
     :toctree: generated
 
     lla_to_ecef
+    lla_to_ned
     perturb_lla
     compute_lla_difference
     resample_state
@@ -33,7 +34,7 @@ from scipy.interpolate import interp1d
 from scipy import signal
 from scipy.spatial.transform import Rotation, Slerp
 from .util import LLA_COLS, VEL_COLS, RPH_COLS, NED_COLS, TRAJECTORY_COLS
-from . import earth
+from . import earth, util
 
 #: Degrees to radians.
 DEG_TO_RAD = np.pi / 180
@@ -74,6 +75,36 @@ def lla_to_ecef(lla):
     r_e[2] = ((1 - earth.E2) * re + alt) * sin_lat
 
     return r_e.transpose()
+
+
+def lla_to_ned(lla, lla_origin=None):
+    """Convert lla into NED Cartesian coordinates.
+
+    Parameters
+    ----------
+    lla : array_like, shape (n, 3)
+        Latitude, longitude and altitude values. If DataFrame (with columns 'lat',
+        'lon', 'alt) the result will be DataFrame with columns 'nort', 'east', 'down'.
+    lla_origin : array_like with shape (3,) or None, optional
+        Values of latitude, longitude and latitude of the origin point.
+        If None (default), the first row in `lla` will be used.
+    Returns
+    -------
+    ndarray of DataFrame
+        NED coordinates.
+    """
+    is_dataframe = isinstance(lla, pd.DataFrame)
+    if is_dataframe:
+        time = lla.index
+        lla = lla[LLA_COLS].values
+    else:
+        lla = np.asarray(lla)
+    if lla_origin is None:
+        lla_origin = lla[0]
+    r_e = lla_to_ecef(lla) - lla_to_ecef(lla_origin)
+    mat_en = mat_en_from_ll(lla_origin[0], lla_origin[1])
+    r_n = util.mv_prod(mat_en, r_e, True)
+    return pd.DataFrame(r_n, index=time, columns=NED_COLS) if is_dataframe else r_n
 
 
 def perturb_lla(lla, dr_n):
