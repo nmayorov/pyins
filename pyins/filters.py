@@ -187,9 +187,9 @@ def _compute_feedforward_result(x, P, trajectory_nominal, trajectory,
 
 def _correct_increments(increments, gyro_model, accel_model):
     result = increments.copy()
-    result[THETA_COLS] = gyro_model.correct_increments(increments.dt,
+    result[THETA_COLS] = gyro_model.correct_increments(increments['dt'],
                                                        increments[THETA_COLS])
-    result[DV_COLS] = accel_model.correct_increments(increments.dt,
+    result[DV_COLS] = accel_model.correct_increments(increments['dt'],
                                                      increments[DV_COLS])
     return result
 
@@ -287,11 +287,16 @@ def run_feedback_filter(initial_pva, position_sd, velocity_sd, level_sd, azimuth
     while integrator.get_time() < end_time:
         time = integrator.get_time()
         measurement_time = measurement_times[measurement_time_index]
-        increment = increments.iloc[increments_index]
+        increment = _correct_increments(increments.iloc[increments_index],
+                                        gyro_model, accel_model)
         if measurement_time < increment.name:
             x = np.zeros(n_states)
-            pva = integrator.predict((measurement_time - time) / increment['dt'] *
-                                     increment)
+            pva = pd.concat([
+                integrator.predict((measurement_time - time) / increment['dt'] *
+                                   increment),
+                pd.Series(increment[THETA_COLS].values / increment['dt'],
+                          index=['rate_x', 'rate_y', 'rate_z'])
+            ])
             for measurement in measurements:
                 ret = measurement.compute_matrices(measurement_time, pva)
                 if ret is not None:

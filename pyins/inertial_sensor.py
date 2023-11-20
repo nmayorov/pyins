@@ -200,10 +200,17 @@ class InertialSensorModel:
                 self.transform[axis_out, axis_in] += xi
 
     def correct_increments(self, dt, increments):
-        dt = np.asarray(dt).reshape(-1, 1)
-        return pd.DataFrame(
-            np.linalg.solve(self.transform, (increments.values - self.bias * dt).T).T,
-            index=increments.index, columns=increments.columns)
+        if isinstance(increments, pd.DataFrame):
+            dt = np.asarray(dt).reshape(-1, 1)
+        corrected = np.linalg.solve(self.transform,
+                                    (increments.values - self.bias * dt).T).T
+        if isinstance(increments, pd.DataFrame):
+            return pd.DataFrame(corrected, index=increments.index,
+                                columns=increments.columns)
+        elif isinstance(increments, pd.Series):
+            return pd.Series(corrected, index=increments.index, name=increments.name)
+        else:
+            assert False
 
     def get_estimates(self):
         estimates = []
