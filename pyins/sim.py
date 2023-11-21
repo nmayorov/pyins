@@ -15,6 +15,13 @@ Functions
     generate_body_velocity_measurements
     generate_pva_error
     perturb_pva
+
+Classes
+-------
+.. autosummary::
+    :toctree: generated/
+
+    Turntable
 """
 import numpy as np
 import pandas as pd
@@ -384,3 +391,203 @@ def perturb_pva(pva, pva_error):
     result[VEL_COLS] += pva_error[VEL_COLS]
     result[RPH_COLS] += pva_error[RPH_COLS]
     return result
+
+
+class Turntable:
+    """Simulator of a turntable with 2 axes.
+
+    A turntable is used for IMU calibration by performing precise and controlled
+    rotations around specified axes.
+
+    Here we consider a turntable with 2 axes: outer and inner.
+    To precisely describe its operation let's introduce 2 frames:
+
+        - table frame (t) - frame of the table fixture, which is typically installed
+          horizontally and aligned with North and East directions. It can be rotated
+          around x-axis, which is known as the outer axis of the table.
+        - mount frame (m) - frame of the inner fixture to which IMU is mounted.
+          It is installed to be aligned with the table frame. It can be rotated around
+          z-axis, which is known as the inner axis of the table.
+
+    Using rotations around the inner and outer axes it is possible to put IMU at
+    any orientation with respect to NED frame and rotate IMU around any of its axes.
+
+    This class is supposed to be used as follows: execute the required commands with
+    `rotate` and `rest` methods and then generate IMU and reference trajectory
+    (mainly attitude of course) with `generate_imu` method.
+
+    Parameters
+    ----------
+    angular_rate : float, optional
+        Default angular rate of rotations in deg/s. Default is 20 deg/s.
+    angular_acceleration : float, optional
+        Default angular acceleration to reach the target angular rate in deg/s^2.
+        Default is 20 deg/s^2.
+    """
+    EXTRA_REST = 0.1
+
+    def __init__(self, angular_rate=20, angular_acceleration=20):
+        self.angular_rate = angular_rate
+        self.angular_acceleration = angular_acceleration
+        self.inner_angle = 0
+        self.outer_angle = 0
+        self.time = 0
+        self.actions = []
+
+    def rotate(self, axis, angle, angular_rate=None, angular_acceleration=None,
+               label=None):
+        """Rotate the table around the inner or the outer axis.
+
+        Parameters
+        ----------
+        axis : 'inner' or 'outer'
+            Axis of rotation.
+        angle : float
+            Angles of rotation in degrees.
+        angular_rate : float or None, optional
+            Angular rate in deg/s. If None (default), use value from the
+            constructor.
+        angular_acceleration : float or None, optional
+            Angular acceleration in deg/s^2 to reach `angular_rate`. If None (default),
+            use value from the constructor.
+        label : string or None, optional
+            Text label to mark this stage. If None (default), generate it automatically.
+        """
+        if axis not in ['inner', 'outer']:
+            raise ValueError("`axis` must be 'inner' or 'outer'")
+        if angular_rate is None:
+            angular_rate = self.angular_rate
+        if angular_acceleration is None:
+            angular_acceleration = self.angular_acceleration
+        if label is None:
+            label = f"rotation_{axis}_{angle}"
+
+        angular_rate = min(angular_rate, (abs(angle) * angular_acceleration) ** 0.5)
+        time = (angular_rate / angular_acceleration + np.abs(angle) / angular_rate
+                + 2 * self.EXTRA_REST)
+        self.actions.append(
+            ('rotate', axis, time, angle, angular_rate, angular_acceleration, label)
+        )
+
+        if axis == 'inner':
+            self.inner_angle += angle
+        elif axis == 'outer':
+            self.outer_angle += angle
+        else:
+            assert False
+        self.time += time
+
+    def rest(self, time, label=None):
+        """Rest the table for the given time.
+
+        Parameters
+        ----------
+        time : float
+            Time to rest.
+        label : string or None, optional
+            Text label to mark this stage. If None (default), generate it automatically.
+        """
+        if label is None:
+            label = f"rest_{time}"
+        self.actions.append(('rest', time, label))
+        self.time += time
+
+    def generate_imu(self, dt, table_lla, table_rph=np.zeros(3),
+                     axes_non_orthogonality=0, sensor_type='rate'):
+        """Generate trajectory and IMU data.
+
+        Parameters
+        ----------
+        dt : float
+            Sampling period for trajectory and IMU data.
+        table_lla : array_like, shape (3,)
+            Latitude, longitude and altitude of the table installation site.
+        table_rph : array_like, shape (3,), optional
+            Roll, pitch and heading angles of the table frame.
+            Typically, a table is installed horizontally (roll and pitch is close to
+            zero) and the heading angle is precisely measured. Default is all zeros.
+        axes_non_orthogonality : float, optional
+            Deviation from orthogonality between inner and outers axes as a rotation
+            around y-axis of the mount frame. Typically, a table is build to have
+            very low non-orthogonality. Default is zero.
+        sensor_type : 'rate' or 'increment', optional
+            Type of IMU sensor to generate. Default is 'rate'.
+
+        Returns
+        -------
+        trajectory : Trajectory
+            Trajectory dataframe.
+        imu : Imu
+            IMU dataframe. When `sensor_type` is 'increment' the first sample is
+            duplicated for more convenient future processing.
+        labels : ndarray
+            Text labels for each trajectory and IMU sample.
+        """
+        times = np.arange(0, self.time, dt)
+        inner_angles = np.empty_like(times)
+        outer_angles = np.empty_like(times)
+        labels = np.empty_like(inner_angles, dtype=object)
+
+        time = 0
+        inner_angle = 0
+        outer_angle = 0
+
+        for action in self.actions:
+            if action[0] == 'rotate':
+                (_, axis, period, angle, angular_rate, angular_acceleration,
+                 label) = action
+                time_mask = (times >= time) & (times < time + period)
+                t = times[time_mask] - time
+
+                sign, angle = np.sign(angle), np.abs(angle)
+
+                ta = angular_rate / angular_acceleration
+                tc = period - 2 * ta - 2 * self.EXTRA_REST
+
+                angles = np.empty_like(t)
+                mask = t < self.EXTRA_REST
+                angles[mask] = 0
+                mask = (t >= self.EXTRA_REST) & (t < self.EXTRA_REST + ta)
+                angles[mask] = (0.5 * angular_acceleration
+                                * (t[mask] - self.EXTRA_REST) ** 2)
+                mask = (t >= self.EXTRA_REST + ta) & (t < self.EXTRA_REST + ta + tc)
+                angles[mask] = (0.5 * angular_rate * ta + angular_rate
+                                * (t[mask] - ta - self.EXTRA_REST))
+                mask = ((t >= self.EXTRA_REST + ta + tc)
+                        & (t < self.EXTRA_REST + 2 * ta + tc))
+                angles[mask] = (angular_rate * (ta + tc)
+                                - 0.5 * angular_acceleration
+                                * (t[mask] - period + self.EXTRA_REST) ** 2)
+                mask = t >= self.EXTRA_REST + 2 * ta + tc
+                angles[mask] = angular_rate * (ta + tc)
+
+                if axis == 'inner':
+                    inner_angles[time_mask] = inner_angle + sign * angles
+                    outer_angles[time_mask] = outer_angle
+                    inner_angle += sign * angle
+                elif axis == 'outer':
+                    inner_angles[time_mask] = inner_angle
+                    outer_angles[time_mask] = outer_angle + sign * angles
+                    outer_angle += sign * angle
+            elif action[0] == 'rest':
+                (_, period, label) = action
+                time_mask = (times >= time) & (times < time + period)
+                inner_angles[time_mask] = inner_angle
+                outer_angles[time_mask] = outer_angle
+            else:
+                assert False
+
+            labels[time_mask] = label
+            time += period
+
+        rot_nt0 = Rotation.from_euler('xyz', table_rph, True)
+        rot_tm0 = Rotation.from_euler('y', axes_non_orthogonality, True)
+        rot_t0t = Rotation.from_euler('x', outer_angles, True)
+        rot_m0m = Rotation.from_euler('z', inner_angles, True)
+        rot_nm = rot_nt0 * rot_t0t * rot_tm0 * rot_m0m
+
+        table_lla = np.asarray(table_lla, dtype=float)
+        trajectory, imu = generate_imu(times, np.resize(table_lla, (len(times), 3)),
+                                       rot_nm.as_euler('xyz', True),
+                                       np.zeros((len(times), 3)), sensor_type)
+        return trajectory, imu, labels
