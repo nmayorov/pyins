@@ -39,7 +39,7 @@ References
        "Stochastic Models, Estimation and Control, Volume 1"
 """
 import numpy as np
-from . import error_model, transform
+from . import transform
 from .util import LLA_COLS, VEL_COLS, RPH_COLS, RATE_COLS
 
 
@@ -68,7 +68,7 @@ class Measurement:
     def __init__(self, data):
         self.data = data
 
-    def compute_matrices(self, time, pva):
+    def compute_matrices(self, time, pva, error_model):
         """Compute matrices for a single linearized measurement.
 
         It must compute the linearized measurement model (z, H, R) at a given time.
@@ -81,6 +81,8 @@ class Measurement:
             Time.
         pva : Pva
             Position-velocity-attitude estimates from INS at `time`.
+        error_model : `pyins.error_model.InsErrorModel`
+            InsErrorModel instance.
 
         Returns
         -------
@@ -119,7 +121,7 @@ class Position(Measurement):
         self.R = sd**2 * np.eye(3)
         self.imu_to_antenna_b = imu_to_antenna_b
 
-    def compute_matrices(self, time, pva):
+    def compute_matrices(self, time, pva, error_model):
         if time not in self.data.index:
             return None
 
@@ -128,10 +130,13 @@ class Position(Measurement):
         if self.imu_to_antenna_b is not None:
             mat_nb = transform.mat_from_rph(pva[RPH_COLS])
             z += mat_nb @ self.imu_to_antenna_b
-
         H = error_model.position_error_jacobian(pva, self.imu_to_antenna_b)
-
-        return z, H, self.R
+        R = self.R
+        if not error_model.with_altitude:
+            z = z[:2]
+            H = H[:2]
+            R = R[:2, :2]
+        return z, H, R
 
 
 class NedVelocity(Measurement):
@@ -157,7 +162,7 @@ class NedVelocity(Measurement):
         self.R = sd**2 * np.eye(3)
         self.imu_to_antenna_b = imu_to_antenna_b
 
-    def compute_matrices(self, time, pva):
+    def compute_matrices(self, time, pva, error_model):
         if time not in self.data.index:
             return None
 
@@ -166,8 +171,13 @@ class NedVelocity(Measurement):
             mat_nb = transform.mat_from_rph(pva[RPH_COLS])
             z += mat_nb @ np.cross(pva[RATE_COLS], self.imu_to_antenna_b)
         H = error_model.ned_velocity_error_jacobian(pva)
+        R = self.R
+        if not error_model.with_altitude:
+            z = z[:2]
+            H = H[:2]
+            R = R[:2, :2]
 
-        return z, H, self.R
+        return z, H, R
 
 
 class BodyVelocity(Measurement):
@@ -189,7 +199,7 @@ class BodyVelocity(Measurement):
         super(BodyVelocity, self).__init__(data[['VX', 'VY', 'VZ']])
         self.R = sd**2 * np.eye(3)
 
-    def compute_matrices(self, time, pva):
+    def compute_matrices(self, time, pva, error_model):
         if time not in self.data.index:
             return None
 
