@@ -246,9 +246,9 @@ def run_feedback_filter(initial_pva, position_sd, velocity_sd, level_sd, azimuth
     """
     error_model = InsErrorModel(with_altitude)
     if gyro_model is None:
-        gyro_model = inertial_sensor.InertialSensorModel()
+        gyro_model = inertial_sensor.EstimationModel()
     if accel_model is None:
-        accel_model = inertial_sensor.InertialSensorModel()
+        accel_model = inertial_sensor.EstimationModel()
     if measurements is None:
         measurements = []
 
@@ -436,9 +436,9 @@ def run_feedforward_filter(trajectory_nominal, trajectory, position_sd, velocity
 
     error_model = InsErrorModel(with_altitude)
     if gyro_model is None:
-        gyro_model = inertial_sensor.InertialSensorModel()
+        gyro_model = inertial_sensor.EstimationModel()
     if accel_model is None:
-        accel_model = inertial_sensor.InertialSensorModel()
+        accel_model = inertial_sensor.EstimationModel()
     if measurements is None:
         measurements = []
 

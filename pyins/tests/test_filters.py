@@ -21,18 +21,18 @@ def test_run_feedback_filter(with_altitude):
         sim.generate_body_velocity_measurements(trajectory_true.iloc[61::200], 0.2,
                                                 rng), 0.2)
 
-    gyro_errors = inertial_sensor.InertialSensorError(
+    gyro_parameters = inertial_sensor.Parameters(
         bias=np.array([-100, 50, 40]) * transform.DH_TO_RS,
         noise=1 * transform.DRH_TO_RRS, rng=rng)
-    accel_errors = inertial_sensor.InertialSensorError(bias=[0.1, -0.1, 0.2],
-                                                       noise=1.0 / 60, rng=rng)
+    accel_parameters = inertial_sensor.Parameters(bias=[0.1, -0.1, 0.2],
+                                                  noise=1.0 / 60, rng=rng)
 
-    gyro_model = inertial_sensor.InertialSensorModel(bias_sd=100 * transform.DH_TO_RS,
-                                                     noise=1 * transform.DRH_TO_RRS)
-    accel_model = inertial_sensor.InertialSensorModel(bias_sd=0.1, noise=1.0 / 60)
+    gyro_model = inertial_sensor.EstimationModel(bias_sd=100 * transform.DH_TO_RS,
+                                                 noise=1 * transform.DRH_TO_RRS)
+    accel_model = inertial_sensor.EstimationModel(bias_sd=0.1, noise=1.0 / 60)
 
-    imu = inertial_sensor.apply_imu_errors(imu_true.iloc[::2], 'rate',
-                                           gyro_errors, accel_errors)
+    imu = inertial_sensor.apply_imu_parameters(imu_true.iloc[::2], 'rate',
+                                               gyro_parameters, accel_parameters)
     increments = strapdown.compute_increments_from_imu(imu, 'rate')
 
     pos_sd = 10
@@ -56,11 +56,12 @@ def test_run_feedback_filter(with_altitude):
 
     assert (util.compute_rms(error / sd) < 1.5).all()
 
-    gyro_error = transform.compute_state_difference(result.gyro, gyro_errors.parameters)
+    gyro_error = transform.compute_state_difference(result.gyro,
+                                                    gyro_parameters.data_frame)
     assert ((gyro_error.iloc[-1] / result.gyro_sd.iloc[-1]).abs() < 2.0).all()
 
-    accel_error = transform.compute_state_difference(result.accel,
-                                                     accel_errors.parameters).iloc[-1]
+    accel_error = transform.compute_state_difference(
+        result.accel, accel_parameters.data_frame).iloc[-1]
     accel_sd = result.accel_sd.iloc[-1]
     if not with_altitude:
         accel_error = accel_error.iloc[:2]
@@ -89,16 +90,17 @@ def test_run_feedforward_filter(with_altitude):
         sim.generate_body_velocity_measurements(
             trajectory_true.iloc[64::100 * factor], 0.2, rng), 0.2)
 
-    gyro_errors = inertial_sensor.InertialSensorError(
+    gyro_parameters = inertial_sensor.Parameters(
         bias=np.array([-1, 2, 1]) * transform.DH_TO_RS,
         noise=0.001 * transform.DRH_TO_RRS, rng=rng)
-    accel_errors = inertial_sensor.InertialSensorError(bias=[0.01, -0.01, 0.02],
-                                                       noise=0.01 / 60, rng=rng)
-    gyro_model = inertial_sensor.InertialSensorModel(bias_sd=1 * transform.DH_TO_RS,
-                                                     noise=0.001 * transform.DRH_TO_RRS)
-    accel_model = inertial_sensor.InertialSensorModel(bias_sd=0.01, noise=0.01 / 60)
+    accel_parameters = inertial_sensor.Parameters(bias=[0.01, -0.01, 0.02],
+                                                  noise=0.01 / 60, rng=rng)
+    gyro_model = inertial_sensor.EstimationModel(bias_sd=1 * transform.DH_TO_RS,
+                                                 noise=0.001 * transform.DRH_TO_RRS)
+    accel_model = inertial_sensor.EstimationModel(bias_sd=0.01, noise=0.01 / 60)
 
-    imu = inertial_sensor.apply_imu_errors(imu_true, 'rate', gyro_errors, accel_errors)
+    imu = inertial_sensor.apply_imu_parameters(imu_true, 'rate', gyro_parameters,
+                                               accel_parameters)
     increments = strapdown.compute_increments_from_imu(imu, 'rate')
 
     pos_sd = 10
@@ -107,8 +109,6 @@ def test_run_feedforward_filter(with_altitude):
     azimuth_sd = 0.2
 
     pva_error = sim.generate_pva_error(pos_sd, vel_sd, level_sd, azimuth_sd, rng=rng)
-    # if not with_altitude:
-    #     pva_error[['down', 'VD']] = 0
     initial = sim.perturb_pva(trajectory_true.iloc[0], pva_error)
     integrator = strapdown.Integrator(initial, with_altitude)
     trajectory_computed = integrator.integrate(increments)
@@ -127,12 +127,12 @@ def test_run_feedforward_filter(with_altitude):
 
     assert (util.compute_rms(error / sd) < (1.6 if with_altitude else 2.2)).all()
 
-    gyro_bias_relative_error = (np.abs(result.gyro.iloc[-1] - gyro_errors.bias)
+    gyro_bias_relative_error = (np.abs(result.gyro.iloc[-1] - gyro_parameters.bias)
                                 / result.gyro_sd.iloc[-1])
     assert (gyro_bias_relative_error < 3.0).all()
 
     accel_error = transform.compute_state_difference(result.accel,
-                                                     accel_errors.parameters).iloc[-1]
+                                                     accel_parameters.data_frame).iloc[-1]
     assert ((accel_error / result.accel_sd.iloc[-1]).abs() < 2.1).all()
 
     assert (util.compute_rms(result.innovations['Position']) < 3.0).all()

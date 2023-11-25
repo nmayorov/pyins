@@ -3,7 +3,7 @@ import pandas as pd
 from numpy.testing import assert_allclose
 from pyins import sim
 from pyins import earth
-from pyins.inertial_sensor import InertialSensorModel
+from pyins.inertial_sensor import EstimationModel
 from pyins.util import GYRO_COLS, ACCEL_COLS
 
 

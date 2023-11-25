@@ -11,15 +11,15 @@ Classes
 .. autosummary::
     :toctree: generated/
 
-    InertialSensorModel
-    InertialSensorError
+    EstimationModel
+    Parameters
 
 Functions
 ---------
 .. autosummary::
     :toctree: generated/
 
-    apply_imu_errors
+    apply_imu_parameters
 """
 import pandas as pd
 import numpy as np
@@ -28,8 +28,8 @@ from . import util
 from .util import GYRO_COLS, ACCEL_COLS, INDEX_TO_XYZ, XYZ_TO_INDEX
 
 
-class InertialSensorModel:
-    """Description of inertial sensor statistical model.
+class EstimationModel:
+    """Estimation model for inertial sensor triad (gyros or accelerometers).
 
     Below all parameters might be floats or arrays.In the former case the parameter is
     assumed to be the same for each of 3 sensors. In the latter case a non-positive
@@ -227,8 +227,8 @@ class InertialSensorModel:
         return pd.Series(estimates, index=self.states)
 
 
-class InertialSensorError:
-    """Errors of inertial sensor triad.
+class Parameters:
+    """Parameters of inertial sensor triad (gyros or accelerometers).
 
     The following basic mode is used::
 
@@ -260,7 +260,7 @@ class InertialSensorError:
 
     Attributes
     ----------
-    parameters : DataFrame or None
+    data_frame : DataFrame or None
         After calling `apply` will contain DataFrame indexed by time with columns
         containing non-zero parameters of IMU error model in the format consistent
         with `pyins.filt` results.
@@ -272,7 +272,7 @@ class InertialSensorError:
         self.noise = self._verify_parameter(noise, 'noise', (3,), True)
         self.bias_walk = self._verify_parameter(bias_walk, 'bias_walk', (3,), True)
         self.rng = check_random_state(rng)
-        self.parameters = None
+        self.data_frame = None
 
     @staticmethod
     def _verify_parameter(parameter, name, shape, allow_float, default=None):
@@ -287,7 +287,7 @@ class InertialSensorError:
         return parameter
 
     @classmethod
-    def from_InertialSensorModel(cls, inertial_sensor_model, rng=None):
+    def from_EstimationModel(cls, model, rng=None):
         """Create object from `InertialSensorModel`.
 
         Parameters will be randomly generated according to standard deviation values
@@ -295,24 +295,23 @@ class InertialSensorError:
 
         Parameters
         ----------
-        inertial_sensor_model : `InertialSensorModel`
-            Instance of `InertialSensorModel`
+        model : `EstimationModel`
+            Instance of `EstimationModel`
         rng : None, int or RandomState, optional
             Random seed.
 
         Returns
         -------
-        InertialSensorError
+        Parameters
             Constructed according to the model.
         """
         rng = check_random_state(rng)
-        transform = np.eye(3) + inertial_sensor_model.scale_misal_sd * rng.randn(3, 3)
-        bias = inertial_sensor_model.bias_sd * rng.randn(3)
-        return cls(transform, bias, inertial_sensor_model.noise,
-                   inertial_sensor_model.bias_walk, rng)
+        transform = np.eye(3) + model.scale_misal_sd * rng.randn(3, 3)
+        bias = model.bias_sd * rng.randn(3)
+        return cls(transform, bias, model.noise, model.bias_walk, rng)
 
     def apply(self, readings, sensor_type):
-        """Apply errors to the readings.
+        """Apply parameters to the readings.
 
         Parameters
         ----------
@@ -341,40 +340,40 @@ class InertialSensorError:
         else:
             raise ValueError("`sensor_type` must be either 'rate' or 'increment ")
 
-        self.parameters = pd.DataFrame(index=readings.index)
+        self.data_frame = pd.DataFrame(index=readings.index)
         for axis in range(3):
             if self.bias[axis] != 0 or self.bias_walk[axis] != 0:
-                self.parameters[f'bias_{INDEX_TO_XYZ[axis]}'] = bias[:, axis]
+                self.data_frame[f'bias_{INDEX_TO_XYZ[axis]}'] = bias[:, axis]
         for axis_out in range(3):
             for axis_in in range(3):
                 nominal = 1 if axis_out == axis_in else 0
                 actual = self.transform[axis_out, axis_in]
                 if actual != nominal:
-                    self.parameters[(f"sm_{INDEX_TO_XYZ[axis_out]}"
+                    self.data_frame[(f"sm_{INDEX_TO_XYZ[axis_out]}"
                                     f"{INDEX_TO_XYZ[axis_in]}")] = actual - nominal
 
         return pd.DataFrame(data=result, index=readings.index, columns=readings.columns)
 
 
-def apply_imu_errors(imu, sensor_type, gyro_errors, accel_errors):
+def apply_imu_parameters(imu, sensor_type, gyro_parameters, accel_parameters):
     """Apply IMU errors.
 
     Parameters
     ----------
-    imu : DataFrame
+    imu : Imu
         IMU data.
     sensor_type : 'rate' or 'increment'
         IMU type.
-    gyro_errors : InertialSensorError
-        Errors for gyros.
-    accel_errors : InertialSensorError
-        Errors for accelerometers.
+    gyro_parameters : `Parameters`
+        Parameters of gyro block.
+    accel_parameters : `Parameters`
+        Parameters of accelerometer block.
 
     Returns
     -------
     DataFrame
-        IMU data after application of errors.
+        IMU data after application of the parameters.
     """
-    return pd.DataFrame(np.hstack([gyro_errors.apply(imu[GYRO_COLS], sensor_type),
-                                   accel_errors.apply(imu[ACCEL_COLS], sensor_type)]),
-                        index=imu.index, columns=GYRO_COLS + ACCEL_COLS)
+    return pd.concat([gyro_parameters.apply(imu[GYRO_COLS], sensor_type),
+                      accel_parameters.apply(imu[ACCEL_COLS], sensor_type)],
+                     axis='columns')
