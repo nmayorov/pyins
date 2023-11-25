@@ -4,7 +4,7 @@ from numpy.testing import assert_allclose, assert_equal
 from pyins.inertial_sensor import EstimationModel, Parameters
 
 
-def test_InertialSensor():
+def test_EstimationModel():
     s = EstimationModel()
     assert_equal(s.n_states, 0)
     assert_equal(s.n_noises, 0)
@@ -70,7 +70,7 @@ def test_InertialSensor():
                            [0, 0, 1, 0, 0, 0.5]])
 
 
-def test_ImuErrors():
+def test_Parameters():
     rng = np.random.RandomState(0)
     readings = pd.DataFrame(data=rng.randn(100, 3), index=0.1 * np.arange(100))
     imu_errors = Parameters(bias=[0.0, 0.2, 0.0])
@@ -101,7 +101,7 @@ def test_ImuErrors():
         assert (readings_with_error[2] != readings[2]).all(None)
 
 
-def test_ImuErrors_from_inertial_sensor_model():
+def test_Parameters_from_EstimationModel():
     model = EstimationModel(bias_sd=[0.0, 1.0, 1.0],
                             scale_misal_sd=[[0.01, 0.0, 0.0],
                                                 [0.0, 0.0, 0.01],

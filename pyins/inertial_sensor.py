@@ -288,10 +288,10 @@ class Parameters:
 
     @classmethod
     def from_EstimationModel(cls, model, rng=None):
-        """Create object from `InertialSensorModel`.
+        """Create object from `EstimationModel`.
 
         Parameters will be randomly generated according to standard deviation values
-        contained in `inertial_sensor_model`.
+        contained in `model`.
 
         Parameters
         ----------

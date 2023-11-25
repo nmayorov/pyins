@@ -216,7 +216,7 @@ def run_feedback_filter(initial_pva, position_sd, velocity_sd, level_sd, azimuth
         Initial assumed heading standard deviation in degrees.
     increments : Increments
         IMU increments.
-    gyro_model, accel_model : InertialSensorModel, optional
+    gyro_model, accel_model : `pyins.inertial_sensor.EstimationModel`, optional
         Sensor models for gyros and accelerometers.
         If None (default), default models will be used.
     measurements : list of `pyins.measurements.Measurement`, optional
@@ -398,7 +398,7 @@ def run_feedforward_filter(trajectory_nominal, trajectory, position_sd, velocity
         Initial assumed roll and pitch standard deviation in degrees.
     azimuth_sd : float
         Initial assumed heading standard deviation in degrees.
-    gyro_model, accel_model : InertialSensorModel, optional
+    gyro_model, accel_model : pyins.inertial_sensor.EstimationModel, optional
         Sensor models for gyros and accelerometers.
          If None (default), default models will be used.
     measurements : list of `pyins.measurements.Measurement`, optional
