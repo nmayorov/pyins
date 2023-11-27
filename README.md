@@ -1,43 +1,34 @@
 ![tests status](https://github.com/nmayorov/pyins/actions/workflows/build_and_test.yaml/badge.svg)
 ![documentation status](https://readthedocs.org/projects/pyins/badge/?version=latest)
 
+# pyins
 
-pyins
-=====
+pyins is a Python package which provides common basic algorithms used in Inertial Navigation Systems (INS) aided by external sensors like GNSS.
 
-pyins is a Python package for data processing commonly done in Strapdown
-Inertial Navigation Systems integrated with other aiding sensors.
+Version 1.0 provides refined and improved functionality, consistent docstrings and extended examples.
+Refer to [version_1.0.md](./version_1.0.md) for the list of main changes compared to earlier versions.
 
+## Installation
 
-Installation
-************
+To install the package to the user directory execute in the package directory:
+```shell
+pip install . --user
+```
+To perform editable (inplace) install:
+```shell
+pip install -e .
+```
 
-Dependencies
-------------
+Installation requires building Cython extension for which you need Cython, scipy and a C compiler.
+On Linux and Mac it works seamlessly with system compilers (gcc or clang), for building on Windows refer to https://docs.python.org/3/extending/windows.html#building-on-windows.
+Add option ``--no-build-isolation`` if you want to use already installed Cython and scipy during the installation.
 
-The package is developed for Python 3 only. It has the following dependencies:
+Runtime dependencies include (versions in parentheses were used for the latest development):
 
-1. numpy
-2. scipy >= 0.18
-3. pandas
-4. Cython >= 0.22
+* numpy (1.24.3)
+* scipy (1.11.3)
+* pandas (2.0.3)
+ 
+## Documentation
 
-Installation
-------------
-
-Currently you need to install from source, you will need a C compiler suitable
-for your version of Python. To install::
-
-    python setup.py install
-
-If you want to use pyins from its source directory without installing, then
-you need to compile extensions::
-
-    python setup.py build_ext -i
-
-Then append the path to the directory to PYTHONPATH.
-
-Documentation
-*************
-
-Documentation is available `here <https://pyins.readthedocs.io>`_.
+Documentation is available here https://pyins.readthedocs.io.
