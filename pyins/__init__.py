@@ -81,4 +81,4 @@ References
 from . import (earth, error_model, filters, inertial_sensor, kalman, measurements, sim,
                strapdown, transform, util)
 
-__version__ = "0.1"
+__version__ = "1.0"
