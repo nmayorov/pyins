@@ -92,26 +92,26 @@ def generate_imu(time, lla, rph, velocity_n=None, sensor_type='rate'):
 
     Parameters
     ----------
-    time : array_like, shape (n_points,)
+    time : array_like, shape (n,)
         Time points for which the trajectory is provided.
-    lla : array_like, shape (n_points, 3) or (3,)
+    lla : array_like, shape (n, 3) or (3,)
         Either time series of latitude, longitude and altitude or initial
         values of those.
-    rph : array_like, shape (n_points, 3)
+    rph : array_like, shape (n, 3)
         Time series of roll, pitch and heading angles.
-    velocity_n : array_like, shape (n_points, 3) or None
+    velocity_n : array_like with shape (n, 3) or None
         Time series of velocity expressed in NED frame.
     sensor_type: 'rate' or 'increment', optional
         Type of sensor to generate. If 'rate' (default), then instantaneous
-        rate values are generated (in rad/s and m/s/s). If 'increment', then
+        rate values are generated (in rad/s and m/s^2). If 'increment', then
         integrals over sampling intervals are generated (in rad and m/s).
 
     Returns
     -------
     trajectory : Trajectory
-        Trajectory dataframe with n_points rows.
+        Trajectory dataframe with n rows.
     imu : Imu
-        IMU dataframe with n_points rows. When `sensor_type` is 'increment' the first
+        IMU dataframe with n rows. When `sensor_type` is 'increment' the first
         sample is duplicated for more convenient future processing.
     """
     MAX_ITER = 3
@@ -236,16 +236,16 @@ def sinusoid_velocity_motion(dt, total_time, lla0, velocity_mean,
         the mean velocity is zero.
     sensor_type: 'rate' or 'increment', optional
         Type of sensor to generate. If 'rate' (default), then instantaneous
-        rate values are generated (in rad/s and m/s/s). If 'increment', then
+        rate values are generated (in rad/s and m/s^2). If 'increment', then
         integrals over sampling intervals are generated (in rad and m/s).
 
     Returns
     -------
     trajectory : Trajectory
-        Trajectory dataframe with n_points rows.
+        Trajectory dataframe with n rows.
     imu : Imu
-        IMU dataframe with n_points rows. When `sensor_type` is 'increment' the first
-        sample is duplicated for more convenient future processing.
+        IMU dataframe with n rows. When `sensor_type` is 'increment' the first sample
+        is duplicated for more convenient future processing.
     """
     time = np.arange(0, total_time, dt)
     phase = (2 * np.pi * time[:, None] / velocity_change_period +
@@ -271,8 +271,9 @@ def generate_position_measurements(trajectory, error_sd, rng=None):
         Trajectory dataframe, only 'lat', 'lon' and 'alt' columns are used.
     error_sd : float
         Standard deviation of errors in meters.
-    rng : None, int or numpy.RandomState
-        Random seed.
+    rng : None, int or `numpy.random.RandomState`, optional
+        Seed to create or already created RandomState. None (default) corresponds to
+        nondeterministic seeding.
 
     Returns
     -------
@@ -297,8 +298,9 @@ def generate_ned_velocity_measurements(trajectory, error_sd, rng=None):
         Trajectory dataframe, only 'VN', 'VE' and 'VD' columns are used.
     error_sd : float
         Standard deviation of errors in m/s.
-    rng : None, int or numpy.RandomState
-        Random seed.
+    rng : None, int or `numpy.random.RandomState`, optional
+        Seed to create or already created RandomState. None (default) corresponds to
+        nondeterministic seeding.
 
     Returns
     -------
@@ -324,8 +326,9 @@ def generate_body_velocity_measurements(trajectory, error_sd, rng=None):
         columns are used.
     error_sd : float
         Standard deviation of errors in m/s.
-    rng : None, int or numpy.RandomState
-        Random seed.
+    rng : None, int or `numpy.random.RandomState`, optional
+        Seed to create or already created RandomState. None (default) corresponds to
+        nondeterministic seeding.
 
     Returns
     -------
@@ -355,8 +358,9 @@ def generate_pva_error(position_sd, velocity_sd, level_sd, azimuth_sd, rng=None)
         Roll and pitch standard deviation in degrees.
     azimuth_sd : float
         Heading standard deviation in degrees.
-    rng : None, int or RandomState
-        Random seed.
+    rng : None, int or `numpy.random.RandomState`, optional
+        Seed to create or already created RandomState. None (default) corresponds to
+        nondeterministic seeding.
 
     Returns
     -------
@@ -404,10 +408,10 @@ class Turntable:
 
         - table frame (t) - frame of the table fixture, which is typically installed
           horizontally and aligned with North and East directions. It can be rotated
-          around x-axis, which is known as the outer axis of the table.
+          around x-axis, which is known as the outer axis.
         - mount frame (m) - frame of the inner fixture to which IMU is mounted.
           It is installed to be aligned with the table frame. It can be rotated around
-          z-axis, which is known as the inner axis of the table.
+          z-axis, which is known as the inner axis.
 
     Using rotations around the inner and outer axes it is possible to put IMU at
     any orientation with respect to NED frame and rotate IMU around any of its axes.
@@ -505,13 +509,15 @@ class Turntable:
         table_rph : array_like, shape (3,), optional
             Roll, pitch and heading angles of the table frame.
             Typically, a table is installed horizontally (roll and pitch is close to
-            zero) and the heading angle is precisely measured. Default is all zeros.
+            zero) and the heading angle is precisely measured. Default is zeros.
         axes_non_orthogonality : float, optional
             Deviation from orthogonality between inner and outers axes as a rotation
             around y-axis of the mount frame. Typically, a table is build to have
             very low non-orthogonality. Default is zero.
-        sensor_type : 'rate' or 'increment', optional
-            Type of IMU sensor to generate. Default is 'rate'.
+        sensor_type: 'rate' or 'increment', optional
+            Type of sensor to generate. If 'rate' (default), then instantaneous
+            rate values are generated (in rad/s and m/s^2). If 'increment', then
+            integrals over sampling intervals are generated (in rad and m/s).
 
         Returns
         -------

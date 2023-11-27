@@ -63,14 +63,14 @@ class InsErrorModel:
     Parameters
     ----------
     with_altitude : bool, optional
-        Whether to model altitude and vertical velocity errors.
+        Whether to model altitude and vertical velocity errors. Default is True.
 
     Attributes
     ----------
     with_altitude : bool
         Whether altitude and vertical velocity errors are modelled.
     n_states : int
-        Number of states used, 9 or 7 depending on `with_altitude`.
+        Number of states used: 9 or 7 depending on `with_altitude`.
 
     References
     ----------
@@ -156,11 +156,11 @@ class InsErrorModel:
 
         Returns
         -------
-        F : ndarray, shape (n_points, n_states, n_states) or (n_states, n_states)
+        F : ndarray, shape (n, n_states, n_states) or (n_states, n_states)
             Error dynamics matrix.
-        B_gyro : ndarray, shape (n_points, n_states, 3) or (n_states, 3)
+        B_gyro : ndarray, shape (n, n_states, 3) or (n_states, 3)
             Gyro error coupling matrix.
-        B_accel : ndarray, shape (n_points, n_states, 3) or (n_states, 3)
+        B_accel : ndarray, shape (n, n_states, 3) or (n_states, 3)
             Accelerometer error coupling matrix.
         """
         is_series = isinstance(trajectory, pd.Series)
@@ -243,7 +243,7 @@ class InsErrorModel:
 
         Returns
         -------
-        ndarray, shape (9, n_states) or (n_points, 9, n_states)
+        ndarray, shape (9, n_states) or (n, 9, n_states)
             Transformation matrix or matrices.
         """
         result = self._transform_to_output_3d(trajectory)

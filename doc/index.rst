@@ -2,10 +2,10 @@
 pyins
 =====
 
-pyins is a Python package which provides common basic algorithms used in aided Inertial Navigation Systems (INS).
+pyins is a Python package which provides common basic algorithms used in Inertial Navigation Systems (INS) aided by external sensors like GNSS.
 The package has rather limited scope and purposes, it may serve as:
 
-- Reasonably well written and tested code implementing basic algorithms in aided INS for people studying the subject
+- Reasonably well written and tested code of basic algorithms in aided INS for people studying the subject
 - Modelling toolkit to verify achievable performance depending on IMU specification, test observability properties, etc.
 - For *basic* processing of real sensor data in case there are no better alternatives
 - As a starting reference point for developing practical aided INS algorithms

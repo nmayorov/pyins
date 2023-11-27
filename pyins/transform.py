@@ -84,10 +84,11 @@ def lla_to_ned(lla, lla_origin=None):
     ----------
     lla : array_like, shape (n, 3)
         Latitude, longitude and altitude values. If DataFrame (with columns 'lat',
-        'lon', 'alt) the result will be DataFrame with columns 'nort', 'east', 'down'.
+        'lon', 'alt) the result will be DataFrame with columns 'north', 'east', 'down'.
     lla_origin : array_like with shape (3,) or None, optional
         Values of latitude, longitude and latitude of the origin point.
         If None (default), the first row in `lla` will be used.
+
     Returns
     -------
     ndarray of DataFrame
@@ -210,7 +211,7 @@ def resample_state(state, times):
 
 
 def compute_state_difference(first, second):
-    """Compute difference between two state dataframes indexed by time.
+    """Compute difference between two state data frames indexed by time.
 
     The function synchronizes data to the common time index using `resample_state`.
     The interpolation is done for the dataframe with more frequent data (to reduce
@@ -280,7 +281,7 @@ def _apply_smoothing(data, T, T_smooth):
     return filtered, num_taps
 
 
-def smooth_rotations(rotations, T, T_smooth):
+def smooth_rotations(rotations, dt, smoothing_time):
     """Smooth rotations.
 
     The function applies a FIR filter to the elements of outer products of quaternion
@@ -288,9 +289,9 @@ def smooth_rotations(rotations, T, T_smooth):
     eigenvector of the matrix with the smoothed coefficients.
 
     A FIR filter is constructed using `scipy.signal.firwin` with the number of
-    coefficients selected as
+    coefficients selected as::
 
-        num_taps = 2 * round(T_smooth / T) + 1
+        num_taps = 2 * round(smoothing_time / dt) + 1
 
     The first and last ``num_taps - 1`` filtered samples are removed as they cannot
     be computed using actual data and the edge effects are hard to eliminate.
@@ -300,9 +301,9 @@ def smooth_rotations(rotations, T, T_smooth):
     rotations : `scipy.spatial.transform.Rotation`
         Rotation objects with multiple rotations. All rotations are supposed to be
         equispaced in time.
-    T : float
+    dt : float
         Time interval between rotations.
-    T_smooth : float
+    smoothing_time : float
         Smoothing time.
 
     Returns
@@ -314,12 +315,12 @@ def smooth_rotations(rotations, T, T_smooth):
         raise ValueError("`rotations` must contain multiple rotations.")
     q = rotations.as_quat()
     coefficients = np.einsum('...i,...j->...ij', q, q).reshape(-1, 16)
-    coefficients  = _apply_smoothing(coefficients, T, T_smooth)[0].reshape(-1, 4, 4)
+    coefficients  = _apply_smoothing(coefficients, dt, smoothing_time)[0].reshape(-1, 4, 4)
     _, v = np.linalg.eigh(coefficients)
     return Rotation.from_quat(v[:, :, -1])
 
 
-def smooth_state(state, T_smooth):
+def smooth_state(state, smoothing_time):
     """Smooth state data.
 
     Smoothing is done in 3 steps: first the state is resampled to the constant time
@@ -329,7 +330,7 @@ def smooth_state(state, T_smooth):
     The smoothing is done by applying FIR filter constructed using
     `scipy.signal.firwin` with the number of coefficients computed as::
 
-        num_taps = 2 * round(T_smooth / T) + 1
+        num_taps = 2 * round(smoothing_time / dt) + 1
 
     The first and last ``num_taps - 1`` filtered samples are removed as they cannot
     be computed using actual data and the edge effects are hard to eliminate.
@@ -341,7 +342,7 @@ def smooth_state(state, T_smooth):
     ----------
     state : DataFrame
         State date indexed by time.
-    T_smooth : float
+    smoothing_time : float
         Smoothing time.
 
     Returns
@@ -349,19 +350,19 @@ def smooth_state(state, T_smooth):
     DataFrame
         Smoothed data.
     """
-    T = np.min(np.diff(state.index))
+    dt = np.min(np.diff(state.index))
     resampled_state = resample_state(state,
-                                     np.arange(state.index[0], state.index[-1], T))
+                                     np.arange(state.index[0], state.index[-1], dt))
     smoothed = pd.DataFrame()
     if _has_rph(state):
         rotations = Rotation.from_euler('xyz', resampled_state[RPH_COLS], True)
         smoothed[RPH_COLS] = smooth_rotations(
-            rotations, T, T_smooth).as_euler('xyz', True)
+            rotations, dt, smoothing_time).as_euler('xyz', True)
     other_columns = state.columns.difference(RPH_COLS)
     smoothed[other_columns], num_taps = _apply_smoothing(
-        resampled_state[other_columns].values, T, T_smooth)
+        resampled_state[other_columns].values, dt, smoothing_time)
     smoothed.index = (resampled_state.index[num_taps - 1 : -num_taps + 1] -
-                      T * (num_taps // 2))
+                      dt * (num_taps // 2))
     return resample_state(smoothed[state.columns], state.index)
 
 

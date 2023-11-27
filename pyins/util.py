@@ -43,7 +43,7 @@ def mm_prod(a, b, at=False, bt=False):
 
     Returns
     -------
-    ab : ndarray
+    ndarray
         Computed products.
     """
     a = np.asarray(a)
@@ -105,7 +105,7 @@ def mv_prod(a, b, at=False):
 
     Returns
     -------
-    ab : ndarray
+    ndarray
         Computed products.
     """
     a = np.asarray(a)
@@ -135,7 +135,7 @@ def skew_matrix(vec):
 
     Returns
     -------
-    skew_matrix : ndarray, shape (3, 3) or (n, 3)
+    ndarray, shape (3, 3) or (n, 3)
         Corresponding skew matrix.
     """
     vec = np.asarray(vec)

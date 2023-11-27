@@ -1,7 +1,7 @@
 """Description of inertial sensors.
 
-Module contains classes to describe inertial sensor statistical model and to define
-their error characteristics for simulation.
+Module contains classes to describe inertial sensor estimation model and to define
+their parameters for simulation.
 
 Gyroscopes and accelerometers are treated as independent blocks, that is two objects
 are required to describe a full IMU.
@@ -31,7 +31,7 @@ from .util import GYRO_COLS, ACCEL_COLS, INDEX_TO_XYZ, XYZ_TO_INDEX
 class EstimationModel:
     """Estimation model for inertial sensor triad (gyros or accelerometers).
 
-    Below all parameters might be floats or arrays.In the former case the parameter is
+    Below all parameters might be floats or arrays. In the former case the parameter is
     assumed to be the same for each of 3 sensors. In the latter case a non-positive
     elements disables the effect for the corresponding axis (or axes in case
     of `scale_misal_sd`). Setting a parameter to None completely disables the effect
@@ -44,19 +44,19 @@ class EstimationModel:
 
     Parameters
     ----------
-    bias_sd : array_like or None
+    bias_sd : array_like or None, optional
         Standard deviation of a bias, which is modeled as a random constant
         (plus an optional random walk).
-    noise : array_like or None
-        Strength of additive white noise. Known as an angle random walk for
+    noise : array_like or None, optional
+        Intensity of additive white noise (root PSD). Known as an angle random walk for
         gyros and velocity random walk for accelerometers.
-    bias_walk : array_like or None
+    bias_walk : array_like or None, optional
         Strength of white noise which is integrated into the bias. Known as
-        a rate random walk for gyros. Can be set only if `bias` is set.
-    scale_misal_sd : array_like, shape (3, 3) or None
+        a rate random walk for gyros. Can be enabled only for axes for which `bias_sd`
+        is also enabled.
+    scale_misal_sd : array_like, shape (3, 3) or None, optional
         Standard deviations of matrix elements which represent sensor triad
-        scale factor errors and misalignment. Non-positive elements will
-        disable the corresponding effect estimation.
+        scale factor errors and misalignment.
     """
     MAX_STATES = 12
     MAX_NOISES = 3
@@ -238,8 +238,8 @@ class Parameters:
 
         - ``x`` is a true kinematic vector
         - ``x_out`` is a measured vector
-        - ``T`` is a 3x3 transformation matrix representing scale factor errors
-          and axes misalignment. It is an identity matrix in the ideal case
+        - ``T`` is a 3x3 transformation matrix representing scale factors and axes
+          misalignment. It is an identity matrix in the ideal case
         - ``b`` is a bias vector, possibly slowly changing with time
         - ``n`` is a noise vector modeled as white Gaussian random process
 
@@ -255,15 +255,16 @@ class Parameters:
     bias_walk : float, array_like of shape (3,) or None, optional
         Intensity of noise (root PSD) integrated into bias.
         None (default) corresponds to zero.
-    rng : None, int or RandomState
-        Random seed.
+    rng : None, int or `numpy.random.RandomState`, optional
+        Seed to create or already created RandomState. None (default) corresponds to
+        nondeterministic seeding.
 
     Attributes
     ----------
     data_frame : DataFrame or None
         After calling `apply` will contain DataFrame indexed by time with columns
-        containing non-zero parameters of IMU error model in the format consistent
-        with `pyins.filt` results.
+        containing non-zero parameters of IMU in the format consistent
+        with `pyins.filters` results.
     """
     def __init__(self, transform=None, bias=None, noise=None, bias_walk=None, rng=None):
         self.transform = self._verify_parameter(transform, 'transform', (3, 3), False,
@@ -297,8 +298,9 @@ class Parameters:
         ----------
         model : `EstimationModel`
             Instance of `EstimationModel`
-        rng : None, int or RandomState, optional
-            Random seed.
+        rng : None, int or `numpy.random.RandomState`, optional
+            Seed to create or already created RandomState. None (default) corresponds to
+            nondeterministic seeding.
 
         Returns
         -------
@@ -355,7 +357,7 @@ class Parameters:
         return pd.DataFrame(data=result, index=readings.index, columns=readings.columns)
 
 
-def apply_imu_parameters(imu, sensor_type, gyro_parameters, accel_parameters):
+def apply_imu_parameters(imu, sensor_type, gyro_parameters=None, accel_parameters=None):
     """Apply IMU errors.
 
     Parameters
@@ -364,16 +366,21 @@ def apply_imu_parameters(imu, sensor_type, gyro_parameters, accel_parameters):
         IMU data.
     sensor_type : 'rate' or 'increment'
         IMU type.
-    gyro_parameters : `Parameters`
-        Parameters of gyro block.
-    accel_parameters : `Parameters`
-        Parameters of accelerometer block.
+    gyro_parameters : `Parameters` or None, optional
+        Gyro parameters. None (default) calls default constructors.
+    accel_parameters : `Parameters` or None, optional
+        Accelerometer parameters. None (default) calls default constructor.
 
     Returns
     -------
     DataFrame
         IMU data after application of the parameters.
     """
+    if gyro_parameters is None:
+        gyro_parameters = Parameters()
+    if accel_parameters is None:
+        accel_parameters = Parameters()
+
     return pd.concat([gyro_parameters.apply(imu[GYRO_COLS], sensor_type),
                       accel_parameters.apply(imu[ACCEL_COLS], sensor_type)],
                      axis='columns')

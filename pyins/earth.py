@@ -10,7 +10,6 @@ Constants
     :toctree: generated
 
     RATE
-    G
     A
     E2
     GE
@@ -39,8 +38,6 @@ from . import transform, util
 
 #: Rotation rate of Earth in rad/s.
 RATE = 7.292115e-5
-#: Approximate value of gravity.
-G = 9.8
 #: Semi major axis of Earth ellipsoid.
 A = 6378137.0
 #: Squared eccentricity of Earth ellipsoid

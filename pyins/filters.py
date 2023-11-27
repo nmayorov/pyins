@@ -112,7 +112,7 @@ def _compute_error_propagation_matrices(pva, gyro, accel, time_delta,
     q = np.hstack((gyro_model.v, accel_model.v, gyro_model.q, accel_model.q))
 
     return kalman.compute_process_matrices(F, G @ np.diag(q**2) @ G.transpose(),
-                                           time_delta, 'expm')
+                                           time_delta)
 
 
 def _compute_sd(P, trajectory, error_model, gyro_model, accel_model):
@@ -198,9 +198,9 @@ def _correct_increments(increments, gyro_model, accel_model):
 def run_feedback_filter(initial_pva, position_sd, velocity_sd, level_sd, azimuth_sd,
                         increments, gyro_model=None, accel_model=None,
                         measurements=None, time_step=0.1, with_altitude=True):
-    """Run INS filter with feedback corrections.
+    """Run navigation filter with feedback corrections.
 
-    Also known as Extended Kalman Filter.
+    Also known as extended Kalman filter (EKF).
 
     Parameters
     ----------
@@ -219,10 +219,10 @@ def run_feedback_filter(initial_pva, position_sd, velocity_sd, level_sd, azimuth
     gyro_model, accel_model : `pyins.inertial_sensor.EstimationModel`, optional
         Sensor models for gyros and accelerometers.
         If None (default), default models will be used.
-    measurements : list of `pyins.measurements.Measurement`, optional
-        Measurements, empty by default.
+    measurements : list of `pyins.measurements.Measurement` or None, optional
+        List of measurements. If None (default), will be set to an empty list.
     time_step : float, optional
-        Time step for error state propagation.
+        Time step for covariance propagation.
         The value typically should not exceed 1 second. Default is 0.1 second.
     with_altitude : bool, optional
         Whether to estimate altitude or vertical velocity. Default is True.
@@ -241,8 +241,8 @@ def run_feedback_filter(initial_pva, position_sd, velocity_sd, level_sd, azimuth
         accel, accel_sd : DataFrame
             Estimated accelerometer model parameters and its standard deviations.
         innovations : dict of DataFrame
-            For each mesaurement class name contains DataFrame with measurement
-            innovations.
+            For each measurement class name contains DataFrame with normalized
+            measurement innovations.
     """
     error_model = InsErrorModel(with_altitude)
     if gyro_model is None:
@@ -307,7 +307,7 @@ def run_feedback_filter(initial_pva, position_sd, velocity_sd, level_sd, azimuth
                     z, H, R = ret
                     H_full = np.zeros((len(z), n_states))
                     H_full[:, ins_block] = H
-                    innovation = kalman.correct(x, P, z, H_full, R)
+                    x, P, innovation = kalman.correct(x, P, z, H_full, R)
                     name = measurement.__class__.__name__
                     innovations[name].append(innovation)
                     innovations_times[name].append(measurement_time)
@@ -376,7 +376,7 @@ def run_feedforward_filter(trajectory_nominal, trajectory, position_sd, velocity
                            level_sd, azimuth_sd, gyro_model=None, accel_model=None,
                            measurements=None, increments=None, time_step=0.1,
                            with_altitude=True):
-    """Run INS filter with output errors compensation.
+    """Run navigation filter with feedforward output compensation.
 
     Also known as a linearized Kalman filter.
     The approach is applicable in practice only for high-end precise INS systems.
@@ -401,13 +401,13 @@ def run_feedforward_filter(trajectory_nominal, trajectory, position_sd, velocity
     gyro_model, accel_model : pyins.inertial_sensor.EstimationModel, optional
         Sensor models for gyros and accelerometers.
          If None (default), default models will be used.
-    measurements : list of `pyins.measurements.Measurement`, optional
-        Measurements, empty by default.
+    measurements : list of `pyins.measurements.Measurement` or None, optional
+        List of measurements. If None (default), will be set to an empty list.
     increments : Increments or None, optional
         IMU increments to be used when gyro or accelerometers scale factor errors or
         misalignment are modelled. Not necessary otherwise.
     time_step : float, optional
-        Time step for error state propagation.
+        Time step for covariance and error state propagation.
         The value typically should not exceed 1 second. Default is 0.1 second.
     with_altitude : bool, optional
         Whether to estimate altitude or vertical velocity. Default is True.
@@ -426,8 +426,8 @@ def run_feedforward_filter(trajectory_nominal, trajectory, position_sd, velocity
         accel, accel_sd : DataFrame
             Estimated accelerometer model parameters and its standard deviations.
         innovations : dict of DataFrame
-            For each measurement class name contains DataFrame with measurement
-            innovations.
+            For each measurement class name contains DataFrame with normalized
+            measurement innovations.
     """
     if (trajectory_nominal.index != trajectory.index).any():
         raise ValueError(
@@ -437,8 +437,12 @@ def run_feedforward_filter(trajectory_nominal, trajectory, position_sd, velocity
     error_model = InsErrorModel(with_altitude)
     if gyro_model is None:
         gyro_model = inertial_sensor.EstimationModel()
+    gyro_model.reset_estimates()
+
     if accel_model is None:
         accel_model = inertial_sensor.EstimationModel()
+    accel_model.reset_estimates()
+
     if measurements is None:
         measurements = []
 
@@ -491,7 +495,7 @@ def run_feedforward_filter(trajectory_nominal, trajectory, position_sd, velocity
                     z, H, R = ret
                     H_full = np.zeros((len(z), n_states))
                     H_full[:, inertial_block] = H
-                    innovation = kalman.correct(x, P, z, H_full, R)
+                    x, P, innovation = kalman.correct(x, P, z, H_full, R)
                     name = measurement.__class__.__name__
                     innovations[name].append(innovation)
                     innovations_times[name].append(time)

@@ -1,4 +1,4 @@
-"""Aided Inertial Navigation toolkit for Python.
+"""pyins: Inertial Navigation System algorithms in Python.
 
 Type naming conventions
 -----------------------
@@ -21,12 +21,13 @@ Series). In this sense we define the following "types":
     - `TrajectoryError` - DataFrame with INS trajectory errors with columns 'north,
       'east', 'down' for the position error in meters resolved in North-East-Down
       frame, 'VN', 'VE', 'VD' for the errors of North-East-Down velocity components,
-      'roll', 'pitch, 'heading' for the Euler angle errors
+      'roll', 'pitch, 'heading' for the Euler angle errors. Data frames for trajectory
+      parameters standard deviations have the same columns
     - `PvaError` - Series representing errors of position-velocity-attitude - a single
       row of `TrajectoryError`
 
 All data (`Trajectory`, `Imu`, measurements) are indexed by time in seconds measured by
-a common clock. This will achieve time synchronization of IMU and measurements and allow
+a common clock. This achieves time synchronization of IMU and measurements and allow
 comparison between trajectories and other states.
 
 Variable naming convention
@@ -38,11 +39,11 @@ A rotation matrix projecting from frame ``b`` to frame ``a`` is denoted as ``mat
 The following one-letter notation for the frames of reference is used:
 
     - e - Earth-centered Earth-fixed frame (ECEF)
-    - i - Earth-centered inertial frame
+    - i - Earth-centered inertial frame (ECI)
     - n - North-East-Down local horizon frame
     - b - frame associated with IMU axes also known as "body frame"
 
-Refer to [1]_ for the detailed definitions of the aforementioned frames.
+Refer to [1]_ for detailed definitions of the aforementioned frames.
 
 Units of measurement
 --------------------

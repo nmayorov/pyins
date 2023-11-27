@@ -82,14 +82,15 @@ class Measurement:
         pva : Pva
             Position-velocity-attitude estimates from INS at `time`.
         error_model : `pyins.error_model.InsErrorModel`
-            InsErrorModel instance.
+            InsErrorModel instance. The method must account  for
+            ``error_model.with_altitude`` as appropriate.
 
         Returns
         -------
         z : ndarray, shape (n_obs,)
             Observation vector. A difference between the value derived from `pva`
             and an observed value.
-        H : ndarray, shape (n_obs, 9)
+        H : ndarray, shape (n_obs, n_states)
             Observation model matrix. It relates the vector `z` to the INS error states.
         R : ndarray, shape (n_obs, n_obs)
             Covariance matrix of the measurement error.
@@ -103,11 +104,11 @@ class Position(Measurement):
     Parameters
     ----------
     data : DataFrame
-        Must be indexed by time and contain columns 'lat', 'lon' and `alt` columns for
+        Must be indexed by time and contain columns 'lat', 'lon' and 'alt' columns for
         latitude, longitude and altitude.
     sd : float
         Measurement accuracy in meters.
-    imu_to_antenna_b : array_like, shape (3,) or None, optional
+    imu_to_antenna_b : array_like with shape (3,) or None, optional
         Vector from IMU to antenna (measurement point) expressed in body
         frame. If None, assumed to be zero.
 
@@ -148,7 +149,7 @@ class NedVelocity(Measurement):
         Must be indexed by time and contain 'VN', 'VE' and 'VD' columns.
     sd : float
         Measurement accuracy in m/s.
-    imu_to_antenna_b : array_like, shape (3,) or None, optional
+    imu_to_antenna_b : array_like with shape (3,) or None, optional
         Vector from IMU to antenna (measurement point) expressed in body
         frame. If None (default), assumed to be zero.
 
