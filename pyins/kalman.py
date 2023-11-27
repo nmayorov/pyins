@@ -13,7 +13,7 @@ Functions
 
 References
 ----------
-.. [1] P\. S\. Maybeck, "Stochastic Models, Estimation and Control", Volume 1
+.. [1] P\. S\. Maybeck, "Stochastic Models, Estimation and Control", volume 1
 """
 import numpy as np
 from scipy.linalg import cholesky, cho_solve, solve_triangular, expm

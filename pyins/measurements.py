@@ -34,9 +34,8 @@ Classes
 References
 ----------
 .. [1] P. D. Groves, "Principles of GNSS, Inertial, and Multisensor Integrated
-       Navigation Systems, Second Edition"
-.. [2] P. S. Maybeck,
-       "Stochastic Models, Estimation and Control, Volume 1"
+       Navigation Systems", 2nd edition
+.. [2] P\. S\. Maybeck, "Stochastic Models, Estimation and Control", volume 1
 """
 import numpy as np
 from . import transform

@@ -18,7 +18,7 @@ Functions
 References
 ----------
 .. [1] P. D. Groves, "Principles of GNSS, Inertial, and Multisensor Integrated
-       Navigation Systems, Second Edition"
+       Navigation Systems", 2nd edition
 """
 import numpy as np
 import pandas as pd

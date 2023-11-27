@@ -30,7 +30,7 @@ The examples of usage in jupyter notebooks are available in :doc:`examples`.
 
 The following books are recommended to understand pyins functionality and the field in general:
 
-- P\. D\. Groves, "Principles of GNSS, Inertial, and Multisensor Integrated Navigation Systems, Second Edition"
+- P\. D\. Groves, "Principles of GNSS, Inertial, and Multisensor Integrated Navigation Systems" 2nd edition
 - P\. G\. Savage, "Strapdown analytics"
 - P\. S\. Maybeck, "Stochastic Models, Estimation and Control", volumes 1 and 2
 
