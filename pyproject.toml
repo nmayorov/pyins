@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools", "cython", "scipy"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyins"
+description = "Inertial Navigation System algorithms in Python"
+version = "1.0"
+maintainers = [
+    {name = "Nikolay Mayorov", email = "nikolay.mayorov@zoho.com"},
+]
+keywords = ["Navigation", "INS", "Inertial navigation", "Kalman filters"]
+license = {file="LICENSE.txt"}
+readme = "README.md"
+dependencies = ["numpy", "scipy", "pandas"]
+classifiers=[
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+]
+
+[project.urls]
+Homepage = "https://github.com/nmayorov/pyins"
+Documentation = "https://pyins.readthedocs.io"
