@@ -46,6 +46,7 @@ E2 = 6.6943799901413e-3
 GE = 9.7803253359
 #: Gravity at the pole.
 GP = 9.8321849378
+F = (1 - E2) ** 0.5 * GP / GE - 1
 
 
 def principal_radii(lat, alt):
@@ -92,7 +93,6 @@ def gravity(lat, alt):
     """
     sin_lat = np.sin(np.deg2rad(lat))
     alt = np.asarray(alt)
-    F = (1 - E2) ** 0.5 * GP / GE - 1
     return (GE * (1 + F * sin_lat**2) / (1 - E2 * sin_lat**2) ** 0.5
             * (1 - 2 * alt / A))
 

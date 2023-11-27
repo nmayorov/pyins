@@ -31,7 +31,7 @@ import numpy as np
 import pandas as pd
 from . import transform
 from .util import LLA_COLS, RPH_COLS, VEL_COLS, GYRO_COLS, ACCEL_COLS, TRAJECTORY_COLS
-from ._integrate import integrate_fast
+from ._numba_integrate import integrate_fast
 
 
 def compute_increments_from_imu(imu, sensor_type):
