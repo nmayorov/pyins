@@ -10,25 +10,26 @@ Refer to [version_1.0.md](./version_1.0.md) for the list of main changes compare
 
 ## Installation
 
-To install the package to the user directory execute in the package directory:
+The package now is pure Python and thus can be easily installed on any platform.
+
+To install execute in the package directory: 
 ```shell
-pip install . --user
+pip install .
 ```
 To perform editable (inplace) install:
 ```shell
 pip install -e .
 ```
 
-Installation requires building Cython extension for which you need Cython, scipy and a C compiler.
-On Linux and Mac it works seamlessly with system compilers (gcc or clang), for building on Windows refer to https://docs.python.org/3/extending/windows.html#building-on-windows.
-Add option ``--no-build-isolation`` if you want to use already installed Cython and scipy during the installation.
+## Dependencies
 
 Runtime dependencies include (versions in parentheses were used for the latest development):
 
-* numpy (1.24.3)
+* numba (0.58.0)
+* numpy (1.25.2)
 * scipy (1.11.3)
-* pandas (2.0.3)
- 
+* pandas (2.1.1)
+
 ## Running tests
 
 To run all the supplied tests with `pytest` execute: 
