@@ -31,7 +31,7 @@ import numpy as np
 import pandas as pd
 from . import transform
 from .util import LLA_COLS, RPH_COLS, VEL_COLS, GYRO_COLS, ACCEL_COLS, TRAJECTORY_COLS
-from ._numba_integrate import integrate_fast
+from ._numba_integrate import integrate
 
 
 def compute_increments_from_imu(imu, sensor_type):
@@ -147,8 +147,8 @@ class Integrator:
 
         theta = np.ascontiguousarray(increments[['theta_x', 'theta_y', 'theta_z']])
         dv = np.ascontiguousarray(increments[['dv_x', 'dv_y', 'dv_z']])
-        integrate_fast(np.asarray(increments.dt), self.lla, self.velocity_n,
-                       self.mat_nb, theta, dv, n_data - 1, self.with_altitude)
+        integrate(np.asarray(increments.dt), self.lla, self.velocity_n,
+                  self.mat_nb, theta, dv, n_data - 1, self.with_altitude)
         rph = transform.mat_to_rph(self.mat_nb[n_data : n_data + n_readings])
         trajectory = pd.DataFrame(
             np.hstack([self.lla[n_data : n_data + n_readings],

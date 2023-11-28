@@ -36,8 +36,7 @@ def mat_from_rotvec(rv, mat):
 
 
 @numba.njit
-def integrate_fast(dt_array, lla, velocity_n,
-                   mat_nb, theta, dv, offset, with_altitude):
+def integrate(dt_array, lla, velocity_n, mat_nb, theta, dv, offset, with_altitude):
     xi = np.empty(3)
     dv_n = np.empty(3)
     C = np.empty((3, 3))
