@@ -41,7 +41,6 @@ def integrate_fast(dt_array, lla, velocity_n,
     xi = np.empty(3)
     dv_n = np.empty(3)
     C = np.empty((3, 3))
-    B = np.empty((3, 3))
     dBn = np.empty((3, 3))
     dBb = np.empty((3, 3))
 
@@ -76,8 +75,7 @@ def integrate_fast(dt_array, lla, velocity_n,
         chi2 = Omega2 + rho2
         chi3 = Omega3 + rho3
 
-        B[:] = mat_nb[j]
-        np.dot(B, dv[i], dv_n)
+        np.dot(mat_nb[j], dv[i], dv_n)
         dv1 = dv_n[0]
         dv2 = dv_n[1]
         dv3 = dv_n[2]
@@ -118,6 +116,6 @@ def integrate_fast(dt_array, lla, velocity_n,
         xi[2] = -chi3 * dt
         mat_from_rotvec(xi, dBn)
         mat_from_rotvec(theta[i], dBb)
-        np.dot(B, dBb, C)
-        np.dot(dBn, C, B)
-        mat_nb[j + 1] = B
+        np.dot(mat_nb[j], dBb, C)
+        np.dot(dBn, C, mat_nb[j + 1])
+
