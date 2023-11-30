@@ -350,10 +350,11 @@ class InsErrorModel:
         """
         result = np.zeros((3, 9))
         result[:, self.DV] = np.eye(3)
-        result[:, self.PHI] = util.skew_matrix(pva[VEL_COLS])
+        velocity_n = pva[VEL_COLS].values.copy()
         if imu_to_antenna_b is not None and all(col in pva for col in RATE_COLS):
             mat_nb = transform.mat_from_rph(pva[RPH_COLS])
-            result[:, self.PHI] += mat_nb @ np.cross(pva[RATE_COLS], imu_to_antenna_b)
+            velocity_n += mat_nb @ np.cross(pva[RATE_COLS], imu_to_antenna_b)
+        result[:, self.PHI] = util.skew_matrix(velocity_n)
         if not self.with_altitude:
             result = result @ self._transform_3d_2d(pva.VN, pva.VE)
             result = result[:2]
