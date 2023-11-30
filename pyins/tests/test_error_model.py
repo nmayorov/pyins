@@ -19,7 +19,7 @@ def test_phi_to_delta_rph():
     delta_rph_true = rph_perturbed - rph
 
     T = error_model._phi_to_delta_rph(rph)
-    delta_rph_linear = np.rad2deg(T @ phi)
+    delta_rph_linear = T @ phi
 
     assert_allclose(delta_rph_linear, delta_rph_true, rtol=1e-1)
 

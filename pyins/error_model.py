@@ -46,6 +46,7 @@ def _phi_to_delta_rph(rph):
     result[:, 2, 0] = -cos[:, 2] * sin[:, 1] / cos[:, 1]
     result[:, 2, 1] = -sin[:, 2] * sin[:, 1] / cos[:, 1]
     result[:, 2, 2] = -1
+    result *= transform.RAD_TO_DEG
 
     return result[0] if single else result
 
@@ -421,10 +422,7 @@ def propagate_errors(trajectory, pva_error=None,
     if pva_error is None:
         pva_error = pd.Series(data=np.zeros(9), index=TRAJECTORY_ERROR_COLS)
 
-    x0 = np.hstack([pva_error[NED_COLS].values,
-                    pva_error[VEL_COLS].values,
-                    pva_error[RPH_COLS].values * transform.DEG_TO_RAD])
-    x0 = error_model.transform_to_internal(trajectory.iloc[0]) @ x0
+    x0 = error_model.transform_to_internal(trajectory.iloc[0]) @ pva_error.values
 
     n_samples = Fi.shape[0]
     x = np.empty((n_samples, error_model.n_states))
@@ -437,6 +435,5 @@ def propagate_errors(trajectory, pva_error=None,
     T = error_model.transform_to_output(trajectory)
     trajectory_error = pd.DataFrame(data=util.mv_prod(T, x), index=trajectory.index,
                                     columns=TRAJECTORY_ERROR_COLS)
-    trajectory_error[RPH_COLS] *= transform.RAD_TO_DEG
 
     return trajectory_error, model_error

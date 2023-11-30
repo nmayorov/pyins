@@ -50,9 +50,9 @@ def _initialize_covariance(pva, pos_sd, vel_sd, level_sd, azimuth_sd,
     P_pva[error_model.DVN, error_model.DVN] = vel_sd ** 2
     P_pva[error_model.DVE, error_model.DVE] = vel_sd ** 2
     P_pva[error_model.DVD, error_model.DVD] = vel_sd ** 2
-    P_pva[error_model.DROLL, error_model.DROLL] = np.deg2rad(level_sd) ** 2
-    P_pva[error_model.DPITCH, error_model.DPITCH] = np.deg2rad(level_sd) ** 2
-    P_pva[error_model.DHEADING, error_model.DHEADING] = np.deg2rad(azimuth_sd) ** 2
+    P_pva[error_model.DROLL, error_model.DROLL] = level_sd ** 2
+    P_pva[error_model.DPITCH, error_model.DPITCH] = level_sd ** 2
+    P_pva[error_model.DHEADING, error_model.DHEADING] = azimuth_sd ** 2
 
     n_states = error_model.n_states + gyro_model.n_states + accel_model.n_states
 
@@ -134,7 +134,6 @@ def _compute_sd(P, trajectory, error_model, gyro_model, accel_model):
 
     trajectory_sd = pd.DataFrame(trajectory_sd, index=trajectory.index,
                                  columns=TRAJECTORY_ERROR_COLS)
-    trajectory_sd[RPH_COLS] *= transform.RAD_TO_DEG
     gyro_sd = pd.DataFrame(gyro_sd, index=trajectory.index, columns=gyro_model.states)
     accel_sd = pd.DataFrame(accel_sd, index=trajectory.index,
                             columns=accel_model.states)
@@ -160,7 +159,6 @@ def _compute_feedforward_result(x, P, trajectory_nominal, trajectory,
     T = error_model.transform_to_output(trajectory_nominal)
     error_nav = pd.DataFrame(util.mv_prod(T, x_ins), index=trajectory.index,
                              columns=TRAJECTORY_ERROR_COLS)
-    error_nav[RPH_COLS] *= transform.RAD_TO_DEG
 
     rn, _, rp = earth.principal_radii(trajectory_nominal.lat, trajectory_nominal.alt)
     trajectory = trajectory.copy()
@@ -173,7 +171,6 @@ def _compute_feedforward_result(x, P, trajectory_nominal, trajectory,
     trajectory_sd = pd.DataFrame(
         np.diagonal(util.mm_prod_symmetric(T, P_ins), axis1=1, axis2=2) ** 0.5,
         index=trajectory.index, columns=TRAJECTORY_ERROR_COLS)
-    trajectory_sd[RPH_COLS] *= transform.RAD_TO_DEG
 
     gyro = pd.DataFrame(x_gyro, index=trajectory.index, columns=gyro_model.states)
     gyro_sd = pd.DataFrame(np.diagonal(P_gyro, axis1=1, axis2=2) ** 0.5,
