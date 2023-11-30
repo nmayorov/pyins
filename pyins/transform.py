@@ -241,9 +241,9 @@ def resample_state(state, times):
 def compute_state_difference(first, second):
     """Compute difference between two state data frames indexed by time.
 
-    The function synchronizes data to the common time index using `resample_state`.
-    The interpolation is done for the dataframe with more frequent data (to reduce
-    average interpolation period).
+    If both inputs are DataFrame, the function synchronizes data to the common time
+    index using `resample_state`. The interpolation is done for the dataframe with more
+    frequent data (to reduce average interpolation period).
 
     For columns 'lat', 'lon', 'alt', the difference is computed in meters
     resolved in NED frame. For columns 'roll', 'pitch' and 'heading' the interpolation
@@ -251,8 +251,8 @@ def compute_state_difference(first, second):
 
     Parameters
     ----------
-    first, second : DataFrame
-        State data to compute the difference between. Both must be indexed by time.
+    first, second : DataFrame or Series
+        State data to compute the difference between.
 
     Returns
     -------
@@ -272,18 +272,23 @@ def compute_state_difference(first, second):
     def has_lla(data):
         return all(col in data for col in LLA_COLS)
 
-    if np.median(np.diff(first.index)) < np.median(np.diff(second.index)):
-        result_sign = -1.0
-        first, second = second, first
-    else:
+    if isinstance(first, pd.DataFrame) and isinstance(second, pd.DataFrame):
+        if np.median(np.diff(first.index)) < np.median(np.diff(second.index)):
+            result_sign = -1.0
+            first, second = second, first
+        else:
+            result_sign = 1.0
+
+        index = first.index
+        index = index[(index >= second.index[0]) & (index <= second.index[-1])]
+        columns = first.columns.intersection(second.columns)
+
+        first = first.loc[index, columns]
+        second = resample_state(second[columns], index)
+    elif isinstance(first, pd.Series) and isinstance(second, pd.Series):
         result_sign = 1.0
-
-    index = first.index
-    index = index[(index >= second.index[0]) & (index <= second.index[-1])]
-    columns = first.columns.intersection(second.columns)
-
-    first = first.loc[index, columns]
-    second = resample_state(second[columns], index)
+    else:
+        raise ValueError("Both inputs must be either DataFrame or Series")
 
     difference = first - second
     if has_lla(difference):
@@ -292,7 +297,8 @@ def compute_state_difference(first, second):
         difference.lat *= rn * DEG_TO_RAD
         difference.lon *= rp * DEG_TO_RAD
         difference.alt *= -1
-        difference.rename(columns={'lat': 'north', 'lon': 'east', 'alt': 'down'},
+        difference.rename({'lat': 'north', 'lon': 'east', 'alt': 'down'},
+                          axis=1 if isinstance(difference, pd.DataFrame) else 0,
                           inplace=True)
 
     if _has_rph(difference):
