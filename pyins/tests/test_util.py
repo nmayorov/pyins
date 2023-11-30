@@ -13,8 +13,7 @@ def test_mm_prod():
     a = np.random.randn(10, 3, 4)
     at = a.transpose((0, 2, 1))
     assert_allclose(util.mm_prod(a, b), a @ b)
-    # crashes
-    # assert_allclose(util.mm_prod(a, b, at=True, bt=True), at @ b.T)
+    assert_allclose(util.mm_prod(a, b, at=True, bt=True), at @ b.T)
 
     b = np.random.randn(10, 4, 3)
     bt = b.transpose((0, 2, 1))

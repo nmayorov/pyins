@@ -60,7 +60,7 @@ def mm_prod(a, b, at=False, bt=False):
         else:
             a = a.T
     if bt:
-        if a.ndim == 3:
+        if b.ndim == 3:
             b = np.transpose(b, (0, 2, 1))
         else:
             b = b.T
