@@ -19,6 +19,7 @@ Functions
     lla_to_ecef
     lla_to_ned
     perturb_lla
+    translate_trajectory
     compute_lla_difference
     resample_state
     compute_state_difference
@@ -33,7 +34,8 @@ import pandas as pd
 from scipy.interpolate import interp1d
 from scipy import signal
 from scipy.spatial.transform import Rotation, Slerp
-from .util import LLA_COLS, VEL_COLS, RPH_COLS, NED_COLS, TRAJECTORY_COLS
+from .util import (LLA_COLS, VEL_COLS, RPH_COLS, NED_COLS, TRAJECTORY_ERROR_COLS,
+                   RATE_COLS)
 from . import earth, util
 
 #: Degrees to radians.
@@ -143,6 +145,32 @@ def perturb_lla(lla, dr_n):
     lla[:, 2] -= dr_n[:, 2]
 
     return lla[0] if return_single else lla
+
+
+def translate_trajectory(trajectory, translation_b):
+    """Translatate trajectory by a vector expressed in body frame.
+
+    Parameters
+    ----------
+    trajectory : Trajectory or Pva
+        Either trajectory or position-velocity-attitude.
+        If has columns 'rate_x', 'rate_y', 'rate_z', velocity will be adjusted by
+        rotation effect.
+    translation_b : array_like, shape (3,)
+        Translation vector expressed in body frame.
+
+    Returns
+    -------
+    Trajectory or Pva
+        Translated trajectory or position-velocity-attitude.
+    """
+    mat_nb = mat_from_rph(trajectory[RPH_COLS])
+    result = trajectory.copy()
+    result[LLA_COLS] = perturb_lla(result[LLA_COLS],
+                                   util.mv_prod(mat_nb, translation_b))
+    if all(col in trajectory for col in RATE_COLS):
+        result[VEL_COLS] += mat_nb @ np.cross(trajectory[RATE_COLS], translation_b)
+    return result
 
 
 def compute_lla_difference(lla1, lla2):
