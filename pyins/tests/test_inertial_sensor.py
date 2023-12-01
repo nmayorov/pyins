@@ -68,6 +68,16 @@ def test_EstimationModel():
                       [0, 1, 0, 0, 2, 0],
                       [0, 0, 1, 0, 0, 0.5]]
                      ])
+    model.update_estimates([0.1, -0.2, 0.05, 0.01, -0.01, 0.02])
+    assert ((model.get_estimates() - pd.Series(
+        [0.1, -0.2, 0.05, 0.01, -0.01, 0.02],
+        index=['bias_x', 'bias_y', 'bias_z', 'sm_xx', 'sm_yy', 'sm_zz'])).abs()
+            < 1e-16).all()
+    model.update_estimates([-0.02, 0.05, 0.06, 0.02, 0.01, -0.01])
+    assert ((model.get_estimates() - pd.Series(
+        [0.08, -0.15, 0.11, 0.03, -0.0, 0.01],
+        index=['bias_x', 'bias_y', 'bias_z', 'sm_xx', 'sm_yy', 'sm_zz'])).abs()
+            < 1e-16).all()
 
 
 def test_Parameters():
