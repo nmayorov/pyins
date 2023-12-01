@@ -26,11 +26,14 @@ def test_kalman_correct():
 
 def test_process_matrices():
     F = np.array([[0, 1], [0, 0]])
-    Q = np.array([[0, 0], [0, 1]])
+    Q = np.diag([1, 3])
 
-    Phi, Qd = kalman.compute_process_matrices(F, Q, 1)
-    assert_allclose(Phi, np.array([[1, 1], [0, 1]]))
-    assert_allclose(Qd, np.array([[1 / 3, 0.5], [0.5, 1]]))
+    dt = 10
+    Phi, Qd = kalman.compute_process_matrices(F, Q, dt)
+    assert_allclose(Phi, np.array([[1, dt], [0, 1]]))
+    assert_allclose(Qd, np.array([
+        [Q[0, 0] + Q[1, 1] * dt ** 2 / 3, Q[1, 1] * dt / 2],
+        [Q[1, 1] * dt / 2, Q[1, 1]]]) * dt)
 
     np.random.seed(0)
     F = np.random.randn(15, 15)
