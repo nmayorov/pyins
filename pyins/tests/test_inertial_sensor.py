@@ -104,30 +104,30 @@ def test_EstimationModel():
 def test_Parameters():
     rng = np.random.RandomState(0)
     readings = pd.DataFrame(data=rng.randn(100, 3), index=0.1 * np.arange(100))
-    imu_errors = Parameters(bias=[0.0, 0.2, 0.0])
-    assert_allclose(imu_errors.apply(readings, 'increment'),
-                    readings + [0.0, 0.2 * 0.1, 0.0], rtol=1e-14)
-    assert_allclose(imu_errors.apply(readings, 'rate'), readings + [0.0, 0.2, 0.0],
+    parameters = Parameters(bias=[-0.1, 0.2, 0.3])
+    assert_allclose(parameters.apply(readings, 'increment'),
+                    readings + [-0.1 * 0.1, 0.2 * 0.1, 0.3 * 0.1], rtol=1e-13)
+    assert_allclose(parameters.apply(readings, 'rate'), readings + [-0.1, 0.2, 0.3],
                     rtol=1e-15)
 
     for sensor_type in ['rate', 'increment']:
-        imu_errors = Parameters()
-        assert (imu_errors.apply(readings, sensor_type) == readings).all(None)
+        parameters = Parameters()
+        assert (parameters.apply(readings, sensor_type) == readings).all(None)
 
-        imu_errors = Parameters(bias_walk=0.1, rng=0)
-        readings_with_error = imu_errors.apply(readings, sensor_type)
+        parameters = Parameters(bias_walk=0.1, rng=0)
+        readings_with_error = parameters.apply(readings, sensor_type)
         diff = readings - readings_with_error
         n_readings = len(readings)
         assert (diff.iloc[:n_readings // 2].abs().mean() <
                 diff.iloc[n_readings // 2:].abs().mean()).all()
 
-        imu_errors = Parameters(transform=np.diag([1.1, 1.0, 1.0]))
-        readings_with_error = imu_errors.apply(readings, sensor_type)
+        parameters = Parameters(transform=np.diag([1.1, 1.0, 1.0]))
+        readings_with_error = parameters.apply(readings, sensor_type)
         assert (readings_with_error[0] == 1.1 * readings[0]).all(None)
         assert (readings_with_error[[1, 2]] == readings[[1, 2]]).all(None)
 
-        imu_errors = Parameters(noise=[0.0, 0.0, 0.1])
-        readings_with_error = imu_errors.apply(readings, sensor_type)
+        parameters = Parameters(noise=[0.0, 0.0, 0.1])
+        readings_with_error = parameters.apply(readings, sensor_type)
         assert (readings_with_error[[0, 1]] == readings[[0, 1]]).all(None)
         assert (readings_with_error[2] != readings[2]).all(None)
 
@@ -135,13 +135,13 @@ def test_Parameters():
 def test_Parameters_from_EstimationModel():
     model = EstimationModel(bias_sd=[0.0, 1.0, 1.0],
                             scale_misal_sd=[[0.01, 0.0, 0.0],
-                                                [0.0, 0.0, 0.01],
-                                                [0.0, 0.01, 0.0]])
-    imu_errors = Parameters.from_EstimationModel(model, 0)
-    assert imu_errors.bias[0] == 0
-    assert imu_errors.bias[1] != 0
-    assert imu_errors.bias[2] != 0
-    T = imu_errors.transform
+                                            [0.0, 0.0, 0.01],
+                                            [0.0, 0.01, 0.0]])
+    parameters = Parameters.from_EstimationModel(model, 0)
+    assert parameters.bias[0] == 0
+    assert parameters.bias[1] != 0
+    assert parameters.bias[2] != 0
+    T = parameters.transform
     assert T[0, 0] != 1
     assert T[0, 1] == 0
     assert T[0, 2] == 0
