@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from numpy.testing import assert_allclose, assert_equal
+from pyins import util
 from pyins.inertial_sensor import EstimationModel, Parameters
 
 
@@ -83,6 +84,21 @@ def test_EstimationModel():
         [0.08, -0.15, 0.11, 0.03, -0.0, 0.01, 0.015],
         index=['bias_x', 'bias_y', 'bias_z', 'sm_xx', 'sm_yy', 'sm_yz', 'sm_zz']))
             .abs() < 1e-15).all()
+
+    increments = pd.Series([1, 2, 3], index=['dv_x', 'dv_y', 'dv_z'])
+    incements_corrected = model.correct_increments(0.5, increments)
+    bias = np.array([0.08, -0.15, 0.11])
+    T = np.array([
+        [1.03, 0.0, 0.0],
+        [0.0, 1.0, 0.01],
+        [0.0, 0.0, 1.015]
+    ])
+    assert_allclose(T @ incements_corrected + 0.5 * bias, increments)
+
+    increments = pd.DataFrame([[1, 2, 3], [-1, 2, 0.5]],
+                              columns=['theta_x', 'theta_y', 'theta_z'])
+    incements_corrected = model.correct_increments(0.5, increments)
+    assert_allclose(util.mv_prod(T, incements_corrected) + 0.5 * bias, increments)
 
 
 def test_Parameters():
