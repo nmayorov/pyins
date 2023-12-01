@@ -1,11 +1,12 @@
 import numpy as np
 import pandas as pd
+import pytest
 from numpy.testing import assert_allclose
 from scipy.spatial.transform import Rotation
 from pyins import error_model, sim, transform
 from pyins.strapdown import compute_increments_from_imu, Integrator
 from pyins.transform import compute_state_difference
-from pyins.util import (LLA_COLS, VEL_COLS, RPH_COLS, NED_COLS, GYRO_COLS, ACCEL_COLS,
+from pyins.util import (VEL_COLS, RPH_COLS, NED_COLS, GYRO_COLS, ACCEL_COLS,
                         TRAJECTORY_ERROR_COLS)
 
 
@@ -149,13 +150,13 @@ def test_ErrorModel_no_altitude():
     assert_allclose(velocity_perturbed_b - velocity_b, H_body_velocity @ x, rtol=1e-1)
 
 
-def test_propagate_errors():
+@pytest.mark.parametrize("with_altitude", [True, False])
+def test_propagate_errors(with_altitude):
     dt = 0.5
     t = 0.5 * 3600
-
-    trajectory, imu = sim.sinusoid_velocity_motion(dt, t, [50, 60, 0], [-5, 10, 0.5],
-                                                   [1, 1, 0.5])
-
+    trajectory, imu = sim.sinusoid_velocity_motion(
+        dt, t, [50, 60, 0], [-5, 10, 0.5 if with_altitude else 0],
+        [1, 1, 0.5 if with_altitude else 0])
     b = 1e-2
     gyro_bias = np.array([1, -2, 0.5]) * transform.DH_TO_RS
     accel_bias = np.array([b, -b, 2 * b])
@@ -166,8 +167,8 @@ def test_propagate_errors():
     increments = compute_increments_from_imu(imu, 'rate')
 
     pva_error = pd.Series(index=TRAJECTORY_ERROR_COLS)
-    pva_error[NED_COLS] = [200, 100, 20]
-    pva_error[VEL_COLS] = [0.1, -0.2, -0.05]
+    pva_error[NED_COLS] = [200, 100, 20 if with_altitude else 0]
+    pva_error[VEL_COLS] = [0.1, -0.2, -0.05 if with_altitude else 0]
     pva_error[RPH_COLS] = [np.rad2deg(-2 * b / 9.8), np.rad2deg(b / 9.8), 0.5]
 
     initial = sim.perturb_pva(trajectory.iloc[0], pva_error)
