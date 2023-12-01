@@ -137,7 +137,7 @@ class EstimationModel:
         self.bias_walk = bias_walk
         self.scale_misal_modelled = bool(output_axes)
         self.scale_misal_sd = scale_misal_sd
-        self.scale_misal_data = output_axes, input_axes, scale_misal_states
+        self._scale_misal_data = output_axes, input_axes, scale_misal_states
         self.P = P
         self.q = q
         self.F = F
@@ -171,7 +171,7 @@ class EstimationModel:
                              "misalignment errors are modeled.")
 
         readings = np.asarray(readings)
-        output_axes, input_axes, states = self.scale_misal_data
+        output_axes, input_axes, states = self._scale_misal_data
         if readings.ndim == 1:
             H = self.H.copy()
             H[output_axes, states] = readings[input_axes]
