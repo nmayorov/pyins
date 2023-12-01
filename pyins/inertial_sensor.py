@@ -230,7 +230,8 @@ class EstimationModel:
 class Parameters:
     """Parameters of inertial sensor triad (gyros or accelerometers).
 
-    The following basic mode is used::
+    This class is intended to be used for simulation.
+    The following measurement model is assumed::
 
         x_out = T @ x + b + n
 
