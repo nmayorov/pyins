@@ -46,38 +46,43 @@ def test_EstimationModel():
     assert_equal(model.output_matrix(), [[1, 0], [0, 0], [0, 1]])
 
     model = EstimationModel(bias_sd=0.1, bias_walk=0.2,
-                            scale_misal_sd=np.diag([0.3, 0.3, 0.3]))
-    assert_equal(model.n_states, 6)
+                            scale_misal_sd=[
+                                [0.1, 0.0, 0.0],
+                                [0.0, 0.2, 0.15],
+                                [0.0, 0.0, 0.05]
+                            ])
+    assert_equal(model.n_states, 7)
     assert_equal(model.n_noises, 3)
     assert_equal(model.n_output_noises, 0)
-    assert_equal(model.states, ['bias_x', 'bias_y', 'bias_z', 'sm_xx', 'sm_yy', 'sm_zz'])
-    assert_allclose(model.P, np.diag([0.01, 0.01, 0.01, 0.09, 0.09, 0.09]))
+    assert_equal(model.states, ['bias_x', 'bias_y', 'bias_z',
+                                'sm_xx', 'sm_yy', 'sm_yz', 'sm_zz'])
+    assert_allclose(model.P, np.diag([0.01, 0.01, 0.01, 0.01, 0.04, 0.0225, 0.0025]))
     assert_equal(model.q, [0.2, 0.2, 0.2])
     assert_equal(model.v, [])
-    assert_allclose(model.F, np.zeros((6, 6)))
-    assert_equal(model.G, np.vstack([np.identity(3), np.zeros((3, 3))]))
+    assert_allclose(model.F, np.zeros((7, 7)))
+    assert_equal(model.G, np.vstack([np.identity(3), np.zeros((4, 3))]))
     assert_equal(model.J, [[], [], []])
-    assert_allclose(model.output_matrix([1,2, 3]), [[1, 0, 0, 1, 0, 0],
-                                                    [0, 1, 0, 0, 2, 0],
-                                                    [0, 0, 1, 0, 0, 3]])
+    assert_allclose(model.output_matrix([1, 2, 3]), [[1, 0, 0, 1, 0, 0, 0],
+                                                     [0, 1, 0, 0, 2, 3, 0],
+                                                     [0, 0, 1, 0, 0, 0, 3]])
     assert_allclose(model.output_matrix([[1, 2, 3], [-1, 2, 0.5]]),
-                    [[[1, 0, 0, 1, 0, 0],
-                      [0, 1, 0, 0, 2, 0],
-                      [0, 0, 1, 0, 0, 3]],
-                     [[1, 0, 0, -1, 0, 0],
-                      [0, 1, 0, 0, 2, 0],
-                      [0, 0, 1, 0, 0, 0.5]]
+                    [[[1, 0, 0, 1, 0, 0, 0],
+                      [0, 1, 0, 0, 2, 3, 0],
+                      [0, 0, 1, 0, 0, 0, 3]],
+                     [[1, 0, 0, -1, 0,   0,   0],
+                      [0, 1, 0,  0, 2, 0.5,   0],
+                      [0, 0, 1,  0, 0,   0, 0.5]]
                      ])
-    model.update_estimates([0.1, -0.2, 0.05, 0.01, -0.01, 0.02])
+    model.update_estimates([0.1, -0.2, 0.05, 0.01, -0.01, 0.02, 0.03])
     assert ((model.get_estimates() - pd.Series(
-        [0.1, -0.2, 0.05, 0.01, -0.01, 0.02],
-        index=['bias_x', 'bias_y', 'bias_z', 'sm_xx', 'sm_yy', 'sm_zz'])).abs()
-            < 1e-16).all()
-    model.update_estimates([-0.02, 0.05, 0.06, 0.02, 0.01, -0.01])
+        [0.1, -0.2, 0.05, 0.01, -0.01, 0.02, 0.03],
+        index=['bias_x', 'bias_y', 'bias_z', 'sm_xx', 'sm_yy', 'sm_yz', 'sm_zz']))
+            .abs() < 1e-16).all()
+    model.update_estimates([-0.02, 0.05, 0.06, 0.02, 0.01, -0.01, -0.015])
     assert ((model.get_estimates() - pd.Series(
-        [0.08, -0.15, 0.11, 0.03, -0.0, 0.01],
-        index=['bias_x', 'bias_y', 'bias_z', 'sm_xx', 'sm_yy', 'sm_zz'])).abs()
-            < 1e-16).all()
+        [0.08, -0.15, 0.11, 0.03, -0.0, 0.01, 0.015],
+        index=['bias_x', 'bias_y', 'bias_z', 'sm_xx', 'sm_yy', 'sm_yz', 'sm_zz']))
+            .abs() < 1e-15).all()
 
 
 def test_Parameters():
