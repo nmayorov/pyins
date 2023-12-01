@@ -84,6 +84,71 @@ def test_ErrorModel():
     assert_allclose(velocity_perturbed_b - velocity_b, H_body_velocity @ x, rtol=1e-1)
 
 
+def test_ErrorModel_no_altitude():
+    np.random.seed(0)
+    em = error_model.InsErrorModel(with_altitude=False)
+    pva = pd.Series({
+        'lat': 58.0,
+        'lon': 55.0,
+        'alt': 150.0,
+        'VN': 10.0,
+        'VE': -12.2,
+        'VD': 0.5,
+        'roll': 0.5,
+        'pitch': 1.5,
+        'heading': 45.0
+    })
+    pva_error = pd.Series({
+        'north': -10.0,
+        'east': 15.0,
+        'down': 0.0,
+        'VN': 1.0,
+        'VE': 0.5,
+        'VD': 0.0,
+        'roll': 0.1,
+        'pitch': -0.15,
+        'heading': 0.5,
+    })
+    assert em.n_states == 7
+    T_io = em.transform_to_internal(pva)
+    T_oi = em.transform_to_output(pva)
+
+    x_out = np.random.randn(9)
+    x_out[error_model.InsErrorModel.DVD] = 0
+    x_out[error_model.InsErrorModel.DRD] = 0
+    assert_allclose(x_out, T_oi @ T_io @ x_out)
+
+    x_in = np.random.randn(7)
+    assert_allclose(x_in, T_io @ T_oi @ x_in)
+
+    x = T_io @ pva_error.values
+    pva_perturbed = sim.perturb_pva(pva, pva_error)
+    pva_corrected = em.correct_pva(pva_perturbed, x)
+    assert_allclose(transform.compute_state_difference(pva_corrected, pva), 0,
+                    atol=1e-3)
+
+    translation_b = [1, -2, 0.5]
+    omega_b = pd.Series([0.2, -0.3, 0.5], index=['rate_x', 'rate_y', 'rate_z'])
+    pva = pd.concat([pva, omega_b])
+    pva_perturbed = pd.concat([pva_perturbed, omega_b])
+
+    pva_t = transform.translate_trajectory(pva, translation_b)
+    pva_perturbed_t = transform.translate_trajectory(pva_perturbed, translation_b)
+
+    pva_diff = transform.compute_state_difference(pva_perturbed_t, pva_t)
+    H_position = em.position_error_jacobian(pva, translation_b)
+    assert_allclose(pva_diff[['north', 'east']], H_position @ x, rtol=1e-5)
+
+    H_ned_velocity = em.ned_velocity_error_jacobian(pva, translation_b)
+    assert_allclose(pva_diff[['VN', 'VE']], H_ned_velocity @ x, rtol=1e-4)
+
+    velocity_b = transform.mat_from_rph(pva[RPH_COLS]).T @ pva[VEL_COLS]
+    velocity_perturbed_b = (transform.mat_from_rph(pva_perturbed[RPH_COLS]).T
+                            @ pva_perturbed[VEL_COLS])
+    H_body_velocity = em.body_velocity_error_jacobian(pva)
+    assert_allclose(velocity_perturbed_b - velocity_b, H_body_velocity @ x, rtol=1e-1)
+
+
 def test_propagate_errors():
     dt = 0.5
     t = 0.5 * 3600
