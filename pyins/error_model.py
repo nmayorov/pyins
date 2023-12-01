@@ -294,6 +294,8 @@ class InsErrorModel:
         mat_tp = Rotation.from_rotvec(x[self.PHI]).as_matrix()
         lla = transform.perturb_lla(pva[LLA_COLS], -x[self.DR])
         velocity_n = mat_tp @ (pva[VEL_COLS] - x[self.DV])
+        if not self.with_altitude:
+            velocity_n[2] = pva.VD
         rph = transform.mat_to_rph(mat_tp @ transform.mat_from_rph(pva[RPH_COLS]))
         return pd.Series(data=np.hstack((lla, velocity_n, rph)), index=pva.index)
 
