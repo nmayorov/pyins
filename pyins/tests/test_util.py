@@ -3,6 +3,43 @@ from numpy.testing import assert_allclose
 from pyins import util
 
 
+def test_mm_prod():
+    np.random.seed(0)
+    a = np.random.randn(3, 4)
+    b = np.random.randn(4, 3)
+    assert_allclose(util.mm_prod(a, b), a @ b)
+    assert_allclose(util.mm_prod(a, b, at=True, bt=True), a.T @ b.T)
+
+    a = np.random.randn(10, 3, 4)
+    at = a.transpose((0, 2, 1))
+    assert_allclose(util.mm_prod(a, b), a @ b)
+    assert_allclose(util.mm_prod(a, b, at=True, bt=True), at @ b.T)
+
+    b = np.random.randn(10, 4, 3)
+    bt = b.transpose((0, 2, 1))
+    assert_allclose(util.mm_prod(a, b), a @ b)
+    assert_allclose(util.mm_prod(a, b, at=True, bt=True), at @ bt)
+
+
+def test_mv_prod():
+    np.random.seed(0)
+    a = np.random.randn(3, 3)
+    b = np.random.randn(3)
+    assert_allclose(util.mv_prod(a, b), a @ b)
+    assert_allclose(util.mv_prod(a, b, at=True), a.T @ b)
+
+    a = np.random.randn(10, 3, 3)
+    b = np.random.randn(3)
+    at = a.transpose((0, 2, 1))
+    assert_allclose(util.mv_prod(a, b), a @ b)
+    assert_allclose(util.mv_prod(a, b, at=True), at @ b)
+
+    b = np.random.randn(10, 3)
+    assert_allclose(util.mv_prod(a, b), (a @ b[:, :, None]).reshape(10, 3))
+    assert_allclose(util.mv_prod(a, b, at=True),
+                   (at @ b[:, :, None]).reshape(10, 3))
+
+
 def test_skew_matrix():
     vec = np.array([
         [0, 1, 2],
