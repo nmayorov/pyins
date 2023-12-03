@@ -168,7 +168,8 @@ def translate_trajectory(trajectory, translation_b):
     result[LLA_COLS] = perturb_lla(result[LLA_COLS],
                                    util.mv_prod(mat_nb, translation_b))
     if all(col in trajectory for col in RATE_COLS):
-        result[VEL_COLS] += mat_nb @ np.cross(trajectory[RATE_COLS], translation_b)
+        result[VEL_COLS] += util.mv_prod(mat_nb,
+            np.cross(trajectory[RATE_COLS], translation_b))
     return result
 
 
