@@ -21,6 +21,21 @@ def test_mm_prod():
     assert_allclose(util.mm_prod(a, b, at=True, bt=True), at @ bt)
 
 
+def test_mm_prod_symmetric():
+    np.random.seed(0)
+    a = np.random.randn(3, 3)
+    b = np.random.randn(3, 3)
+    assert_allclose(util.mm_prod_symmetric(a, b), a @ b @ a.T)
+
+    a = np.random.randn(10, 3, 3)
+    at = a.transpose((0, 2, 1))
+    b = np.random.randn(3, 3)
+    assert_allclose(util.mm_prod_symmetric(a, b), a @ b @ at)
+
+    b = np.random.randn(10, 3, 3)
+    assert_allclose(util.mm_prod_symmetric(a, b), a @ b @ at)
+
+
 def test_mv_prod():
     np.random.seed(0)
     a = np.random.randn(3, 3)
@@ -55,3 +70,23 @@ def test_skew_matrix():
                     np.cross(vec[1], check[1]))
     assert_allclose(util.mv_prod(util.skew_matrix(vec), check),
                     np.cross(vec, check))
+
+
+def test_compute_rms():
+    a = np.zeros(10)
+    assert_allclose(util.compute_rms(a), 0)
+    a[::2] = 2
+    assert_allclose(util.compute_rms(a), 2**0.5)
+    a[1::2] = -2
+    assert_allclose(util.compute_rms(a), 2)
+
+
+def test_bunch():
+    dict = {'a': 1, 'b': None, 'c': 3 * np.ones(3)}
+    bunch = util.Bunch(dict)
+    assert(bunch.a == 1)
+    assert(bunch.b == None)
+    assert((bunch.c == 3).all())
+
+    assert(dir(bunch) == ['a', 'b', 'c'])
+    assert(isinstance(repr(bunch), str))
