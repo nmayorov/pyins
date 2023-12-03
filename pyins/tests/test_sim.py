@@ -4,7 +4,7 @@ from pyins import earth, sim, transform
 from pyins.util import GYRO_COLS, ACCEL_COLS
 
 
-def test_sim_on_stationary():
+def test_generate_imu():
     dt = 1e-1
     n_points = 1000
 
