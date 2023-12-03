@@ -74,10 +74,10 @@ def test_integrate_constant_velocity():
         'roll': 1e-4, 'pitch': 1e-4, 'heading': 1e-4
     })
 
-    ref, imu = sim.sinusoid_velocity_motion(dt, total_time, lla0, velocity_n,
-                                            sensor_type='increment')
+    ref, imu = sim.generate_sine_velocity_motion(dt, total_time, lla0, velocity_n,
+                                                 sensor_type='increment')
     run_integration_test(ref, imu, 'increment', thresholds)
 
-    ref, imu = sim.sinusoid_velocity_motion(dt, total_time, lla0, velocity_n,
-                                            sensor_type='rate')
+    ref, imu = sim.generate_sine_velocity_motion(dt, total_time, lla0, velocity_n,
+                                                 sensor_type='rate')
     run_integration_test(ref, imu, 'rate', thresholds)

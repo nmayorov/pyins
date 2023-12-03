@@ -202,11 +202,11 @@ def generate_imu(time, lla, rph, velocity_n=None, sensor_type='rate'):
                          columns=GYRO_COLS + ACCEL_COLS))
 
 
-def sinusoid_velocity_motion(dt, total_time, lla0, velocity_mean,
-                             velocity_change_amplitude=0,
-                             velocity_change_period=60,
-                             velocity_change_phase_offset=[0, 90, 0],
-                             sensor_type='rate'):
+def generate_sine_velocity_motion(dt, total_time, lla0, velocity_mean,
+                                  velocity_change_amplitude=0,
+                                  velocity_change_period=60,
+                                  velocity_change_phase_offset=[0, 90, 0],
+                                  sensor_type='rate'):
     """Generate trajectory with NED velocity changing as sine.
 
     The NED velocity changes as::

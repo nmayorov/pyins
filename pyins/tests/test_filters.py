@@ -9,7 +9,7 @@ def test_run_feedback_filter(with_altitude):
     dt = 0.01
     rng = np.random.RandomState(123456789)
 
-    trajectory_true, imu_true = sim.sinusoid_velocity_motion(
+    trajectory_true, imu_true = sim.generate_sine_velocity_motion(
         0.5 * dt, 300, [50, 60, 100], [1, -1, 0], [3, 3, 0], sensor_type='rate')
 
     position_obs = measurements.Position(
@@ -79,7 +79,7 @@ def test_run_feedforward_filter(with_altitude):
     factor = 5
     rng = np.random.RandomState(123456789)
 
-    trajectory_true, imu_true = sim.sinusoid_velocity_motion(
+    trajectory_true, imu_true = sim.generate_sine_velocity_motion(
         dt / factor, 300, [50, 60, 100], [1, -1, 0], [3, 3, 0])
 
     position_obs = measurements.Position(sim.generate_position_measurements(

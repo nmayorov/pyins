@@ -154,7 +154,7 @@ def test_ErrorModel_no_altitude():
 def test_propagate_errors(with_altitude):
     dt = 0.5
     t = 0.5 * 3600
-    trajectory, imu = sim.sinusoid_velocity_motion(
+    trajectory, imu = sim.generate_sine_velocity_motion(
         dt, t, [50, 60, 0], [-5, 10, 0.5 if with_altitude else 0],
         [1, 1, 0.5 if with_altitude else 0])
     b = 1e-2
