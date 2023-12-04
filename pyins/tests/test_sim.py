@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from numpy.testing import assert_allclose, assert_array_equal
 from pyins import earth, sim, transform, util
 from pyins.util import GYRO_COLS, ACCEL_COLS
@@ -62,3 +63,25 @@ def test_generate_sine_velocity_motion():
     assert_allclose(imu.accel_x, 0, atol=1e-4)
     assert_allclose(imu.accel_y, -360 / 10 * transform.DEG_TO_RAD, rtol=1e-3)
     assert_allclose(imu.accel_z, -earth.gravity(55, 0), rtol=1e-5)
+
+
+def test_generate_measurements():
+    trajectory, _ = sim.generate_sine_velocity_motion(0.1, 1000, [55, 37, 0],
+                                                      1, 0.1, 20)
+    rng = np.random.RandomState(0)
+    position_obs = sim.generate_position_measurements(trajectory, 2.0, rng)
+    assert_allclose(
+        util.compute_rms(transform.compute_state_difference(position_obs, trajectory)),
+        2.0, 1e-1)
+
+    ned_velocity_obs = sim.generate_ned_velocity_measurements(trajectory, 0.2, rng)
+    assert_allclose(
+        util.compute_rms(transform.compute_state_difference(ned_velocity_obs,
+                                                            trajectory)), 0.2, 1e-1)
+
+    mat_nb = transform.mat_from_rph(trajectory[util.RPH_COLS])
+    velocity_b = pd.DataFrame(util.mv_prod(mat_nb, trajectory[util.VEL_COLS], True),
+                              columns=['VX', 'VY', 'VZ'])
+    body_velocity_obs = sim.generate_body_velocity_measurements(trajectory, 0.3, rng)
+    assert_allclose(util.compute_rms(transform.compute_state_difference(
+        velocity_b, body_velocity_obs)), 0.3, 1.2e-1)
