@@ -93,3 +93,31 @@ def test_generate_pva_error():
     assert pva_error[util.VEL_COLS].abs().max() < 0.8
     assert pva_error[['roll', 'pitch']].abs().max() < 0.2
     assert abs(pva_error.heading) < 1.2
+
+
+def test_perturb_pva():
+    pva = pd.Series({
+        'lat': 55,
+        'lon': 58,
+        'alt': 150.0,
+        'VN': 10.0,
+        'VE': -5.0,
+        'VD': 1.0,
+        'roll': 1.2,
+        'pitch': -2.9,
+        'heading': 102.0
+    })
+    pva_error = pd.Series({
+        'north': -2.0,
+        'east': 1.0,
+        'down': 0.5,
+        'VN': -0.5,
+        'VE': 1.2,
+        'VD': 0.9,
+        'roll': 0.1,
+        'pitch': -0.15,
+        'heading': -0.4
+    })
+    pva_perturbed = sim.perturb_pva(pva, pva_error)
+    pva_error_true = transform.compute_state_difference(pva_perturbed, pva)
+    assert_allclose(pva_error_true, pva_error, rtol=1e-6)
