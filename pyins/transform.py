@@ -259,16 +259,6 @@ def compute_state_difference(first, second):
     DataFrame
         Computed difference.
     """
-    def to_180_degrees_range(angle):
-        angle = angle % 360.0
-        if isinstance(angle, (pd.Series, pd.DataFrame)):
-            angle = angle.copy()
-        else:
-            angle = np.asarray(angle)
-        angle[angle < -180.0] += 360.0
-        angle[angle > 180.0] -= 360.0
-        return angle
-
     def has_lla(data):
         return all(col in data for col in LLA_COLS)
 
@@ -302,7 +292,7 @@ def compute_state_difference(first, second):
                           inplace=True)
 
     if _has_rph(difference):
-        difference[RPH_COLS] = to_180_degrees_range(difference[RPH_COLS])
+        difference[RPH_COLS] = util.to_180_range(difference[RPH_COLS])
 
     return result_sign * difference
 

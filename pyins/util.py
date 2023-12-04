@@ -10,8 +10,10 @@ Functions
     mv_prod
     skew_matrix
     compute_rms
+    to_180_range
 """
 import numpy as np
+import pandas as pd
 
 
 LLA_COLS = ['lat', 'lon', 'alt']
@@ -155,6 +157,22 @@ def skew_matrix(vec):
 def compute_rms(data):
     """Compute root-mean-square of data along 0 axis."""
     return np.mean(np.square(data), axis=0) ** 0.5
+
+
+def to_180_range(angle):
+    """Reduce angle in degrees to the range of [-180, 180]."""
+    is_pandas = isinstance(angle, (pd.Series, pd.DataFrame))
+    if not is_pandas:
+        angle = np.asarray(angle)
+    result = angle % 360
+    if is_pandas or result.ndim > 0:
+        result[result < -180] += 360
+        result[result > 180] -= 360
+    elif result < -180:
+        result += 360
+    elif result > 180:
+        result += 360
+    return result
 
 
 class Bunch(dict):
