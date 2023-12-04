@@ -85,3 +85,11 @@ def test_generate_measurements():
     body_velocity_obs = sim.generate_body_velocity_measurements(trajectory, 0.3, rng)
     assert_allclose(util.compute_rms(transform.compute_state_difference(
         velocity_b, body_velocity_obs)), 0.3, 1.2e-1)
+
+
+def test_generate_pva_error():
+    pva_error = sim.generate_pva_error(1.0, 0.2, 0.05, 0.3, 0)
+    assert pva_error[util.NED_COLS].abs().max() < 4.0
+    assert pva_error[util.VEL_COLS].abs().max() < 0.8
+    assert pva_error[['roll', 'pitch']].abs().max() < 0.2
+    assert abs(pva_error.heading) < 1.2
