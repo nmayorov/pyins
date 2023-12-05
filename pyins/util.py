@@ -171,7 +171,7 @@ def to_180_range(angle):
     elif result < -180:
         result += 360
     elif result > 180:
-        result += 360
+        result -= 360
     return result
 
 
