@@ -9,7 +9,7 @@ Functions
     :toctree: generated/
 
     generate_imu
-    sinusoid_velocity_motion
+    generate_sine_velocity_motion
     generate_position_measurements
     generate_ned_velocity_measurements
     generate_body_velocity_measurements
