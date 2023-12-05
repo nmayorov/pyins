@@ -34,8 +34,7 @@ import pandas as pd
 from scipy.interpolate import interp1d
 from scipy import signal
 from scipy.spatial.transform import Rotation, Slerp
-from .util import (LLA_COLS, VEL_COLS, RPH_COLS, NED_COLS, TRAJECTORY_ERROR_COLS,
-                   RATE_COLS)
+from .util import LLA_COLS, VEL_COLS, RPH_COLS, NED_COLS, RATE_COLS
 from . import earth, util
 
 #: Degrees to radians.
@@ -148,7 +147,7 @@ def perturb_lla(lla, dr_n):
 
 
 def translate_trajectory(trajectory, translation_b):
-    """Translatate trajectory by a vector expressed in body frame.
+    """Translate trajectory by a vector expressed in body frame.
 
     Parameters
     ----------
@@ -339,7 +338,8 @@ def smooth_rotations(rotations, dt, smoothing_time):
         raise ValueError("`rotations` must contain multiple rotations.")
     q = rotations.as_quat()
     coefficients = np.einsum('...i,...j->...ij', q, q).reshape(-1, 16)
-    coefficients  = _apply_smoothing(coefficients, dt, smoothing_time)[0].reshape(-1, 4, 4)
+    coefficients  = _apply_smoothing(
+        coefficients, dt, smoothing_time)[0].reshape(-1, 4, 4)
     _, v = np.linalg.eigh(coefficients)
     return Rotation.from_quat(v[:, :, -1])
 
