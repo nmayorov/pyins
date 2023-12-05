@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from numpy.testing import assert_allclose, assert_array_equal
+from numpy.testing import assert_allclose, assert_array_equal, assert_almost_equal
 from pyins import earth, sim, transform, util
 from pyins.util import GYRO_COLS, ACCEL_COLS
 
@@ -121,3 +121,27 @@ def test_perturb_pva():
     pva_perturbed = sim.perturb_pva(pva, pva_error)
     pva_error_true = transform.compute_state_difference(pva_perturbed, pva)
     assert_allclose(pva_error_true, pva_error, rtol=1e-6)
+
+
+def test_Turntable():
+    table = sim.Turntable([58, 55, 150])
+    table.rest(10, label='rest_1')
+    table.rotate('inner', 360, label='rotate_inner')
+    table.rotate('outer', 180, label='rotate_outer')
+    table.rest(20, label='rest_2')
+    trajectory, imu, labels = table.generate_imu(0.1, 'increment')
+    assert_allclose(trajectory.lat, 58)
+    assert_allclose(trajectory.lon, 55)
+    assert_allclose(trajectory.alt, 150)
+    assert_allclose(trajectory[util.VEL_COLS], 0)
+    assert_allclose(trajectory.loc[labels == 'rest_1', util.RPH_COLS], 0)
+    assert_allclose(trajectory.loc[labels == 'rotate_inner', ['roll', 'pitch']], 0)
+    assert_almost_equal(imu.loc[labels == 'rotate_inner', 'gyro_z'].sum(), 2 * np.pi,
+                        decimal=2)
+    assert_allclose(trajectory.loc[labels == 'rotate_outer', ['heading', 'pitch']], 0,
+                    atol=1e-13)
+    assert_almost_equal(imu.loc[labels == 'rotate_outer', 'gyro_x'].sum(), np.pi,
+                        decimal=2)
+    assert_allclose(trajectory.loc[labels == 'rest_2', ['heading', 'pitch']], 0,
+                    atol=1e-13)
+    assert_allclose(trajectory.loc[labels == 'rest_2', 'roll'].abs(), 180.0)
