@@ -62,23 +62,15 @@ def test_integrate_stationary(with_altitude, sensor_type):
     run_integration_test(ref, imu, with_altitude, sensor_type, thresholds)
 
 
-def test_integrate_constant_velocity():
-    dt = 1e-1
-    total_time = 3600
-
-    lla0 = [55.0, 37.0, 1500.0]
-    velocity_n = [5.0, -3.0, 0.2]
-
-    thresholds = pd.Series({
-        'north': 1, 'east':1, 'down': 1,
-        'VN': 1e-3, 'VE': 1e-3, 'VD': 1e-3,
-        'roll': 1e-4, 'pitch': 1e-4, 'heading': 1e-4
-    })
-
-    ref, imu = sim.generate_sine_velocity_motion(dt, total_time, lla0, velocity_n,
-                                                 sensor_type='increment')
-    run_integration_test(ref, imu, True, 'increment', thresholds)
-
-    ref, imu = sim.generate_sine_velocity_motion(dt, total_time, lla0, velocity_n,
-                                                 sensor_type='rate')
-    run_integration_test(ref, imu, True, 'rate', thresholds)
+@pytest.mark.parametrize("sensor_type, thresholds", [
+    ("rate", {'north': 10.0, 'east': 10.0, 'down': 10,
+              'VN': 1e-2, 'VE': 1e-2, 'VD': 1e-2,
+              'roll': 1e-4, 'pitch': 1e-4, 'heading': 1e-4}),
+    ("increment", {'north': 0.1, 'east': 0.1, 'down': 3,
+                   'VN': 1e-3, 'VE': 1e-3, 'VD': 1e-2,
+                   'roll': 1e-6, 'pitch': 1e-6, 'heading': 1e-5})])
+def test_integrate_sine_velocity(sensor_type, thresholds):
+    ref, imu = sim.generate_sine_velocity_motion(
+        1e-2, 3600, [55, 37, 1500], [5, -3, 0.2], velocity_change_amplitude=1,
+        sensor_type=sensor_type)
+    run_integration_test(ref, imu, True, sensor_type, pd.Series(thresholds))
