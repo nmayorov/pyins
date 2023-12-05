@@ -1,6 +1,7 @@
 import pandas as pd
 from numpy.testing import assert_allclose
 import numpy as np
+import pytest
 from pyins import sim
 from pyins.transform import compute_state_difference
 from pyins.strapdown import compute_increments_from_imu, Integrator
@@ -24,15 +25,18 @@ def test_coning_sculling():
     assert_allclose(increments[DV_COLS], dv_true, rtol=1e-10)
 
 
-def run_integration_test(reference_trajectory, imu, sensor_type, thresholds):
+def run_integration_test(reference_trajectory, imu, with_altitude, sensor_type,
+                         thresholds):
     increments = compute_increments_from_imu(imu, sensor_type)
-    integrator = Integrator(reference_trajectory.iloc[0])
+    integrator = Integrator(reference_trajectory.iloc[0], with_altitude)
     result = integrator.integrate(increments)
     diff = compute_state_difference(result, reference_trajectory).abs().max(axis=0)
     assert (diff < thresholds).all()
 
 
-def test_integrate_stationary():
+@pytest.mark.parametrize("with_altitude", [True, False])
+@pytest.mark.parametrize("sensor_type", ["rate", "increment"])
+def test_integrate_stationary(with_altitude, sensor_type):
     total_time = 3600
     dt = 1e-1
     time = np.arange(0, total_time, dt)
@@ -54,11 +58,8 @@ def test_integrate_stationary():
         'roll': 1e-8, 'pitch': 1e-8, 'heading': 1e-8
     })
 
-    ref, imu = sim.generate_imu(time, lla, rph, sensor_type='increment')
-    run_integration_test(ref, imu, 'increment', thresholds)
-
-    ref, imu = sim.generate_imu(time, lla, rph, sensor_type='rate')
-    run_integration_test(ref, imu, 'rate', thresholds)
+    ref, imu = sim.generate_imu(time, lla, rph, sensor_type=sensor_type)
+    run_integration_test(ref, imu, with_altitude, sensor_type, thresholds)
 
 
 def test_integrate_constant_velocity():
@@ -76,8 +77,8 @@ def test_integrate_constant_velocity():
 
     ref, imu = sim.generate_sine_velocity_motion(dt, total_time, lla0, velocity_n,
                                                  sensor_type='increment')
-    run_integration_test(ref, imu, 'increment', thresholds)
+    run_integration_test(ref, imu, True, 'increment', thresholds)
 
     ref, imu = sim.generate_sine_velocity_motion(dt, total_time, lla0, velocity_n,
                                                  sensor_type='rate')
-    run_integration_test(ref, imu, 'rate', thresholds)
+    run_integration_test(ref, imu, True, 'rate', thresholds)
