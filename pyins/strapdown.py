@@ -75,7 +75,6 @@ def compute_increments_from_imu(imu, sensor_type):
         sculling = (np.cross(gyro[:-1], accel[1:]) +
                     np.cross(accel[:-1], gyro[1:])) / 12
     elif sensor_type == 'rate':
-        dt = np.diff(imu.index).reshape(-1, 1)
         a_gyro = gyro[:-1]
         b_gyro = gyro[1:] - gyro[:-1]
         a_accel = accel[:-1]
