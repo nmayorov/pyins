@@ -1,5 +1,6 @@
 import numpy as np
-from numpy.testing import assert_allclose
+import pandas as pd
+from numpy.testing import assert_allclose, assert_almost_equal
 from pyins import util
 
 
@@ -79,6 +80,22 @@ def test_compute_rms():
     assert_allclose(util.compute_rms(a), 2**0.5)
     a[1::2] = -2
     assert_allclose(util.compute_rms(a), 2)
+
+
+def test_to_180_range():
+    assert util.to_180_range(100) == 100
+    assert_almost_equal(util.to_180_range(1050.1), -29.9, 13)
+    data = [-400.0, 0.0, 25.0, 721.0]
+    correct_result = np.array([-40.0, 0.0, 25.0, 1.0])
+    assert_allclose(util.to_180_range(data), correct_result, rtol=1e-16)
+
+    result_series = util.to_180_range(pd.Series(data))
+    assert isinstance(result_series, pd.Series)
+    assert_allclose(result_series, correct_result, rtol=1e-16)
+
+    result_data_frame = util.to_180_range(pd.DataFrame(data))
+    assert isinstance(result_data_frame, pd.DataFrame)
+    assert_allclose(result_data_frame, correct_result.reshape(-1, 1), rtol=1e-16)
 
 
 def test_bunch():
