@@ -422,6 +422,16 @@ class Turntable:
 
     Parameters
     ----------
+    table_lla : array_like, shape (3,)
+        Latitude, longitude and altitude of the table installation site.
+    table_rph : array_like, shape (3,), optional
+        Roll, pitch and heading angles of the table frame.
+        Typically, a table is installed horizontally (roll and pitch is close to
+        zero) and the heading angle is precisely measured. Default is zeros.
+    axes_non_orthogonality : float, optional
+        Deviation from orthogonality between inner and outers axes as a rotation
+        around y-axis of the mount frame. Typically, a table is build to have
+        very low non-orthogonality. Default is zero.
     angular_rate : float, optional
         Default angular rate of rotations in deg/s. Default is 20 deg/s.
     angular_acceleration : float, optional
@@ -430,7 +440,11 @@ class Turntable:
     """
     EXTRA_REST = 0.1
 
-    def __init__(self, angular_rate=20, angular_acceleration=20):
+    def __init__(self, table_lla, table_rph=np.zeros(3), axes_non_orthogonality=0,
+                 angular_rate=20, angular_acceleration=20):
+        self.table_lla = table_lla
+        self.table_rph = table_rph
+        self.axes_non_orthogonality = axes_non_orthogonality
         self.angular_rate = angular_rate
         self.angular_acceleration = angular_acceleration
         self.inner_angle = 0
@@ -496,24 +510,13 @@ class Turntable:
         self.actions.append(('rest', time, label))
         self.time += time
 
-    def generate_imu(self, dt, table_lla, table_rph=np.zeros(3),
-                     axes_non_orthogonality=0, sensor_type='rate'):
+    def generate_imu(self, dt, sensor_type='rate'):
         """Generate trajectory and IMU data.
 
         Parameters
         ----------
         dt : float
             Sampling period for trajectory and IMU data.
-        table_lla : array_like, shape (3,)
-            Latitude, longitude and altitude of the table installation site.
-        table_rph : array_like, shape (3,), optional
-            Roll, pitch and heading angles of the table frame.
-            Typically, a table is installed horizontally (roll and pitch is close to
-            zero) and the heading angle is precisely measured. Default is zeros.
-        axes_non_orthogonality : float, optional
-            Deviation from orthogonality between inner and outers axes as a rotation
-            around y-axis of the mount frame. Typically, a table is build to have
-            very low non-orthogonality. Default is zero.
         sensor_type: 'rate' or 'increment', optional
             Type of sensor to generate. If 'rate' (default), then instantaneous
             rate values are generated (in rad/s and m/s^2). If 'increment', then
@@ -586,13 +589,13 @@ class Turntable:
             labels[time_mask] = label
             time += period
 
-        rot_nt0 = Rotation.from_euler('xyz', table_rph, True)
-        rot_tm0 = Rotation.from_euler('y', axes_non_orthogonality, True)
+        rot_nt0 = Rotation.from_euler('xyz', self.table_rph, True)
+        rot_tm0 = Rotation.from_euler('y', self.axes_non_orthogonality, True)
         rot_t0t = Rotation.from_euler('x', outer_angles, True)
         rot_m0m = Rotation.from_euler('z', inner_angles, True)
         rot_nm = rot_nt0 * rot_t0t * rot_tm0 * rot_m0m
 
-        table_lla = np.asarray(table_lla, dtype=float)
+        table_lla = np.asarray(self.table_lla, dtype=float)
         trajectory, imu = generate_imu(times, np.resize(table_lla, (len(times), 3)),
                                        rot_nm.as_euler('xyz', True),
                                        np.zeros((len(times), 3)), sensor_type)
