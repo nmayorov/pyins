@@ -134,3 +134,37 @@ def test_mat_en_from_ll():
     assert_allclose(transform.mat_en_from_ll(0, 0), A2, rtol=1e-10, atol=1e-10)
     assert_allclose(transform.mat_en_from_ll([-90, 0], [0, 0]),
                     np.stack([A1, A2]), rtol=1e-10, atol=1e-10)
+
+
+def test_mat_from_rph():
+    assert_allclose(transform.mat_from_rph([0, 0, 0]), np.eye(3))
+
+    rph1 = [90, 0, 0]
+    mat1 = [[1, 0, 0], [0, 0, -1], [0, 1, 0]]
+    assert_allclose(transform.mat_from_rph(rph1), mat1, atol=1e-15)
+
+    rph2 = [0, -90, 0]
+    mat2 = [[0, 0, -1], [0, 1, 0], [1, 0, 0]]
+    assert_allclose(transform.mat_from_rph(rph2), mat2, atol=1e-15)
+
+    rph3 = [0, 0, 180]
+    mat3 = [[-1, 0, 0], [0, -1, 0], [0, 0, 1]]
+    assert_allclose(transform.mat_from_rph(rph3), mat3, atol=1e-15)
+
+    rph = np.asarray([rph1, rph2, rph3])
+    mat = np.asarray([mat1, mat2, mat3])
+    assert_allclose(transform.mat_from_rph(rph), mat, atol=1e-15)
+
+
+def test_mat_to_rph():
+    assert_allclose(transform.mat_to_rph(np.eye(3)), 0)
+
+    np.random.seed(0)
+    for i in range(10):
+        rph = 30 * np.random.randn(3)
+        mat = Rotation.from_euler('xyz', rph, degrees=True).as_matrix()
+        assert_allclose(transform.mat_to_rph(mat), rph)
+
+    rph = 30 * np.random.randn(10, 3)
+    mat = Rotation.from_euler('xyz', rph, degrees=True).as_matrix()
+    assert_allclose(transform.mat_to_rph(mat), rph)
