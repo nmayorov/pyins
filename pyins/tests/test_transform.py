@@ -168,3 +168,43 @@ def test_mat_to_rph():
     rph = 30 * np.random.randn(10, 3)
     mat = Rotation.from_euler('xyz', rph, degrees=True).as_matrix()
     assert_allclose(transform.mat_to_rph(mat), rph)
+
+
+def test_smooth_rotations():
+    def generate_envelope(dt, total_time, rest_time, raise_time):
+        time = np.arange(0, total_time, dt)
+        result = np.zeros_like(time)
+
+        mask = (time >= rest_time) & (time < rest_time + raise_time)
+        result[mask] = (time[mask] - rest_time) / raise_time
+
+        steady_time = total_time - 2 * (rest_time + raise_time)
+        mask = (time >= rest_time + raise_time) & (
+                    time < rest_time + raise_time + steady_time)
+        result[mask] = 1.0
+
+        mask = (time >= rest_time + raise_time + steady_time) & (
+                    time < total_time - rest_time)
+        result[mask] = (-time[mask] + (total_time - rest_time)) / raise_time
+
+        return result
+
+    dt = 0.01
+    total_time = 60
+    time = np.arange(0, total_time, dt)
+    smoothing_time = 1
+    envelope = generate_envelope(dt, total_time, smoothing_time, 20 * smoothing_time)
+
+    rph = np.empty((len(time), 3))
+    rph[:, 0] = 30 * envelope * np.sin(2 * np.pi * time / 0.1)
+    rph[:, 1] = 70 * envelope * np.cos(2 * np.pi * time / 10)
+    rph[:, 2] = 90 * envelope * np.sin(2 * np.pi * time / 20)
+
+    rotations = Rotation.from_euler('xyz', rph, True)
+    smoothed_rotation, num_taps = transform.smooth_rotations(rotations, dt,
+                                                             smoothing_time)
+    rph[:, 0] = 0.0
+    rotations_expected = Rotation.from_euler('xyz', rph, True)
+    rotation_diff = (smoothed_rotation[num_taps - 1:] *
+                     rotations_expected[num_taps // 2:-(num_taps // 2)].inv())
+    assert np.max(rotation_diff.magnitude()) < 0.4 * transform.DEG_TO_RAD
