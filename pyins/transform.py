@@ -301,8 +301,7 @@ def _apply_smoothing(data, T, T_smooth):
     num_taps = 2 * round(T_smooth / T) + 1
     h = signal.firwin(num_taps, 1 / T_smooth, fs=1 / T)
     filtered = signal.lfilter(h, 1, data, axis=0)
-    filtered = filtered[num_taps - 1 : -num_taps + 1]
-    return filtered, num_taps
+    return filtered[num_taps - 1:], num_taps
 
 
 def smooth_rotations(rotations, dt, smoothing_time):
@@ -317,7 +316,7 @@ def smooth_rotations(rotations, dt, smoothing_time):
 
         num_taps = 2 * round(smoothing_time / dt) + 1
 
-    The first and last ``num_taps - 1`` filtered samples are removed as they cannot
+    The first ``num_taps - 1`` filtered samples are removed as they cannot
     be computed using actual data and the edge effects are hard to eliminate.
 
     Parameters
@@ -334,15 +333,16 @@ def smooth_rotations(rotations, dt, smoothing_time):
     -------
     `scipy.spatial.transform.Rotation`
         Smoothed rotations.
+    delay : int
+        Group delay of the filtered signal in samples.
     """
     if rotations.single:
         raise ValueError("`rotations` must contain multiple rotations.")
     q = rotations.as_quat()
     coefficients = np.einsum('...i,...j->...ij', q, q).reshape(-1, 16)
-    coefficients  = _apply_smoothing(
-        coefficients, dt, smoothing_time)[0].reshape(-1, 4, 4)
-    _, v = np.linalg.eigh(coefficients)
-    return Rotation.from_quat(v[:, :, -1])
+    coefficients, num_taps = _apply_smoothing(coefficients, dt, smoothing_time)
+    _, v = np.linalg.eigh(coefficients.reshape(-1, 4, 4))
+    return Rotation.from_quat(v[:, :, -1]), num_taps // 2
 
 
 def smooth_state(state, smoothing_time):
@@ -357,9 +357,9 @@ def smooth_state(state, smoothing_time):
 
         num_taps = 2 * round(smoothing_time / dt) + 1
 
-    The first and last ``num_taps - 1`` filtered samples are removed as they cannot
-    be computed using actual data and the edge effects are hard to eliminate.
-    The group delay is compensated by approriately adjusting time index.
+    The first ``num_taps - 1`` filtered samples are removed as they cannot be computed
+    using actual data and the edge effects are hard to eliminate. The group delay is
+    compensated by appropriately adjusting time index.
 
     Rotations ('roll', 'pitch', 'heading' columns) are smoothed by `smooth_rotations`.
 
@@ -382,12 +382,11 @@ def smooth_state(state, smoothing_time):
     if _has_rph(state):
         rotations = Rotation.from_euler('xyz', resampled_state[RPH_COLS], True)
         smoothed[RPH_COLS] = smooth_rotations(
-            rotations, dt, smoothing_time).as_euler('xyz', True)
+            rotations, dt, smoothing_time)[0].as_euler('xyz', True)
     other_columns = state.columns.difference(RPH_COLS)
     smoothed[other_columns], num_taps = _apply_smoothing(
         resampled_state[other_columns].values, dt, smoothing_time)
-    smoothed.index = (resampled_state.index[num_taps - 1 : -num_taps + 1] -
-                      dt * (num_taps // 2))
+    smoothed.index = resampled_state.index[num_taps - 1:] - dt * (num_taps // 2)
     return resample_state(smoothed[state.columns], state.index)
 
 
