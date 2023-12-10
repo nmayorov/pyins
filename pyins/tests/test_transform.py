@@ -2,11 +2,8 @@ import numpy as np
 from numpy.testing import assert_allclose
 import pandas as pd
 from scipy.spatial.transform import Rotation
-from pyins import earth, transform
-from pyins.sim import generate_sine_velocity_motion
-from pyins import util
-from pyins.util import (LLA_COLS, NED_COLS, VEL_COLS, RPH_COLS,
-                        GYRO_COLS, RATE_COLS)
+from pyins import earth, sim, transform, util
+from pyins.util import LLA_COLS, NED_COLS, VEL_COLS, RPH_COLS, GYRO_COLS, RATE_COLS
 
 
 def test_lla_to_ecef():
@@ -63,7 +60,7 @@ def test_perturb_ll():
 
 
 def test_translate_trajectory():
-    traj, imu = generate_sine_velocity_motion(0.1, 60, [10, 20, -3], [5, 7, 3])
+    traj, imu = sim.generate_sine_velocity_motion(0.1, 60, [10, 20, -3], [5, 7, 3])
     traj_new = transform.translate_trajectory(traj, [10, -20, 5])
     mat_nb = Rotation.from_euler('xyz', traj[RPH_COLS], degrees=True).as_matrix()
     ned = util.mv_prod(mat_nb, [10, -20, 5])
@@ -95,10 +92,10 @@ def test_compute_lla_difference():
 
 
 def test_resample_state():
-    traj, _ = generate_sine_velocity_motion(0.02, 60.01, [40, -50, 100], [5, -7, 0],
-                                            velocity_change_amplitude=[10, 15, 2])
-    ref_traj, _ = generate_sine_velocity_motion(0.01, 60.01, [40, -50, 100], [5, -7, 0],
-                                                velocity_change_amplitude=[10, 15, 2])
+    traj, _ = sim.generate_sine_velocity_motion(
+        0.02, 60.01, [40, -50, 100], [5, -7, 0], velocity_change_amplitude=[10, 15, 2])
+    ref_traj, _ = sim.generate_sine_velocity_motion(
+        0.01, 60.01, [40, -50, 100], [5, -7, 0], velocity_change_amplitude=[10, 15, 2])
     test_traj = transform.resample_state(traj, ref_traj.index)
 
     assert_allclose(test_traj.lat, ref_traj.lat)
@@ -110,10 +107,10 @@ def test_resample_state():
 
 
 def test_compute_state_difference():
-    traj1, _ = generate_sine_velocity_motion(0.02, 60.01, [40, -50, 100], [5, -7, 0],
-                                             velocity_change_amplitude=[10, 15, 2])
-    traj2, _ = generate_sine_velocity_motion(0.01, 60.01, [40, -50, 100], [5, -7, 0],
-                                             velocity_change_amplitude=[10, 15, 2])
+    traj1, _ = sim.generate_sine_velocity_motion(
+        0.02, 60.01, [40, -50, 100], [5, -7, 0], velocity_change_amplitude=[10, 15, 2])
+    traj2, _ = sim.generate_sine_velocity_motion(
+        0.01, 60.01, [40, -50, 100], [5, -7, 0], velocity_change_amplitude=[10, 15, 2])
     traj2 = traj2.iloc[1::2]
     traj2[LLA_COLS] = transform.perturb_lla(traj2[LLA_COLS], [-3, 5, 7])
     traj2[VEL_COLS] += [1, -2, 3]
