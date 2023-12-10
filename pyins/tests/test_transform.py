@@ -205,3 +205,16 @@ def test_smooth_rotations():
     rotation_diff = (smoothed_rotation[num_taps - 1:] *
                      rotations_expected[num_taps // 2:-(num_taps // 2)].inv())
     assert np.max(rotation_diff.magnitude()) < 0.4 * transform.DEG_TO_RAD
+
+
+def test_smooth_state():
+    trajectory, _ = sim.generate_sine_velocity_motion(
+        0.1, 600.0, [55, 37, 150], [1, 2, -0.1], 0.5, 1)
+    trajectory_smoothed = transform.smooth_state(trajectory, 10)
+    trajectory_expected, _ = sim.generate_sine_velocity_motion(
+        0.1, 600.0, [55, 37, 150], [1, 2, -0.1])
+    difference = transform.compute_state_difference(trajectory_smoothed,
+                                                    trajectory_expected)
+    assert difference[NED_COLS].abs().max(None) < 0.1
+    assert difference[VEL_COLS].abs().max(None) < 5e-5
+    assert difference[RPH_COLS].abs().max(None) < 0.7
