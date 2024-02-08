@@ -3,7 +3,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pyins"
+name = "python-ins"
 description = "Inertial Navigation System algorithms in Python"
 version = "1.0"
 maintainers = [

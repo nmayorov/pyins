@@ -1,7 +1,7 @@
 build
 dist
 .idea
-pyins.egg-info
+*.egg-info
 examples/.ipynb_checkpoints
 
 *.c
