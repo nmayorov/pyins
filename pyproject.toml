@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "python-ins"
 description = "Inertial Navigation System algorithms in Python"
-version = "1.0"
+version = "1.0.1"
 maintainers = [
     {name = "Nikolay Mayorov", email = "nikolay.mayorov@zoho.com"},
 ]
