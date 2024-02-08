@@ -12,11 +12,20 @@ Refer to [version_1.0.md](./version_1.0.md) for the list of main changes compare
 
 The package now is pure Python and thus can be easily installed on any platform.
 
-To install execute in the package directory: 
+### Installing from pypi
+
+Due to pypi policies the distribution package name is "python-ins".
+```shell
+pip install python-ins
+```
+
+### Installing from source
+
+To perform a regular install, execute in the cloned repository directory: 
 ```shell
 pip install .
 ```
-To perform editable (inplace) install:
+To perform an editable (inplace) install:
 ```shell
 pip install -e .
 ```
@@ -34,9 +43,9 @@ Runtime dependencies include (versions in parentheses were used for the latest d
 
 To run all the supplied tests with `pytest` execute: 
 ```shell
-pytest pyins
+pytest --pyargs pyins
 ```
-Due to some `pytest` limitations it won't work for editable installation. 
+Due to some `pytest` limitations it won't work for the editable installation. 
 In this case supply path to `tests` directory:
 ```shell
 pytest /your_dev_dir/pyins/pyins/tests
