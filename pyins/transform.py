@@ -78,6 +78,92 @@ def lla_to_ecef(lla):
     return r_e.transpose()
 
 
+def ecef_to_lla(r_e):
+    """Convert ECEF coordinates into latitude, longitude and altitude.
+
+    This code is a literal translation from the code provided in [1]_.
+
+    Parameters
+    ----------
+    r_e : ndarray, shape (3,) or (n, 3)
+        Cartesian coordinates in ECEF.
+
+    Returns
+    -------
+    lla : ndarray, shape (3,) or (n, 3)
+        Latitude, longitude and altitude.
+
+    References
+    ----------
+    .. [1] D. K. Olson, "Converting Earth-Centered, Earth-Fixed Coordinates
+           to Geodetic Coordinates", IEEE Transactions on Aerospace and
+           Electronic Systems, 32 (1996) 473-476.
+    """
+    r_e = np.asarray(r_e)
+
+    single_point = r_e.ndim == 1
+    if single_point:
+        r_e = np.atleast_2d(r_e)
+    n_points = r_e.shape[0]
+
+    e2 = earth.E2
+    a = earth.A
+    a1 = a * e2
+    a2 = a1 * a1
+    a3 = a1 * e2 / 2
+    a4 = 2.5 * a2
+    a5 = a1 + a3
+    a6 = 1 - e2
+
+    w = np.hypot(r_e[:, 0], r_e[:, 1])
+    z = r_e[:, 2]
+    zp = abs(z)
+    w2 = w * w
+    r2 = z * z + w2
+    r = r2 ** 0.5
+    s2 = z * z / r2
+    c2 = w2 / r2
+    u = a2 / r
+    v = a3 - a4 / r
+
+    s = (zp / r) * (1 + c2 * (a1 + u + s2 * v) / r)
+    c = (w / r) * (1 - s2 * (a5 - u - c2 * v) / r)
+
+    lat = np.empty(n_points)
+    ss = np.empty(n_points)
+
+    m = c2 > 0.3
+    lat[m] = np.arcsin(s[m])
+    ss[m] = s[m] * s[m]
+    c[m] = (1 - ss[m]) ** 0.5
+
+    m = ~m
+    lat[m] = np.arccos(c[m])
+    ss[m] = 1 - c[m] * c[m]
+    s[m] = ss[m] ** 0.5
+
+    g = 1 - e2 * ss
+    rg = a / g**0.5
+    rf = a6 * rg
+    u = w - rg * c
+    v = zp - rf * s
+    f = c * u + s * v
+    m = c * v - s * u
+    p = m / (rf / g + f)
+    lat = lat + p
+    lat[z < 0] *= -1
+    lat = np.rad2deg(lat)
+
+    lon = np.rad2deg(np.arctan2(r_e[:, 1], r_e[:, 0]))
+    alt = f + 0.5 * m * p
+
+    lla = np.vstack((lat, lon, alt)).T
+    if single_point:
+        lla = lla[0]
+
+    return lla
+
+
 def lla_to_ned(lla, lla_origin=None):
     """Convert lla into NED Cartesian coordinates.
 

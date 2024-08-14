@@ -18,6 +18,28 @@ def test_lla_to_ecef():
     assert_allclose(r_e, [[earth.A + 10, 0, 0], [0, 0, -b + 10]], atol=1e-9)
 
 
+def test_ecef_to_lla():
+    lla = transform.ecef_to_lla([earth.A, 0, 0])
+    assert_allclose(lla, [0, 0, 0])
+
+    lla = transform.ecef_to_lla([0, earth.A, 0])
+    assert_allclose(lla, [0, 90, 0])
+
+    lla = transform.ecef_to_lla([0, 0, earth.A * (1 - earth.E2) ** 0.5])
+    assert_allclose(lla, [90, 0, 0])
+
+    lla = transform.ecef_to_lla([0, 0, -earth.A * (1 - earth.E2) ** 0.5])
+    assert_allclose(lla, [-90, 0, 0])
+
+    lla = transform.ecef_to_lla([
+        [earth.A, 0, 0],
+        [0, earth.A, 0],
+        [0, 0, earth.A * (1 - earth.E2) ** 0.5],
+        [0, 0, -earth.A * (1 - earth.E2) ** 0.5]
+    ])
+    assert_allclose(lla, [[0, 0, 0], [0, 90, 0], [90, 0, 0], [-90, 0, 0]])
+
+
 def test_lla_to_ned():
     lla = [[0, 0, 1000], [90, 90, 0], [0, -90, -1000]]
     ned = transform.lla_to_ned(lla)
