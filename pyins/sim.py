@@ -591,8 +591,8 @@ class Turntable:
 
         rot_nt0 = Rotation.from_euler('xyz', self.table_rph, True)
         rot_tm0 = Rotation.from_euler('y', self.axes_non_orthogonality, True)
-        rot_t0t = Rotation.from_euler('x', outer_angles, True)
-        rot_m0m = Rotation.from_euler('z', inner_angles, True)
+        rot_t0t = Rotation.from_euler('x', outer_angles[:, None], True)
+        rot_m0m = Rotation.from_euler('z', inner_angles[:, None], True)
         rot_nm = rot_nt0 * rot_t0t * rot_tm0 * rot_m0m
 
         table_lla = np.asarray(self.table_lla, dtype=float)
