@@ -1,4 +1,4 @@
-"""pyins: Inertial Navigation System algorithms in Python.
+r"""pyins: Inertial Navigation System algorithms in Python.
 
 Type naming conventions
 -----------------------
@@ -79,6 +79,6 @@ References
 .. [2] P\. S\. Maybeck, "Stochastic Models, Estimation and Control", volume 1
 """
 from . import (earth, error_model, filters, inertial_sensor, kalman, measurements, sim,
-               strapdown, transform, util)
+               strapdown, transform, util, gmf)
 
 __version__ = "1.0"
