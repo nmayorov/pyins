@@ -291,6 +291,10 @@ def _has_rph(data):
     return all(col in data for col in RPH_COLS)
 
 
+def _has_lla(data):
+    return all(col in data for col in LLA_COLS)
+
+
 def resample_state(state, times):
     """Compute state values at new set of time values.
 
@@ -345,9 +349,6 @@ def compute_state_difference(first, second):
     DataFrame
         Computed difference.
     """
-    def has_lla(data):
-        return all(col in data for col in LLA_COLS)
-
     if isinstance(first, pd.DataFrame) and isinstance(second, pd.DataFrame):
         if np.median(np.diff(first.index)) < np.median(np.diff(second.index)):
             result_sign = -1.0
@@ -367,7 +368,7 @@ def compute_state_difference(first, second):
         raise ValueError("Both inputs must be either DataFrame or Series")
 
     difference = first - second
-    if has_lla(difference):
+    if _has_lla(difference):
         rn, _, rp = earth.principal_radii(0.5 * (first.lat + second.lat),
                                           0.5 * (first.alt + second.alt))
         difference.lat *= rn * DEG_TO_RAD
@@ -537,15 +538,20 @@ def mat_to_rph(mat):
     return Rotation.from_matrix(mat).as_euler('xyz', degrees=True)
 
 
-def compute_mean_pva(trajectory, weights=None):
-    """Compute weighted mean lla."""
+def compute_mean_state(state, weights=None):
+    """Compute weighted mean state with special handling of lla and attitude."""
     if weights is None:
-        weights = np.ones(len(trajectory), dtype=float)
+        weights = np.ones(len(state), dtype=float)
     weights = np.asarray(weights, dtype=float) / np.sum(weights)
-    position_e = lla_to_ecef(trajectory[LLA_COLS])
-    mean_lla = ecef_to_lla(np.sum(weights[:, None] * position_e, axis=0))
-    mean_velocity_n = np.sum(weights[:, None] * trajectory[VEL_COLS].values, axis=0)
-    mean_rpy = (Rotation.from_euler('xyz', trajectory[RPH_COLS], True)
-                .mean(weights).as_euler('xyz', True))
-    return pd.Series(data=np.hstack([mean_lla, mean_velocity_n, mean_rpy]),
-                     index=util.TRAJECTORY_COLS)
+    result = []
+    if _has_lla(state):
+        position_e = lla_to_ecef(state[LLA_COLS])
+        result.append(pd.Series(ecef_to_lla(
+            np.sum(weights[:, None] * position_e, axis=0)), index=LLA_COLS))
+    if _has_rph(state):
+        result.append(pd.Series(Rotation.from_euler('xyz', state[RPH_COLS], True)
+                                .mean(weights).as_euler('xyz', True), index=RPH_COLS))
+    other_columns = state.columns.difference(LLA_COLS + RPH_COLS)
+    result.append(pd.Series(np.sum(weights[:, None] * state[other_columns].values,
+                                   axis=0), index=other_columns))
+    return pd.concat(result)[state.columns]
