@@ -299,6 +299,19 @@ class InsErrorModel:
         rph = transform.mat_to_rph(mat_tp @ transform.mat_from_rph(pva[RPH_COLS]))
         return pd.Series(data=np.hstack((lla, velocity_n, rph)), index=pva.index)
 
+    def subtract_pva(self, left, right):
+        """Subtract two PVA.
+
+        The result is returned as error vector in internal format.
+        """
+        rot_diff = (Rotation.from_euler('xyz', right[RPH_COLS], True) *
+                    Rotation.from_euler('xyz', left[RPH_COLS], True).inv())
+        position_diff = transform.compute_lla_difference(
+            left[LLA_COLS], right[LLA_COLS])
+        velocity_diff = left[VEL_COLS] - rot_diff.apply(right[VEL_COLS], True)
+        diff_vector = np.hstack([position_diff, velocity_diff, rot_diff.as_rotvec()])
+        return diff_vector if self.with_altitude else self.TRANSFORM_2D_3D * diff_vector
+
     def position_error_jacobian(self, pva, imu_to_antenna_b=None):
         """Compute position error Jacobian matrix.
 
