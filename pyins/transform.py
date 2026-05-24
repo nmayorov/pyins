@@ -535,3 +535,17 @@ def mat_to_rph(mat):
         Roll, pitch and heading angles.
     """
     return Rotation.from_matrix(mat).as_euler('xyz', degrees=True)
+
+
+def compute_mean_pva(trajectory, weights=None):
+    """Compute weighted mean lla."""
+    if weights is None:
+        weights = np.ones(len(trajectory), dtype=float)
+    weights = np.asarray(weights, dtype=float) / np.sum(weights)
+    position_e = lla_to_ecef(trajectory[LLA_COLS])
+    mean_lla = ecef_to_lla(np.sum(weights[:, None] * position_e, axis=0))
+    mean_velocity_n = np.sum(weights[:, None] * trajectory[VEL_COLS].values, axis=0)
+    mean_rpy = (Rotation.from_euler('xyz', trajectory[RPH_COLS], True)
+                .mean(weights).as_euler('xyz', True))
+    return pd.Series(data=np.hstack([mean_lla, mean_velocity_n, mean_rpy]),
+                     index=util.TRAJECTORY_COLS)
