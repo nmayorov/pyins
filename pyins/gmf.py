@@ -7,10 +7,14 @@ import scipy.stats
 
 from . import inertial_sensor, kalman, util, strapdown, transform
 from .error_model import InsErrorModel
-from .util import (THETA_COLS, DV_COLS)
-from ._filter_common import (interpolate_pva, initialize_covariance,
-                             compute_error_propagation_matrices, compute_sd,
-                             correct_increments)
+from .util import THETA_COLS, DV_COLS
+from ._filter_common import (
+    interpolate_pva,
+    initialize_covariance,
+    compute_error_propagation_matrices,
+    compute_sd,
+    correct_increments,
+)
 
 
 @dataclass
@@ -22,10 +26,26 @@ class FilterState:
     P: np.ndarray
 
 
-def run_gmf(initial_pva, position_sd, velocity_sd, level_sd,
-            increments, n_components=12, critical_sigma=3.0, gyro_model=None,
-            accel_model=None,
-            measurements=None, time_step=0.1, with_altitude=True):
+@dataclass
+class GmfSettings:
+    n_components = 12
+    minimal_relative_weight = 0.01
+    critical_sigma = 3.0
+
+
+def run_gaussian_mixture_filter(
+    initial_pva,
+    position_sd,
+    velocity_sd,
+    level_sd,
+    increments,
+    settings=GmfSettings(),
+    gyro_model=None,
+    accel_model=None,
+    measurements=None,
+    time_step=0.1,
+    with_altitude=True,
+):
     """Run navigation filter with feedback corrections.
 
     Also known as extended Kalman filter (EKF).
@@ -40,12 +60,10 @@ def run_gmf(initial_pva, position_sd, velocity_sd, level_sd,
         Initial assumed velocity standard deviation in m/s.
     level_sd : float
         Initial assumed roll and pitch standard deviation in degrees.
-    azimuth_sd : float
-        Initial assumed heading standard deviation in degrees.
     increments : Increments
         IMU increments.
-    n_components : int
-        Number of components in Gaussian mixture for initial heading estimation.
+    settings : GmfSettings, optional
+        Settings of Gaussian Mixture Filter algorithm.
     gyro_model, accel_model : `pyins.inertial_sensor.EstimationModel`, optional
         Sensor models for gyros and accelerometers.
         If None (default), default models will be used.
@@ -74,7 +92,7 @@ def run_gmf(initial_pva, position_sd, velocity_sd, level_sd,
             For each measurement class name contains DataFrame with normalized
             measurement innovations.
     """
-    critical_p = 2 * scipy.stats.norm.cdf(critical_sigma) - 1
+    critical_p = 2 * scipy.stats.norm.cdf(settings.critical_sigma) - 1
 
     error_model = InsErrorModel(with_altitude)
     if gyro_model is None:
@@ -84,38 +102,49 @@ def run_gmf(initial_pva, position_sd, velocity_sd, level_sd,
     if measurements is None:
         measurements = []
 
-    measurement_times = np.hstack([
-        np.asarray(measurement.data.index) for measurement in measurements])
+    measurement_times = np.hstack(
+        [np.asarray(measurement.data.index) for measurement in measurements]
+    )
     measurement_times = np.sort(np.unique(measurement_times))
 
     start_time = initial_pva.name
     end_time = increments.index[-1]
-    measurement_times = measurement_times[(measurement_times >= start_time) &
-                                          (measurement_times <= end_time)]
+    measurement_times = measurement_times[
+        (measurement_times >= start_time) & (measurement_times <= end_time)
+    ]
     measurement_times = np.append(measurement_times, np.inf)
     measurement_time_index = 0
 
-    heading_section_width = 360 / n_components
-    azimuth_sd = heading_section_width / 12 ** 0.5
+    heading_section_width = 360 / settings.n_components
+    azimuth_sd = heading_section_width / 12**0.5
 
     gyro_model.reset_estimates()
     accel_model.reset_estimates()
 
     time = initial_pva.name
     states = []
-    for start in np.linspace(0, 360, n_components, endpoint=False):
+    for start in np.linspace(0, 360, settings.n_components, endpoint=False):
         initial_pva = initial_pva.copy()
         initial_pva.heading = start + 0.5 * heading_section_width
 
-        states.append(FilterState(
-            weight=1 / n_components,
-            integrator=strapdown.Integrator(initial_pva, with_altitude),
-            gyro_model=deepcopy(gyro_model),
-            accel_model=deepcopy(accel_model),
-            P=initialize_covariance(initial_pva, position_sd, velocity_sd, level_sd,
-                                    azimuth_sd, error_model, gyro_model,
-                                    accel_model)
-        ))
+        states.append(
+            FilterState(
+                weight=1 / settings.n_components,
+                integrator=strapdown.Integrator(initial_pva, with_altitude),
+                gyro_model=deepcopy(gyro_model),
+                accel_model=deepcopy(accel_model),
+                P=initialize_covariance(
+                    initial_pva,
+                    position_sd,
+                    velocity_sd,
+                    level_sd,
+                    azimuth_sd,
+                    error_model,
+                    gyro_model,
+                    accel_model,
+                ),
+            )
+        )
 
     ins_block = slice(error_model.n_states)
     gyro_block = slice(error_model.n_states, error_model.n_states + gyro_model.n_states)
@@ -142,27 +171,34 @@ def run_gmf(initial_pva, position_sd, velocity_sd, level_sd,
         increment = increments.iloc[increments_index]
         if measurement_time < increment.name:
             for state in states:
-                increment_corrected = correct_increments(increment,
-                                                         state.gyro_model,
-                                                         state.accel_model)
+                increment_corrected = correct_increments(
+                    increment, state.gyro_model, state.accel_model
+                )
                 x = np.zeros(n_states)
                 P = state.P
-                pva = pd.concat([
-                    state.integrator.predict(
-                        (measurement_time - time) / increment_corrected['dt'] *
-                        increment_corrected),
-                    pd.Series(increment[THETA_COLS].values / increment_corrected['dt'],
-                              index=['rate_x', 'rate_y', 'rate_z'])
-                ])
+                pva = pd.concat(
+                    [
+                        state.integrator.predict(
+                            (measurement_time - time)
+                            / increment_corrected["dt"]
+                            * increment_corrected
+                        ),
+                        pd.Series(
+                            increment[THETA_COLS].values / increment_corrected["dt"],
+                            index=["rate_x", "rate_y", "rate_z"],
+                        ),
+                    ]
+                )
                 for measurement in measurements:
-                    ret = measurement.compute_matrices(measurement_time, pva,
-                                                       error_model)
+                    ret = measurement.compute_matrices(
+                        measurement_time, pva, error_model
+                    )
                     if ret is not None:
                         z, H, R = ret
                         H_full = np.zeros((len(z), n_states))
                         H_full[:, ins_block] = H
                         x_new, P_new, innovation = kalman.correct(x, P, z, H_full, R)
-                        chi2 = np.sum(innovation ** 2)
+                        chi2 = np.sum(innovation**2)
                         p = scipy.stats.chi2.cdf(chi2, len(z))
                         if p < critical_p:
                             x = x_new
@@ -170,7 +206,8 @@ def run_gmf(initial_pva, position_sd, velocity_sd, level_sd,
                         state.weight *= np.exp(-0.5 * chi2)
 
                 state.integrator.set_pva(
-                    error_model.correct_pva(state.integrator.get_pva(), x[ins_block]))
+                    error_model.correct_pva(state.integrator.get_pva(), x[ins_block])
+                )
                 state.gyro_model.update_estimates(x[gyro_block])
                 state.accel_model.update_estimates(x[accel_block])
                 state.P = P
@@ -179,28 +216,46 @@ def run_gmf(initial_pva, position_sd, velocity_sd, level_sd,
             for state in states:
                 state.weight /= weight_sum
 
+            required_weight = settings.minimal_relative_weight / len(states)
+            states = [state for state in states if state.weight > required_weight]
             measurement_time_index += 1
 
         weights = [state.weight for state in states]
-        pvas = pd.DataFrame([state.integrator.get_pva() for state in states])
-        mean_pva = transform.compute_mean_state(pvas, weights)
-        gyro_states = pd.DataFrame(
-            [state.gyro_model.get_estimates() for state in states])
-        mean_gyro_state = transform.compute_mean_state(gyro_states, weights)
-        accel_states = pd.DataFrame(
-            [state.accel_model.get_estimates() for state in states])
-        mean_accel_state = transform.compute_mean_state(accel_states, weights)
+        if len(states) == 1:
+            state = states[0]
+            mean_pva = state.integrator.get_pva()
+            mean_gyro_state = state.gyro_model.get_estimates()
+            mean_accel_state = state.accel_model.get_estimates()
+            P_total = state.P
+        else:
+            pvas = pd.DataFrame([state.integrator.get_pva() for state in states])
+            mean_pva = transform.compute_mean_state(pvas, weights)
+            gyro_states = pd.DataFrame(
+                [state.gyro_model.get_estimates() for state in states]
+            )
+            mean_gyro_state = transform.compute_mean_state(gyro_states, weights)
+            accel_states = pd.DataFrame(
+                [state.accel_model.get_estimates() for state in states]
+            )
+            mean_accel_state = transform.compute_mean_state(accel_states, weights)
 
-        Ps = [state.P for state in states]
-        P_total = np.zeros((n_states, n_states))
-        for weight, P, (_, pva), (_, gyro_state), (_, accel_state) in zip(
-                weights, Ps, pvas.iterrows(),
+            Ps = [state.P for state in states]
+            P_total = np.zeros((n_states, n_states))
+            for weight, P, (_, pva), (_, gyro_state), (_, accel_state) in zip(
+                weights,
+                Ps,
+                pvas.iterrows(),
                 gyro_states.iterrows(),
-                accel_states.iterrows()):
-            diff_vector = np.hstack([error_model.subtract_pva(pva, mean_pva),
-                                     gyro_state - mean_gyro_state,
-                                     accel_state - mean_accel_state])
-            P_total += weight * (P + np.outer(diff_vector, diff_vector))
+                accel_states.iterrows(),
+            ):
+                diff_vector = np.hstack(
+                    [
+                        error_model.subtract_pva(pva, mean_pva),
+                        gyro_state - mean_gyro_state,
+                        accel_state - mean_accel_state,
+                    ]
+                )
+                P_total += weight * (P + np.outer(diff_vector, diff_vector))
 
         times_result.append(time)
         weights_result.append(weights)
@@ -209,38 +264,46 @@ def run_gmf(initial_pva, position_sd, velocity_sd, level_sd,
         accel_result.append(mean_accel_state)
         P_result.append(P_total)
 
-        next_time = min(time + time_step,
-                        measurement_times[measurement_time_index])
-        next_increment_index = np.searchsorted(increments.index, next_time,
-                                               side='right')
+        next_time = min(time + time_step, measurement_times[measurement_time_index])
+        next_increment_index = np.searchsorted(
+            increments.index, next_time, side="right"
+        )
         if next_increment_index == increments_index:
             next_increment_index += 1
-        increments_batch = increments.iloc[increments_index: next_increment_index]
+        increments_batch = increments.iloc[increments_index:next_increment_index]
         increments_index = next_increment_index
 
         for state in states:
-            increments_batch_corrected = correct_increments(increments_batch,
-                                                            state.gyro_model,
-                                                            state.accel_model)
+            increments_batch_corrected = correct_increments(
+                increments_batch, state.gyro_model, state.accel_model
+            )
             pva_old = state.integrator.get_pva()
             state.integrator.integrate(increments_batch_corrected)
             pva_new = state.integrator.get_pva()
             time_delta = state.integrator.get_time() - time
             pva_average = interpolate_pva(pva_old, pva_new, 0.5)
-            gyro_average = increments_batch_corrected[THETA_COLS].sum(
-                axis=0) / time_delta
+            gyro_average = (
+                increments_batch_corrected[THETA_COLS].sum(axis=0) / time_delta
+            )
             accel_average = increments_batch_corrected[DV_COLS].sum(axis=0) / time_delta
 
             Phi, Qd = compute_error_propagation_matrices(
-                pva_average, gyro_average, accel_average, time_delta,
-                error_model, state.gyro_model, state.accel_model)
+                pva_average,
+                gyro_average,
+                accel_average,
+                time_delta,
+                error_model,
+                state.gyro_model,
+                state.accel_model,
+            )
             state.P = Phi @ state.P @ Phi.transpose() + Qd
 
         time = states[0].integrator.get_time()
 
     trajectory = pd.DataFrame(pva_result, times_result)
-    trajectory_sd, gyro_sd, accel_sd = compute_sd(np.asarray(P_result), trajectory,
-                                                  error_model, gyro_model, accel_model)
+    trajectory_sd, gyro_sd, accel_sd = compute_sd(
+        np.asarray(P_result), trajectory, error_model, gyro_model, accel_model
+    )
 
     return util.Bunch(
         weights=pd.Series(weights_result, times_result),
@@ -250,4 +313,5 @@ def run_gmf(initial_pva, position_sd, velocity_sd, level_sd,
         gyro_sd=gyro_sd,
         accel=pd.DataFrame(accel_result, index=times_result),
         accel_sd=accel_sd,
-        innovations=innovations)
+        innovations=innovations,
+    )
