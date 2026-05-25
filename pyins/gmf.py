@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import scipy.stats
 
-from . import inertial_sensor, kalman, util, strapdown
+from . import inertial_sensor, kalman, util, strapdown, transform
 from .error_model import InsErrorModel
 from .util import (THETA_COLS, DV_COLS)
 from ._filter_common import (interpolate_pva, initialize_covariance,
@@ -121,15 +121,13 @@ def run_gmf(initial_pva, position_sd, velocity_sd, level_sd,
     gyro_block = slice(error_model.n_states, error_model.n_states + gyro_model.n_states)
     accel_block = slice(error_model.n_states + gyro_model.n_states, None)
 
-    del gyro_model
-    del accel_model
-
     n_states = len(states[0].P)
     times_result = []
-    weights = [[] for _ in range(n_components)]
-    gyro_result = [[] for _ in range(n_components)]
-    accel_result = [[] for _ in range(n_components)]
-    P_result = [[] for _ in range(n_components)]
+    weights_result = []
+    pva_result = []
+    gyro_result = []
+    accel_result = []
+    P_result = []
 
     innovations = {}
     innovations_times = {}
@@ -183,12 +181,33 @@ def run_gmf(initial_pva, position_sd, velocity_sd, level_sd,
 
             measurement_time_index += 1
 
+        weights = [state.weight for state in states]
+        pvas = pd.DataFrame([state.integrator.get_pva() for state in states])
+        mean_pva = transform.compute_mean_state(pvas, weights)
+        gyro_states = pd.DataFrame(
+            [state.gyro_model.get_estimates() for state in states])
+        mean_gyro_state = transform.compute_mean_state(gyro_states, weights)
+        accel_states = pd.DataFrame(
+            [state.accel_model.get_estimates() for state in states])
+        mean_accel_state = transform.compute_mean_state(accel_states, weights)
+
+        Ps = [state.P for state in states]
+        P_total = np.zeros((n_states, n_states))
+        for weight, P, (_, pva), (_, gyro_state), (_, accel_state) in zip(
+                weights, Ps, pvas.iterrows(),
+                gyro_states.iterrows(),
+                accel_states.iterrows()):
+            diff_vector = np.hstack([error_model.subtract_pva(pva, mean_pva),
+                                     gyro_state - mean_gyro_state,
+                                     accel_state - mean_accel_state])
+            P_total += weight * (P + np.outer(diff_vector, diff_vector))
+
         times_result.append(time)
-        for i, state in enumerate(states):
-            weights[i].append(state.weight)
-            gyro_result[i].append(state.gyro_model.get_estimates())
-            accel_result[i].append(state.accel_model.get_estimates())
-            P_result[i].append(state.P)
+        weights_result.append(weights)
+        pva_result.append(mean_pva)
+        gyro_result.append(mean_gyro_state)
+        accel_result.append(mean_accel_state)
+        P_result.append(P_total)
 
         next_time = min(time + time_step,
                         measurement_times[measurement_time_index])
@@ -219,20 +238,16 @@ def run_gmf(initial_pva, position_sd, velocity_sd, level_sd,
 
         time = states[0].integrator.get_time()
 
-    result = []
-    for i in range(n_components):
-        state = states[i]
-        trajectory_sd, gyro_sd, accel_sd = compute_sd(
-            np.asarray(P_result[i]), state.integrator.trajectory.loc[times_result],
-            error_model, state.gyro_model, state.accel_model)
-        result.append(util.Bunch(
-            weights=pd.Series(weights[i], times_result),
-            trajectory=state.integrator.trajectory,
-            trajectory_sd=trajectory_sd,
-            gyro=pd.DataFrame(gyro_result[i], index=times_result),
-            gyro_sd=gyro_sd,
-            accel=pd.DataFrame(accel_result[i], index=times_result),
-            accel_sd=accel_sd,
-            innovations=innovations))
+    trajectory = pd.DataFrame(pva_result, times_result)
+    trajectory_sd, gyro_sd, accel_sd = compute_sd(np.asarray(P_result), trajectory,
+                                                  error_model, gyro_model, accel_model)
 
-    return result
+    return util.Bunch(
+        weights=pd.Series(weights_result, times_result),
+        trajectory=trajectory,
+        trajectory_sd=trajectory_sd,
+        gyro=pd.DataFrame(gyro_result, index=times_result),
+        gyro_sd=gyro_sd,
+        accel=pd.DataFrame(accel_result, index=times_result),
+        accel_sd=accel_sd,
+        innovations=innovations)
