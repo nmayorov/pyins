@@ -308,7 +308,8 @@ class InsErrorModel:
                     Rotation.from_euler('xyz', left[RPH_COLS], True).inv())
         position_diff = transform.compute_lla_difference(
             left[LLA_COLS], right[LLA_COLS])
-        velocity_diff = left[VEL_COLS] - rot_diff.apply(right[VEL_COLS], True)
+        velocity_diff = left[VEL_COLS] - rot_diff.apply(right[VEL_COLS].values.copy(),
+                                                        True)
         diff_vector = np.hstack([position_diff, velocity_diff, rot_diff.as_rotvec()])
         return diff_vector if self.with_altitude else self.TRANSFORM_2D_3D * diff_vector
 
