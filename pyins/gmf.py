@@ -29,8 +29,9 @@ class FilterState:
 @dataclass
 class GmfSettings:
     n_components = 12
-    minimal_relative_weight = 0.01
     critical_sigma = 3.0
+    minimal_relative_weight = 0.01
+    components_collapse_threshold = 0.3
 
 
 def run_gaussian_mixture_filter(
@@ -240,7 +241,9 @@ def run_gaussian_mixture_filter(
             mean_accel_state = transform.compute_mean_state(accel_states, weights)
 
             Ps = [state.P for state in states]
-            P_total = np.zeros((n_states, n_states))
+
+            P_components = np.zeros((n_states, n_states))
+            P_spread = np.zeros((n_states, n_states))
             for weight, P, (_, pva), (_, gyro_state), (_, accel_state) in zip(
                 weights,
                 Ps,
@@ -255,7 +258,21 @@ def run_gaussian_mixture_filter(
                         accel_state - mean_accel_state,
                     ]
                 )
-                P_total += weight * (P + np.outer(diff_vector, diff_vector))
+                P_components += weight * P
+                P_spread += weight * np.outer(diff_vector, diff_vector)
+
+            P_total = P_components + P_spread
+            if all(
+                np.diag(P_spread) ** 0.5
+                < settings.components_collapse_threshold * np.diag(P_total) ** 0.5
+            ):
+                state = states[0]
+                state.weight = 1.0
+                state.integrator.set_pva(mean_pva)
+                state.gyro_model.set_estimates(mean_gyro_state)
+                state.accel_model.set_estimates(mean_accel_state)
+                state.P = P_total
+                states = [state]
 
         times_result.append(time)
         weights_result.append(weights)

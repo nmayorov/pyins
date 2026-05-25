@@ -226,6 +226,18 @@ class EstimationModel:
                                  (1 if axis_out == axis_in else 0))
         return pd.Series(estimates, index=self.states)
 
+    def set_estimates(self, estimates):
+        for state in self.states:
+            items = state.split("_")
+            if items[0] == 'bias':
+                axis = XYZ_TO_INDEX[items[1]]
+                self.bias[axis] = estimates[state]
+            elif items[0] == 'sm':
+                axis_out = XYZ_TO_INDEX[items[1][0]]
+                axis_in = XYZ_TO_INDEX[items[1][1]]
+                self.transform[axis_out, axis_in] = ((1 if axis_out == axis_in else 0)
+                                                     + estimates[state])
+
 
 class Parameters:
     """Parameters of inertial sensor triad (gyros or accelerometers).
