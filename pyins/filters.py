@@ -7,12 +7,18 @@ functionality provided by `pyins.inertial_sensor`, `pyins.error_model` and
 
 Refer to [1]_ for the discussion of Kalman filtering in context of inertial navigation.
 
+Classes
+-------
+.. autosummary::
+    :toctree: generated/
+
+    GmfSettings
+
 Functions
 ---------
 .. autosummary::
     :toctree: generated/
 
-    GmfSettings
     run_feedback_filter
     run_feedforward_filter
 
