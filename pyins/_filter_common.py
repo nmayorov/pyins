@@ -2,20 +2,24 @@ import numpy as np
 import pandas as pd
 from scipy.spatial.transform import Rotation
 from . import kalman, util, earth, transform
-from .util import (LLA_COLS, VEL_COLS, RPH_COLS, THETA_COLS, DV_COLS,
+from .util import (VEL_COLS, RPH_COLS, THETA_COLS, DV_COLS, TRAJECTORY_COLS,
                    TRAJECTORY_ERROR_COLS)
 
 
 def interpolate_pva(first, second, alpha):
-    rot_1 = Rotation.from_euler('xyz', first[RPH_COLS], True)
-    rot_2 = Rotation.from_euler('xyz', second[RPH_COLS], True)
-    rph_average = pd.Series(Rotation.concatenate([rot_1, rot_2])
-                            .mean([1 - alpha, alpha]).as_euler('xyz', True), RPH_COLS)
-    return pd.concat([
-        (1 - alpha) * first[LLA_COLS] + alpha * second[LLA_COLS],
-        (1 - alpha) * first[VEL_COLS] + alpha * second[VEL_COLS],
-        rph_average
-    ])
+    first = first.values
+    second = second.values
+    rot_1 = Rotation.from_euler('xyz', first[-3:], True)
+    rot_2 = Rotation.from_euler('xyz', second[-3:], True)
+    rph_average = (
+        Rotation.concatenate([rot_1, rot_2])
+        .mean([1 - alpha, alpha])
+        .as_euler("xyz", True)
+    )
+    return pd.Series(
+        np.hstack([(1 - alpha) * first[:-3] + alpha * second[:-3], rph_average]),
+        index=TRAJECTORY_COLS,
+    )
 
 
 def initialize_covariance(pva, pos_sd, vel_sd, level_sd, azimuth_sd,

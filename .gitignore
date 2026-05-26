@@ -1,5 +1,6 @@
 build
 dist
+scripts
 .idea
 *.egg-info
 examples/.ipynb_checkpoints
