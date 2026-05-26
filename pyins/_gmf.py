@@ -51,18 +51,16 @@ class GmfSettings:
         Weight threshold for component removal. If component weight becomes less
         that `minimal_relative_weight / n_components` the component is removed
         from the mixture.
-    components_collapse_threshold:
-        Threshold for collapsing the mixture to a single component.
-        When the per-variable standard deviation from inter-component spread is less
-        than this fraction of the total standard deviation for all state variables,
-        all components are merged into one. Prevents the filter from maintaining several
-        essentially identical components unnecessarily.
+    heading_accuracy_for_collapse:
+        If total heading accuracy becomes less than this value, all the components
+        are collapsed into one. It prevents the filter from maintaining several
+        very similar components unnecessarily.
     """
 
     n_components = 12
     critical_sigma = 3.0
     minimal_relative_weight = 0.01
-    components_collapse_threshold = 0.3
+    heading_accuracy_for_collapse = 5.0
 
 
 def run_gaussian_mixture_filter(
@@ -281,8 +279,7 @@ def run_gaussian_mixture_filter(
 
             Ps = [state.P for state in states]
 
-            P_components = np.zeros((n_states, n_states))
-            P_spread = np.zeros((n_states, n_states))
+            P_total = np.zeros((n_states, n_states))
             for weight, P, (_, pva), (_, gyro_state), (_, accel_state) in zip(
                 weights,
                 Ps,
@@ -297,13 +294,11 @@ def run_gaussian_mixture_filter(
                         accel_state - mean_accel_state,
                     ]
                 )
-                P_components += weight * P
-                P_spread += weight * np.outer(diff_vector, diff_vector)
+                P_total += weight * (P + np.outer(diff_vector, diff_vector))
 
-            P_total = P_components + P_spread
-            if all(
-                np.diag(P_spread) ** 0.5
-                < settings.components_collapse_threshold * np.diag(P_total) ** 0.5
+            if (
+                P_total[error_model.PHI3, error_model.PHI3]
+                < (settings.heading_accuracy_for_collapse * transform.DEG_TO_RAD) ** 2
             ):
                 state = states[0]
                 state.weight = 1.0
