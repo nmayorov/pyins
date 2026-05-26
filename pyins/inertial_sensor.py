@@ -200,17 +200,12 @@ class EstimationModel:
                 self.transform[axis_out, axis_in] += xi
 
     def correct_increments(self, dt, increments):
-        if isinstance(increments, pd.DataFrame):
-            dt = np.asarray(dt).reshape(-1, 1)
-        corrected = np.linalg.solve(self.transform,
-                                    (increments.values - self.bias * dt).T).T
-        if isinstance(increments, pd.DataFrame):
-            return pd.DataFrame(corrected, index=increments.index,
-                                columns=increments.columns)
-        elif isinstance(increments, pd.Series):
-            return pd.Series(corrected, index=increments.index, name=increments.name)
+        if increments.ndim == 1:
+            return np.linalg.solve(self.transform, increments - self.bias * dt)
         else:
-            assert False
+            return np.linalg.solve(
+                self.transform, increments.T - self.bias[:, None] * dt
+            ).T
 
     def get_estimates(self):
         estimates = []

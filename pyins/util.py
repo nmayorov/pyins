@@ -27,6 +27,7 @@ DV_COLS = ['dv_x', 'dv_y', 'dv_z']
 NED_COLS = ["north", "east", "down"]
 TRAJECTORY_COLS = LLA_COLS + VEL_COLS + RPH_COLS
 TRAJECTORY_ERROR_COLS = NED_COLS + VEL_COLS + RPH_COLS
+INCREMENT_COLS = ["dt"] + THETA_COLS + DV_COLS
 XYZ_TO_INDEX = {'x': 0, 'y': 1, 'z': 2}
 INDEX_TO_XYZ = {0: 'x', 1: 'y', 2: 'z'}
 

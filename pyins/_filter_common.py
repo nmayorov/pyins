@@ -196,11 +196,22 @@ def compute_feedforward_result(
 
 
 def correct_increments(increments, gyro_model, accel_model):
-    result = increments.copy()
-    result[THETA_COLS] = gyro_model.correct_increments(
-        increments["dt"], increments[THETA_COLS]
-    )
-    result[DV_COLS] = accel_model.correct_increments(
-        increments["dt"], increments[DV_COLS]
-    )
-    return result
+    dt = increments["dt"]
+    if isinstance(dt, pd.Series):
+        dt = dt.values
+    theta = gyro_model.correct_increments(dt, increments[THETA_COLS].values)
+    dv = accel_model.correct_increments(dt, increments[DV_COLS].values)
+    if isinstance(increments, pd.DataFrame):
+        return pd.DataFrame(
+            data=np.hstack([dt[:, None], theta, dv]),
+            index=increments.index,
+            columns=util.INCREMENT_COLS,
+        )
+    elif isinstance(increments, pd.Series):
+        return pd.Series(
+            data=np.hstack([dt, theta, dv]),
+            index=util.INCREMENT_COLS,
+            name=increments.name,
+        )
+    else:
+        assert False
