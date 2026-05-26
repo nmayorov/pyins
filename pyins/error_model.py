@@ -324,9 +324,20 @@ class InsErrorModel:
         return pd.Series(data=np.hstack((lla, velocity_n, rph)), index=pva.index)
 
     def subtract_pva(self, left, right):
-        """Subtract two PVA.
+        """Subtract two position-velocity-attitude instances.
 
+        This is essentially the inverse of `correct_pva`.
         The result is returned as error vector in internal format.
+
+        Parameters
+        ----------
+        left, right : Pva
+            Position-velocity-attitude.
+
+        Returns
+        -------
+        ndarray, shape (9,) or (7,)
+            Computed difference.
         """
         left = left.values
         right = right.values
