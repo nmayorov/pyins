@@ -58,6 +58,7 @@ class GmfSettings:
         all components are merged into one. Prevents the filter from maintaining several
         essentially identical components unnecessarily.
     """
+
     n_components = 12
     critical_sigma = 3.0
     minimal_relative_weight = 0.01
@@ -228,13 +229,14 @@ def run_gaussian_mixture_filter(
                         z, H, R = ret
                         H_full = np.zeros((len(z), n_states))
                         H_full[:, ins_block] = H
-                        x_new, P_new, innovation, _ = kalman.correct(x, P, z, H_full, R)
+                        x_new, P_new, innovation, evidence = kalman.correct(
+                            x, P, z, H_full, R
+                        )
                         chi2 = np.sum(innovation**2)
-                        p = scipy.stats.chi2.cdf(chi2, len(z))
-                        if p < critical_p:
+                        if scipy.stats.chi2.cdf(chi2, len(z)) < critical_p:
                             x = x_new
                             P = P_new
-                        state.weight *= np.exp(-0.5 * chi2)
+                        state.weight *= evidence
 
                 state.integrator.set_pva(
                     error_model.correct_pva(state.integrator.get_pva(), x[ins_block])
