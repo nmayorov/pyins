@@ -71,12 +71,12 @@ def run_gaussian_mixture_filter(
     velocity_sd,
     level_sd,
     increments,
-    settings=GmfSettings(),
     gyro_model=None,
     accel_model=None,
     measurements=None,
     time_step=0.1,
     with_altitude=True,
+    settings=GmfSettings(),
 ):
     """Run navigation filter with feedback corrections.
 

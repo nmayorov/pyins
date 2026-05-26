@@ -113,13 +113,13 @@ def run_feedback_filter(
             position_sd,
             velocity_sd,
             level_sd,
-            azimuth_sd,
-            gmf_settings,
+            increments,
             gyro_model,
             accel_model,
             measurements,
             time_step,
             with_altitude,
+            gmf_settings,
         )
 
     error_model = InsErrorModel(with_altitude)
