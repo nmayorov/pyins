@@ -37,8 +37,10 @@ def test_gravity():
 
 def test_gravity_n():
     assert_allclose(earth.gravity_n(0, 0), [0, 0, earth.GE])
-    assert_allclose(earth.gravity_n([0, 90, -90], 0),
-                    [[0, 0, earth.GE], [0, 0, earth.GP], [0, 0, earth.GP]])
+    assert_allclose(
+        earth.gravity_n([0, 90, -90], 0),
+        [[0, 0, earth.GE], [0, 0, earth.GP], [0, 0, earth.GP]],
+    )
 
 
 def test_gravitation_ecef():
@@ -48,12 +50,15 @@ def test_gravitation_ecef():
 
     g = earth.gravity(0, 0)
     g0_e = earth.gravitation_ecef([0, 90, 0])
-    assert_allclose(g0_e, [0, -g - earth.RATE ** 2 * earth.A, 0], atol=1e-12)
+    assert_allclose(g0_e, [0, -g - earth.RATE**2 * earth.A, 0], atol=1e-12)
 
-    g0_true = [[0, 0, -earth.gravity(90, 100)],
-               [0, -earth.gravity(0, 0) - earth.RATE ** 2 * earth.A, 0]]
-    assert_allclose(earth.gravitation_ecef([[90, 0, 100], [0, 90, 0]]),
-                    g0_true, atol=1e-12)
+    g0_true = [
+        [0, 0, -earth.gravity(90, 100)],
+        [0, -earth.gravity(0, 0) - earth.RATE**2 * earth.A, 0],
+    ]
+    assert_allclose(
+        earth.gravitation_ecef([[90, 0, 100], [0, 90, 0]]), g0_true, atol=1e-12
+    )
 
 
 def test_curvature_matrix():
@@ -69,12 +74,15 @@ def test_curvature_matrix():
     assert_allclose(F @ dr_n, rot_n1_n2, rtol=1e-5)
 
     F = F[None, :, :]
-    assert_allclose(earth.curvature_matrix([lla_0[0], lla_0[0]], [lla_0[1], lla_0[1]]),
-                    np.vstack((F, F)))
+    assert_allclose(
+        earth.curvature_matrix([lla_0[0], lla_0[0]], [lla_0[1], lla_0[1]]),
+        np.vstack((F, F)),
+    )
 
 
 def test_rate_n():
     assert_allclose(earth.rate_n(0), [earth.RATE, 0, 0], atol=1e-20)
     assert_allclose(earth.rate_n(90), [0, 0, -earth.RATE], atol=1e-20)
-    assert_allclose(earth.rate_n([0, 90]), [[earth.RATE, 0, 0], [0, 0, -earth.RATE]],
-                    atol=1e-20)
+    assert_allclose(
+        earth.rate_n([0, 90]), [[earth.RATE, 0, 0], [0, 0, -earth.RATE]], atol=1e-20
+    )

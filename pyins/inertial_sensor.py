@@ -21,6 +21,7 @@ Functions
 
     apply_imu_parameters
 """
+
 import pandas as pd
 import numpy as np
 from scipy._lib._util import check_random_state
@@ -58,6 +59,7 @@ class EstimationModel:
         Standard deviations of matrix elements which represent sensor triad
         scale factor errors and misalignment.
     """
+
     MAX_STATES = 12
     MAX_NOISES = 3
     MAX_OUTPUT_NOISES = 3
@@ -70,7 +72,8 @@ class EstimationModel:
 
         if np.any(bias_walk[bias_sd <= 0] > 0):
             raise ValueError(
-                "``bias_walk` can be enabled only for axes where `bias_sd` is positive")
+                "``bias_walk` can be enabled only for axes where `bias_sd` is positive"
+            )
 
         F = np.zeros((self.MAX_STATES, self.MAX_STATES))
         G = np.zeros((self.MAX_STATES, self.MAX_NOISES))
@@ -109,7 +112,8 @@ class EstimationModel:
                     scale_misal_states.append(n_states)
                     P[n_states, n_states] = scale_misal_sd[output_axis, input_axis] ** 2
                     states.append(
-                        f"sm_{INDEX_TO_XYZ[output_axis]}{INDEX_TO_XYZ[input_axis]}")
+                        f"sm_{INDEX_TO_XYZ[output_axis]}{INDEX_TO_XYZ[input_axis]}"
+                    )
                     n_states += 1
 
         n_output_noises = 0
@@ -167,8 +171,10 @@ class EstimationModel:
             return self.H
 
         if readings is None:
-            raise ValueError("`readings` are required when scale factor and "
-                             "misalignment errors are modeled.")
+            raise ValueError(
+                "`readings` are required when scale factor and "
+                "misalignment errors are modeled."
+            )
 
         readings = np.asarray(readings)
         output_axes, input_axes, states = self._scale_misal_data
@@ -187,14 +193,15 @@ class EstimationModel:
 
     def update_estimates(self, x):
         if len(x) != len(self.states):
-            raise ValueError("`x` must have the same length as `states` from the "
-                             "constructor")
+            raise ValueError(
+                "`x` must have the same length as `states` from the constructor"
+            )
         for state, xi in zip(self.states, x):
             items = state.split("_")
-            if items[0] == 'bias':
+            if items[0] == "bias":
                 axis = XYZ_TO_INDEX[items[1]]
                 self.bias[axis] += xi
-            elif items[0] == 'sm':
+            elif items[0] == "sm":
                 axis_out = XYZ_TO_INDEX[items[1][0]]
                 axis_in = XYZ_TO_INDEX[items[1][1]]
                 self.transform[axis_out, axis_in] += xi
@@ -211,27 +218,30 @@ class EstimationModel:
         estimates = []
         for state in self.states:
             items = state.split("_")
-            if items[0] == 'bias':
+            if items[0] == "bias":
                 axis = XYZ_TO_INDEX[items[1]]
                 estimates.append(self.bias[axis])
-            elif items[0] == 'sm':
+            elif items[0] == "sm":
                 axis_out = XYZ_TO_INDEX[items[1][0]]
                 axis_in = XYZ_TO_INDEX[items[1][1]]
-                estimates.append(self.transform[axis_out, axis_in] -
-                                 (1 if axis_out == axis_in else 0))
+                estimates.append(
+                    self.transform[axis_out, axis_in]
+                    - (1 if axis_out == axis_in else 0)
+                )
         return pd.Series(estimates, index=self.states)
 
     def set_estimates(self, estimates):
         for state in self.states:
             items = state.split("_")
-            if items[0] == 'bias':
+            if items[0] == "bias":
                 axis = XYZ_TO_INDEX[items[1]]
                 self.bias[axis] = estimates[state]
-            elif items[0] == 'sm':
+            elif items[0] == "sm":
                 axis_out = XYZ_TO_INDEX[items[1][0]]
                 axis_in = XYZ_TO_INDEX[items[1][1]]
-                self.transform[axis_out, axis_in] = ((1 if axis_out == axis_in else 0)
-                                                     + estimates[state])
+                self.transform[axis_out, axis_in] = (
+                    1 if axis_out == axis_in else 0
+                ) + estimates[state]
 
 
 class Parameters:
@@ -274,12 +284,14 @@ class Parameters:
         containing non-zero parameters of IMU in the format consistent
         with `pyins.filters` results.
     """
+
     def __init__(self, transform=None, bias=None, noise=None, bias_walk=None, rng=None):
-        self.transform = self._verify_parameter(transform, 'transform', (3, 3), False,
-                                                np.eye(3))
-        self.bias = self._verify_parameter(bias, 'bias', (3,), False)
-        self.noise = self._verify_parameter(noise, 'noise', (3,), True)
-        self.bias_walk = self._verify_parameter(bias_walk, 'bias_walk', (3,), True)
+        self.transform = self._verify_parameter(
+            transform, "transform", (3, 3), False, np.eye(3)
+        )
+        self.bias = self._verify_parameter(bias, "bias", (3,), False)
+        self.noise = self._verify_parameter(noise, "noise", (3,), True)
+        self.bias_walk = self._verify_parameter(bias_walk, "bias_walk", (3,), True)
         self.rng = check_random_state(rng)
         self.data_frame = None
 
@@ -337,14 +349,15 @@ class Parameters:
         """
         dt = np.hstack([0, np.diff(readings.index)])[:, None]
         bias = self.bias + self.bias_walk * np.cumsum(
-            self.rng.randn(*readings.shape) * dt ** 0.5, axis=0)
+            self.rng.randn(*readings.shape) * dt**0.5, axis=0
+        )
 
         dt[0, 0] = dt[1, 0]
         result = util.mv_prod(self.transform, readings)
-        if sensor_type == 'rate':
+        if sensor_type == "rate":
             result += bias
             result += self.noise * dt**-0.5 * self.rng.randn(*readings.shape)
-        elif sensor_type == 'increment':
+        elif sensor_type == "increment":
             result += bias * dt
             result += self.noise * dt**0.5 * self.rng.randn(*readings.shape)
         else:
@@ -353,14 +366,15 @@ class Parameters:
         self.data_frame = pd.DataFrame(index=readings.index)
         for axis in range(3):
             if self.bias[axis] != 0 or self.bias_walk[axis] != 0:
-                self.data_frame[f'bias_{INDEX_TO_XYZ[axis]}'] = bias[:, axis]
+                self.data_frame[f"bias_{INDEX_TO_XYZ[axis]}"] = bias[:, axis]
         for axis_out in range(3):
             for axis_in in range(3):
                 nominal = 1 if axis_out == axis_in else 0
                 actual = self.transform[axis_out, axis_in]
                 if actual != nominal:
-                    self.data_frame[(f"sm_{INDEX_TO_XYZ[axis_out]}"
-                                    f"{INDEX_TO_XYZ[axis_in]}")] = actual - nominal
+                    self.data_frame[
+                        (f"sm_{INDEX_TO_XYZ[axis_out]}{INDEX_TO_XYZ[axis_in]}")
+                    ] = actual - nominal
 
         return pd.DataFrame(data=result, index=readings.index, columns=readings.columns)
 
@@ -389,6 +403,10 @@ def apply_imu_parameters(imu, sensor_type, gyro_parameters=None, accel_parameter
     if accel_parameters is None:
         accel_parameters = Parameters()
 
-    return pd.concat([gyro_parameters.apply(imu[GYRO_COLS], sensor_type),
-                      accel_parameters.apply(imu[ACCEL_COLS], sensor_type)],
-                     axis='columns')
+    return pd.concat(
+        [
+            gyro_parameters.apply(imu[GYRO_COLS], sensor_type),
+            accel_parameters.apply(imu[ACCEL_COLS], sensor_type),
+        ],
+        axis="columns",
+    )

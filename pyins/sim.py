@@ -23,14 +23,23 @@ Classes
 
     Turntable
 """
+
 import numpy as np
 import pandas as pd
 from scipy.interpolate import CubicSpline, CubicHermiteSpline
 from scipy.spatial.transform import Rotation, RotationSpline
 from scipy._lib._util import check_random_state
 from . import earth, transform, util
-from .util import (LLA_COLS, VEL_COLS, RPH_COLS, NED_COLS, GYRO_COLS, ACCEL_COLS,
-                   TRAJECTORY_COLS, TRAJECTORY_ERROR_COLS)
+from .util import (
+    LLA_COLS,
+    VEL_COLS,
+    RPH_COLS,
+    NED_COLS,
+    GYRO_COLS,
+    ACCEL_COLS,
+    TRAJECTORY_COLS,
+    TRAJECTORY_ERROR_COLS,
+)
 
 
 def _compute_increment_readings(dt, a, b, c, d, e):
@@ -65,10 +74,8 @@ def _compute_increment_readings(dt, a, b, c, d, e):
     f[1] = e - ad
     f[2] = -ae - bd + 0.5 * np.cross(a, ad)
     f[3] = -be - cd + 0.5 * (np.cross(a, ae + bd) + np.cross(b, ad))
-    f[4] = -ce + 0.5 * (np.cross(a, be + cd) + np.cross(b, ae + bd) +
-                        np.cross(c, ad))
-    f[5] = 0.5 * (np.cross(a, ce) + np.cross(b, be + cd) +
-                  np.cross(c, ae + bd))
+    f[4] = -ce + 0.5 * (np.cross(a, be + cd) + np.cross(b, ae + bd) + np.cross(c, ad))
+    f[5] = 0.5 * (np.cross(a, ce) + np.cross(b, be + cd) + np.cross(c, ae + bd))
     f[6] = 0.5 * (np.cross(b, ce) + np.cross(c, be + cd))
     f[7] = 0.5 * np.cross(c, ce)
 
@@ -80,7 +87,7 @@ def _compute_increment_readings(dt, a, b, c, d, e):
     return gyros, accels
 
 
-def generate_imu(time, lla, rph, velocity_n=None, sensor_type='rate'):
+def generate_imu(time, lla, rph, velocity_n=None, sensor_type="rate"):
     """Generate IMU readings from the trajectory.
 
     Attitude angles (`rph`) must be always given and there are 3 options for
@@ -117,13 +124,14 @@ def generate_imu(time, lla, rph, velocity_n=None, sensor_type='rate'):
     MAX_ITER = 3
     ACCURACY = 0.01
 
-    if sensor_type not in ['rate', 'increment']:
+    if sensor_type not in ["rate", "increment"]:
         raise ValueError("`sensor_type` must be 'rate' or 'increment'.")
 
     lla = np.asarray(lla)
     if lla.ndim == 1 and velocity_n is None:
-        raise ValueError("`velocity_n` must be provided when `lla` contains only "
-                         "initial values")
+        raise ValueError(
+            "`velocity_n` must be provided when `lla` contains only initial values"
+        )
 
     n_points = len(time)
     if lla.ndim == 1:
@@ -163,7 +171,8 @@ def generate_imu(time, lla, rph, velocity_n=None, sensor_type='rate'):
     if velocity_n is None:
         v_i_spline = CubicSpline(time, r_i).derivative()
         velocity_n = util.mv_prod(
-            mat_in, v_i_spline(time) - np.cross(earth_rate_i, r_i), True)
+            mat_in, v_i_spline(time) - np.cross(earth_rate_i, r_i), True
+        )
     else:
         v_i = util.mv_prod(mat_in, velocity_n) + np.cross(earth_rate_i, r_i)
         v_i_spline = CubicHermiteSpline(time, r_i, v_i).derivative()
@@ -172,10 +181,10 @@ def generate_imu(time, lla, rph, velocity_n=None, sensor_type='rate'):
     rot_ib_spline = RotationSpline(time, Rotation.from_matrix(mat_ib))
     g_i = earth.gravitation_ecef(lla_inertial)
 
-    if sensor_type == 'rate':
+    if sensor_type == "rate":
         gyro = rot_ib_spline(time, 1)
         accel = util.mv_prod(mat_ib, v_i_spline(time, 1) - g_i, at=True)
-    elif sensor_type == 'increment':
+    elif sensor_type == "increment":
         dt = np.diff(time)[:, None]
 
         a = rot_ib_spline.interpolator.c[2]
@@ -195,18 +204,27 @@ def generate_imu(time, lla, rph, velocity_n=None, sensor_type='rate'):
     else:
         assert False
 
-    index = pd.Index(time, name='time')
-    return (pd.DataFrame(np.hstack([lla, velocity_n, rph]),
-                         index=index, columns=TRAJECTORY_COLS),
-            pd.DataFrame(data=np.hstack((gyro, accel)), index=index,
-                         columns=GYRO_COLS + ACCEL_COLS))
+    index = pd.Index(time, name="time")
+    return (
+        pd.DataFrame(
+            np.hstack([lla, velocity_n, rph]), index=index, columns=TRAJECTORY_COLS
+        ),
+        pd.DataFrame(
+            data=np.hstack((gyro, accel)), index=index, columns=GYRO_COLS + ACCEL_COLS
+        ),
+    )
 
 
-def generate_sine_velocity_motion(dt, total_time, lla0, velocity_mean,
-                                  velocity_change_amplitude=0,
-                                  velocity_change_period=60,
-                                  velocity_change_phase_offset=[0, 90, 0],
-                                  sensor_type='rate'):
+def generate_sine_velocity_motion(
+    dt,
+    total_time,
+    lla0,
+    velocity_mean,
+    velocity_change_amplitude=0,
+    velocity_change_period=60,
+    velocity_change_phase_offset=[0, 90, 0],
+    sensor_type="rate",
+):
     """Generate trajectory with NED velocity changing as sine.
 
     The NED velocity changes as::
@@ -248,13 +266,16 @@ def generate_sine_velocity_motion(dt, total_time, lla0, velocity_mean,
         is duplicated for more convenient future processing.
     """
     time = np.arange(0, total_time, dt)
-    phase = (2 * np.pi * time[:, None] / velocity_change_period +
-             np.deg2rad(velocity_change_phase_offset))
-    velocity_n = (np.atleast_2d(velocity_mean) +
-                  np.atleast_2d(velocity_change_amplitude) * np.sin(phase))
+    phase = 2 * np.pi * time[:, None] / velocity_change_period + np.deg2rad(
+        velocity_change_phase_offset
+    )
+    velocity_n = np.atleast_2d(velocity_mean) + np.atleast_2d(
+        velocity_change_amplitude
+    ) * np.sin(phase)
     rph = np.zeros_like(velocity_n)
-    rph[:, 1] = np.rad2deg(np.arctan2(
-        velocity_n[:, 2], np.hypot(velocity_n[:, 0], velocity_n[:, 1])))
+    rph[:, 1] = np.rad2deg(
+        np.arctan2(velocity_n[:, 2], np.hypot(velocity_n[:, 0], velocity_n[:, 1]))
+    )
     rph[:, 2] = np.rad2deg(np.arctan2(velocity_n[:, 1], velocity_n[:, 0]))
     return generate_imu(time, lla0, rph, velocity_n, sensor_type)
 
@@ -339,8 +360,9 @@ def generate_body_velocity_measurements(trajectory, error_sd, rng=None):
     error = error_sd * rng.randn(len(trajectory), 3)
     mat_nb = transform.mat_from_rph(trajectory[RPH_COLS])
     velocity_b = util.mv_prod(mat_nb, trajectory[VEL_COLS], at=True) + error
-    return pd.DataFrame(data=velocity_b, index=trajectory.index,
-                        columns=['VX', 'VY', 'VZ'])
+    return pd.DataFrame(
+        data=velocity_b, index=trajectory.index, columns=["VX", "VY", "VZ"]
+    )
 
 
 def generate_pva_error(position_sd, velocity_sd, level_sd, azimuth_sd, rng=None):
@@ -438,10 +460,17 @@ class Turntable:
         Default angular acceleration to reach the target angular rate in deg/s^2.
         Default is 20 deg/s^2.
     """
+
     EXTRA_REST = 0.1
 
-    def __init__(self, table_lla, table_rph=np.zeros(3), axes_non_orthogonality=0,
-                 angular_rate=20, angular_acceleration=20):
+    def __init__(
+        self,
+        table_lla,
+        table_rph=np.zeros(3),
+        axes_non_orthogonality=0,
+        angular_rate=20,
+        angular_acceleration=20,
+    ):
         self.table_lla = table_lla
         self.table_rph = table_rph
         self.axes_non_orthogonality = axes_non_orthogonality
@@ -452,8 +481,9 @@ class Turntable:
         self.time = 0
         self.actions = []
 
-    def rotate(self, axis, angle, angular_rate=None, angular_acceleration=None,
-               label=None):
+    def rotate(
+        self, axis, angle, angular_rate=None, angular_acceleration=None, label=None
+    ):
         """Rotate the table around the inner or the outer axis.
 
         Parameters
@@ -471,7 +501,7 @@ class Turntable:
         label : string or None, optional
             Text label to mark this stage. If None (default), generate it automatically.
         """
-        if axis not in ['inner', 'outer']:
+        if axis not in ["inner", "outer"]:
             raise ValueError("`axis` must be 'inner' or 'outer'")
         if angular_rate is None:
             angular_rate = self.angular_rate
@@ -481,15 +511,18 @@ class Turntable:
             label = f"rotation_{axis}_{angle}"
 
         angular_rate = min(angular_rate, (abs(angle) * angular_acceleration) ** 0.5)
-        time = (angular_rate / angular_acceleration + np.abs(angle) / angular_rate
-                + 2 * self.EXTRA_REST)
+        time = (
+            angular_rate / angular_acceleration
+            + np.abs(angle) / angular_rate
+            + 2 * self.EXTRA_REST
+        )
         self.actions.append(
-            ('rotate', axis, time, angle, angular_rate, angular_acceleration, label)
+            ("rotate", axis, time, angle, angular_rate, angular_acceleration, label)
         )
 
-        if axis == 'inner':
+        if axis == "inner":
             self.inner_angle += angle
-        elif axis == 'outer':
+        elif axis == "outer":
             self.outer_angle += angle
         else:
             assert False
@@ -507,10 +540,10 @@ class Turntable:
         """
         if label is None:
             label = f"rest_{time}"
-        self.actions.append(('rest', time, label))
+        self.actions.append(("rest", time, label))
         self.time += time
 
-    def generate_imu(self, dt, sensor_type='rate'):
+    def generate_imu(self, dt, sensor_type="rate"):
         """Generate trajectory and IMU data.
 
         Parameters
@@ -542,9 +575,10 @@ class Turntable:
         outer_angle = 0
 
         for action in self.actions:
-            if action[0] == 'rotate':
-                (_, axis, period, angle, angular_rate, angular_acceleration,
-                 label) = action
+            if action[0] == "rotate":
+                (_, axis, period, angle, angular_rate, angular_acceleration, label) = (
+                    action
+                )
                 time_mask = (times >= time) & (times < time + period)
                 t = times[time_mask] - time
 
@@ -557,28 +591,34 @@ class Turntable:
                 mask = t < self.EXTRA_REST
                 angles[mask] = 0
                 mask = (t >= self.EXTRA_REST) & (t < self.EXTRA_REST + ta)
-                angles[mask] = (0.5 * angular_acceleration
-                                * (t[mask] - self.EXTRA_REST) ** 2)
+                angles[mask] = (
+                    0.5 * angular_acceleration * (t[mask] - self.EXTRA_REST) ** 2
+                )
                 mask = (t >= self.EXTRA_REST + ta) & (t < self.EXTRA_REST + ta + tc)
-                angles[mask] = (0.5 * angular_rate * ta + angular_rate
-                                * (t[mask] - ta - self.EXTRA_REST))
-                mask = ((t >= self.EXTRA_REST + ta + tc)
-                        & (t < self.EXTRA_REST + 2 * ta + tc))
-                angles[mask] = (angular_rate * (ta + tc)
-                                - 0.5 * angular_acceleration
-                                * (t[mask] - period + self.EXTRA_REST) ** 2)
+                angles[mask] = 0.5 * angular_rate * ta + angular_rate * (
+                    t[mask] - ta - self.EXTRA_REST
+                )
+                mask = (t >= self.EXTRA_REST + ta + tc) & (
+                    t < self.EXTRA_REST + 2 * ta + tc
+                )
+                angles[mask] = (
+                    angular_rate * (ta + tc)
+                    - 0.5
+                    * angular_acceleration
+                    * (t[mask] - period + self.EXTRA_REST) ** 2
+                )
                 mask = t >= self.EXTRA_REST + 2 * ta + tc
                 angles[mask] = angular_rate * (ta + tc)
 
-                if axis == 'inner':
+                if axis == "inner":
                     inner_angles[time_mask] = inner_angle + sign * angles
                     outer_angles[time_mask] = outer_angle
                     inner_angle += sign * angle
-                elif axis == 'outer':
+                elif axis == "outer":
                     inner_angles[time_mask] = inner_angle
                     outer_angles[time_mask] = outer_angle + sign * angles
                     outer_angle += sign * angle
-            elif action[0] == 'rest':
+            elif action[0] == "rest":
                 (_, period, label) = action
                 time_mask = (times >= time) & (times < time + period)
                 inner_angles[time_mask] = inner_angle
@@ -589,14 +629,18 @@ class Turntable:
             labels[time_mask] = label
             time += period
 
-        rot_nt0 = Rotation.from_euler('xyz', self.table_rph, True)
-        rot_tm0 = Rotation.from_euler('y', self.axes_non_orthogonality, True)
-        rot_t0t = Rotation.from_euler('x', outer_angles[:, None], True)
-        rot_m0m = Rotation.from_euler('z', inner_angles[:, None], True)
+        rot_nt0 = Rotation.from_euler("xyz", self.table_rph, True)
+        rot_tm0 = Rotation.from_euler("y", self.axes_non_orthogonality, True)
+        rot_t0t = Rotation.from_euler("x", outer_angles[:, None], True)
+        rot_m0m = Rotation.from_euler("z", inner_angles[:, None], True)
         rot_nm = rot_nt0 * rot_t0t * rot_tm0 * rot_m0m
 
         table_lla = np.asarray(self.table_lla, dtype=float)
-        trajectory, imu = generate_imu(times, np.resize(table_lla, (len(times), 3)),
-                                       rot_nm.as_euler('xyz', True),
-                                       np.zeros((len(times), 3)), sensor_type)
+        trajectory, imu = generate_imu(
+            times,
+            np.resize(table_lla, (len(times), 3)),
+            rot_nm.as_euler("xyz", True),
+            np.zeros((len(times), 3)),
+            sensor_type,
+        )
         return trajectory, imu, labels

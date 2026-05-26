@@ -31,12 +31,14 @@ def test_ecef_to_lla():
     lla = transform.ecef_to_lla([0, 0, -earth.A * (1 - earth.E2) ** 0.5])
     assert_allclose(lla, [-90, 0, 0])
 
-    lla = transform.ecef_to_lla([
-        [earth.A, 0, 0],
-        [0, earth.A, 0],
-        [0, 0, earth.A * (1 - earth.E2) ** 0.5],
-        [0, 0, -earth.A * (1 - earth.E2) ** 0.5]
-    ])
+    lla = transform.ecef_to_lla(
+        [
+            [earth.A, 0, 0],
+            [0, earth.A, 0],
+            [0, 0, earth.A * (1 - earth.E2) ** 0.5],
+            [0, 0, -earth.A * (1 - earth.E2) ** 0.5],
+        ]
+    )
     assert_allclose(lla, [[0, 0, 0], [0, 90, 0], [90, 0, 0], [-90, 0, 0]])
 
 
@@ -84,7 +86,7 @@ def test_perturb_ll():
 def test_translate_trajectory():
     traj, imu = sim.generate_sine_velocity_motion(0.1, 60, [10, 20, -3], [5, 7, 3])
     traj_new = transform.translate_trajectory(traj, [10, -20, 5])
-    mat_nb = Rotation.from_euler('xyz', traj[RPH_COLS], degrees=True).as_matrix()
+    mat_nb = Rotation.from_euler("xyz", traj[RPH_COLS], degrees=True).as_matrix()
     ned = util.mv_prod(mat_nb, [10, -20, 5])
     lla = transform.perturb_lla(traj[LLA_COLS], ned)
     assert_allclose(traj_new[LLA_COLS], lla, rtol=1e-11)
@@ -115,9 +117,11 @@ def test_compute_lla_difference():
 
 def test_resample_state():
     traj, _ = sim.generate_sine_velocity_motion(
-        0.02, 60.01, [40, -50, 100], [5, -7, 0], velocity_change_amplitude=[10, 15, 2])
+        0.02, 60.01, [40, -50, 100], [5, -7, 0], velocity_change_amplitude=[10, 15, 2]
+    )
     ref_traj, _ = sim.generate_sine_velocity_motion(
-        0.01, 60.01, [40, -50, 100], [5, -7, 0], velocity_change_amplitude=[10, 15, 2])
+        0.01, 60.01, [40, -50, 100], [5, -7, 0], velocity_change_amplitude=[10, 15, 2]
+    )
     test_traj = transform.resample_state(traj, ref_traj.index)
 
     assert_allclose(test_traj.lat, ref_traj.lat)
@@ -130,9 +134,11 @@ def test_resample_state():
 
 def test_compute_state_difference():
     traj1, _ = sim.generate_sine_velocity_motion(
-        0.02, 60.01, [40, -50, 100], [5, -7, 0], velocity_change_amplitude=[10, 15, 2])
+        0.02, 60.01, [40, -50, 100], [5, -7, 0], velocity_change_amplitude=[10, 15, 2]
+    )
     traj2, _ = sim.generate_sine_velocity_motion(
-        0.01, 60.01, [40, -50, 100], [5, -7, 0], velocity_change_amplitude=[10, 15, 2])
+        0.01, 60.01, [40, -50, 100], [5, -7, 0], velocity_change_amplitude=[10, 15, 2]
+    )
     traj2 = traj2.iloc[1::2]
     traj2[LLA_COLS] = transform.perturb_lla(traj2[LLA_COLS], [-3, 5, 7])
     traj2[VEL_COLS] += [1, -2, 3]
@@ -148,11 +154,14 @@ def test_mat_en_from_ll():
     A1 = np.eye(3)
     A2 = np.array([[0, 0, -1], [0, 1, 0], [1, 0, 0]])
 
-    assert_allclose(transform.mat_en_from_ll(-90, 0), A1,
-                    rtol=1e-10, atol=1e-10)
+    assert_allclose(transform.mat_en_from_ll(-90, 0), A1, rtol=1e-10, atol=1e-10)
     assert_allclose(transform.mat_en_from_ll(0, 0), A2, rtol=1e-10, atol=1e-10)
-    assert_allclose(transform.mat_en_from_ll([-90, 0], [0, 0]),
-                    np.stack([A1, A2]), rtol=1e-10, atol=1e-10)
+    assert_allclose(
+        transform.mat_en_from_ll([-90, 0], [0, 0]),
+        np.stack([A1, A2]),
+        rtol=1e-10,
+        atol=1e-10,
+    )
 
 
 def test_mat_from_rph():
@@ -181,11 +190,11 @@ def test_mat_to_rph():
     np.random.seed(0)
     for i in range(10):
         rph = 30 * np.random.randn(3)
-        mat = Rotation.from_euler('xyz', rph, degrees=True).as_matrix()
+        mat = Rotation.from_euler("xyz", rph, degrees=True).as_matrix()
         assert_allclose(transform.mat_to_rph(mat), rph)
 
     rph = 30 * np.random.randn(10, 3)
-    mat = Rotation.from_euler('xyz', rph, degrees=True).as_matrix()
+    mat = Rotation.from_euler("xyz", rph, degrees=True).as_matrix()
     assert_allclose(transform.mat_to_rph(mat), rph)
 
 
@@ -199,11 +208,13 @@ def test_smooth_rotations():
 
         steady_time = total_time - 2 * (rest_time + raise_time)
         mask = (time >= rest_time + raise_time) & (
-                    time < rest_time + raise_time + steady_time)
+            time < rest_time + raise_time + steady_time
+        )
         result[mask] = 1.0
 
         mask = (time >= rest_time + raise_time + steady_time) & (
-                    time < total_time - rest_time)
+            time < total_time - rest_time
+        )
         result[mask] = (-time[mask] + (total_time - rest_time)) / raise_time
 
         return result
@@ -219,24 +230,30 @@ def test_smooth_rotations():
     rph[:, 1] = 70 * envelope * np.cos(2 * np.pi * time / 10)
     rph[:, 2] = 90 * envelope * np.sin(2 * np.pi * time / 20)
 
-    rotations = Rotation.from_euler('xyz', rph, True)
-    smoothed_rotation, num_taps = transform.smooth_rotations(rotations, dt,
-                                                             smoothing_time)
+    rotations = Rotation.from_euler("xyz", rph, True)
+    smoothed_rotation, num_taps = transform.smooth_rotations(
+        rotations, dt, smoothing_time
+    )
     rph[:, 0] = 0.0
-    rotations_expected = Rotation.from_euler('xyz', rph, True)
-    rotation_diff = (smoothed_rotation[num_taps - 1:] *
-                     rotations_expected[num_taps // 2:-(num_taps // 2)].inv())
+    rotations_expected = Rotation.from_euler("xyz", rph, True)
+    rotation_diff = (
+        smoothed_rotation[num_taps - 1 :]
+        * rotations_expected[num_taps // 2 : -(num_taps // 2)].inv()
+    )
     assert np.max(rotation_diff.magnitude()) < 0.4 * transform.DEG_TO_RAD
 
 
 def test_smooth_state():
     trajectory, _ = sim.generate_sine_velocity_motion(
-        0.1, 600.0, [55, 37, 150], [1, 2, -0.1], 0.5, 1)
+        0.1, 600.0, [55, 37, 150], [1, 2, -0.1], 0.5, 1
+    )
     trajectory_smoothed = transform.smooth_state(trajectory, 10)
     trajectory_expected, _ = sim.generate_sine_velocity_motion(
-        0.1, 600.0, [55, 37, 150], [1, 2, -0.1])
-    difference = transform.compute_state_difference(trajectory_smoothed,
-                                                    trajectory_expected)
+        0.1, 600.0, [55, 37, 150], [1, 2, -0.1]
+    )
+    difference = transform.compute_state_difference(
+        trajectory_smoothed, trajectory_expected
+    )
     assert difference[NED_COLS].abs().max(None) < 0.1
     assert difference[VEL_COLS].abs().max(None) < 5e-5
     assert difference[RPH_COLS].abs().max(None) < 0.7

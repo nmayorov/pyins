@@ -78,7 +78,19 @@ References
        Navigation Systems", 2nd edition
 .. [2] P\. S\. Maybeck, "Stochastic Models, Estimation and Control", volume 1
 """
-from . import (earth, error_model, filters, inertial_sensor, kalman, measurements, sim,
-               strapdown, transform, util, gmf)
+
+from . import (
+    earth,
+    error_model,
+    filters,
+    inertial_sensor,
+    kalman,
+    measurements,
+    sim,
+    strapdown,
+    transform,
+    util,
+    gmf,
+)
 
 __version__ = "1.0"

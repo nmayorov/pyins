@@ -32,6 +32,7 @@ References
 .. [1] P. D. Groves, "Principles of GNSS, Inertial, and Multisensor Integrated
        Navigation Systems", 2nd edition
 """
+
 import numpy as np
 from . import transform, util
 
@@ -69,7 +70,7 @@ def principal_radii(lat, alt):
     sin_lat = np.sin(np.deg2rad(lat))
     cos_lat = np.sqrt(1 - sin_lat**2)
 
-    x = 1 - E2 * sin_lat ** 2
+    x = 1 - E2 * sin_lat**2
     re = A / np.sqrt(x)
     rn = re * (1 - E2) / x
 
@@ -93,8 +94,7 @@ def gravity(lat, alt):
     """
     sin_lat = np.sin(np.deg2rad(lat))
     alt = np.asarray(alt)
-    return (GE * (1 + F * sin_lat**2) / (1 - E2 * sin_lat**2) ** 0.5
-            * (1 - 2 * alt / A))
+    return GE * (1 + F * sin_lat**2) / (1 - E2 * sin_lat**2) ** 0.5 * (1 - 2 * alt / A)
 
 
 def gravity_n(lat, alt):
@@ -144,7 +144,7 @@ def gravitation_ecef(lla):
 
     g0_g = np.zeros((3,) + lat.shape)
     g0_g[0] = RATE**2 * rp * sin_lat
-    g0_g[2] = gravity(lat, alt) + RATE ** 2 * rp * cos_lat
+    g0_g[2] = gravity(lat, alt) + RATE**2 * rp * cos_lat
     g0_g = g0_g.T
 
     mat_eg = transform.mat_en_from_ll(lat, lon)

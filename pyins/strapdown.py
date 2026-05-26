@@ -27,6 +27,7 @@ References
        Design Part 2: Velocity and Position Algorithms", Journal of
        Guidance, Control, and Dynamics 1998, Vol. 21, no. 2.
 """
+
 import numpy as np
 import pandas as pd
 from . import transform
@@ -62,37 +63,39 @@ def compute_increments_from_imu(imu, sensor_type):
         DataFrame containing attitude and velocity increments with one less row than
         the passed `imu`.
     """
-    if sensor_type not in ['rate', 'increment']:
+    if sensor_type not in ["rate", "increment"]:
         raise ValueError("`sensor_type` must be either 'rate' or 'increment'")
 
     gyro = imu[GYRO_COLS].values
-    accel = imu[ACCEL_COLS].values    
+    accel = imu[ACCEL_COLS].values
     dt = np.diff(imu.index).reshape(-1, 1)
-    if sensor_type == 'increment':
+    if sensor_type == "increment":
         gyro_increment = gyro[1:]
         accel_increment = accel[1:]
         coning = np.cross(gyro[:-1], gyro[1:]) / 12
-        sculling = (np.cross(gyro[:-1], accel[1:]) +
-                    np.cross(accel[:-1], gyro[1:])) / 12
-    elif sensor_type == 'rate':
+        sculling = (
+            np.cross(gyro[:-1], accel[1:]) + np.cross(accel[:-1], gyro[1:])
+        ) / 12
+    elif sensor_type == "rate":
         a_gyro = gyro[:-1]
         b_gyro = gyro[1:] - gyro[:-1]
         a_accel = accel[:-1]
         b_accel = accel[1:] - accel[:-1]
         gyro_increment = (a_gyro + 0.5 * b_gyro) * dt
         accel_increment = (a_accel + 0.5 * b_accel) * dt
-        coning = np.cross(a_gyro, b_gyro) * dt ** 2 / 12
-        sculling = (np.cross(a_gyro, b_accel) +
-                    np.cross(a_accel, b_gyro)) * dt ** 2 / 12
+        coning = np.cross(a_gyro, b_gyro) * dt**2 / 12
+        sculling = (np.cross(a_gyro, b_accel) + np.cross(a_accel, b_gyro)) * dt**2 / 12
     else:
         assert False
 
     theta = gyro_increment + coning
     dv = accel_increment + sculling + 0.5 * np.cross(gyro_increment, accel_increment)
 
-    return pd.DataFrame(data=np.hstack((dt, theta, dv)), index=imu.index[1:],
-                        columns=['dt', 'theta_x', 'theta_y', 'theta_z',
-                                 'dv_x', 'dv_y', 'dv_z'])
+    return pd.DataFrame(
+        data=np.hstack((dt, theta, dv)),
+        index=imu.index[1:],
+        columns=["dt", "theta_x", "theta_y", "theta_z", "dv_x", "dv_y", "dv_z"],
+    )
 
 
 class Integrator:
@@ -114,6 +117,7 @@ class Integrator:
     trajectory : Trajectory
         Computed trajectory so far.
     """
+
     INITIAL_SIZE = 10000
 
     def __init__(self, pva, with_altitude=True):
@@ -130,7 +134,7 @@ class Integrator:
         self.velocity_n[0] = self.initial_pva[VEL_COLS]
         self.mat_nb[0] = transform.mat_from_rph(self.initial_pva[RPH_COLS])
         self.trajectory = self.initial_pva.to_frame().transpose(copy=True)
-        self.trajectory.index.name = 'time'
+        self.trajectory.index.name = "time"
 
     def _integrate(self, increments, mode):
         n_data = len(self.trajectory)
@@ -144,21 +148,35 @@ class Integrator:
             self.velocity_n.resize((new_size, 3), refcheck=False)
             self.mat_nb.resize((new_size, 3, 3), refcheck=False)
 
-        theta = np.ascontiguousarray(increments[['theta_x', 'theta_y', 'theta_z']])
-        dv = np.ascontiguousarray(increments[['dv_x', 'dv_y', 'dv_z']])
-        integrate(np.asarray(increments.dt), self.lla, self.velocity_n,
-                  self.mat_nb, theta, dv, n_data - 1, self.with_altitude)
+        theta = np.ascontiguousarray(increments[["theta_x", "theta_y", "theta_z"]])
+        dv = np.ascontiguousarray(increments[["dv_x", "dv_y", "dv_z"]])
+        integrate(
+            np.asarray(increments.dt),
+            self.lla,
+            self.velocity_n,
+            self.mat_nb,
+            theta,
+            dv,
+            n_data - 1,
+            self.with_altitude,
+        )
         rph = transform.mat_to_rph(self.mat_nb[n_data : n_data + n_readings])
         trajectory = pd.DataFrame(
-            np.hstack([self.lla[n_data : n_data + n_readings],
-                       self.velocity_n[n_data : n_data + n_readings],
-                       rph]),
-            index=increments.index, columns=TRAJECTORY_COLS)
+            np.hstack(
+                [
+                    self.lla[n_data : n_data + n_readings],
+                    self.velocity_n[n_data : n_data + n_readings],
+                    rph,
+                ]
+            ),
+            index=increments.index,
+            columns=TRAJECTORY_COLS,
+        )
 
-        if mode == 'integrate':
+        if mode == "integrate":
             self.trajectory = pd.concat([self.trajectory, trajectory])
-            return self.trajectory.iloc[-n_readings - 1:]
-        elif mode == 'predict':
+            return self.trajectory.iloc[-n_readings - 1 :]
+        elif mode == "predict":
             return trajectory
         else:
             assert False
@@ -180,7 +198,7 @@ class Integrator:
             Added chunk of the trajectory including the last point before
             `increments` were integrated.
         """
-        return self._integrate(increments, 'integrate')
+        return self._integrate(increments, "integrate")
 
     def predict(self, increment):
         """Predict position-velocity-increment given a single increment.
@@ -197,7 +215,7 @@ class Integrator:
         Pva
             Predicted position-velocity-attitude.
         """
-        return self._integrate(increment.to_frame().transpose(), 'predict').iloc[0]
+        return self._integrate(increment.to_frame().transpose(), "predict").iloc[0]
 
     def get_time(self):
         """Get time of the latest position-velocity-attitude."""

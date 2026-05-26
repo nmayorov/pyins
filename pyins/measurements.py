@@ -37,6 +37,7 @@ References
        Navigation Systems", 2nd edition
 .. [2] P\. S\. Maybeck, "Stochastic Models, Estimation and Control", volume 1
 """
+
 import numpy as np
 from . import transform
 from .util import LLA_COLS, VEL_COLS, RPH_COLS, RATE_COLS
@@ -64,6 +65,7 @@ class Measurement:
     NedVelocity
     BodyVelocity
     """
+
     def __init__(self, data):
         self.data = data
 
@@ -116,6 +118,7 @@ class Position(Measurement):
     data : DataFrame
         Data saved from the constructor.
     """
+
     def __init__(self, data, sd, imu_to_antenna_b=None):
         super(Position, self).__init__(data[LLA_COLS])
         self.R = sd**2 * np.eye(3)
@@ -125,8 +128,9 @@ class Position(Measurement):
         if time not in self.data.index:
             return None
 
-        z = transform.compute_lla_difference(pva[LLA_COLS],
-                                             self.data.loc[time, LLA_COLS])
+        z = transform.compute_lla_difference(
+            pva[LLA_COLS], self.data.loc[time, LLA_COLS]
+        )
         if self.imu_to_antenna_b is not None:
             mat_nb = transform.mat_from_rph(pva[RPH_COLS])
             z += mat_nb @ self.imu_to_antenna_b
@@ -157,6 +161,7 @@ class NedVelocity(Measurement):
     data : DataFrame
         Data saved from the constructor.
     """
+
     def __init__(self, data, sd, imu_to_antenna_b=None):
         super(NedVelocity, self).__init__(data[VEL_COLS])
         self.R = sd**2 * np.eye(3)
@@ -195,8 +200,9 @@ class BodyVelocity(Measurement):
     data : DataFrame
         Data saved from the constructor.
     """
+
     def __init__(self, data, sd):
-        super(BodyVelocity, self).__init__(data[['VX', 'VY', 'VZ']])
+        super(BodyVelocity, self).__init__(data[["VX", "VY", "VZ"]])
         self.R = sd**2 * np.eye(3)
 
     def compute_matrices(self, time, pva, error_model):
@@ -204,6 +210,6 @@ class BodyVelocity(Measurement):
             return None
 
         mat_nb = transform.mat_from_rph(pva[RPH_COLS])
-        z = mat_nb.T @ pva[VEL_COLS] - self.data.loc[time, ['VX', 'VY', 'VZ']]
+        z = mat_nb.T @ pva[VEL_COLS] - self.data.loc[time, ["VX", "VY", "VZ"]]
         H = error_model.body_velocity_error_jacobian(pva)
         return z, H, self.R

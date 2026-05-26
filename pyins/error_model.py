@@ -22,12 +22,19 @@ Functions
 
     propagate_errors
 """
+
 import numpy as np
 import pandas as pd
 from scipy.spatial.transform import Rotation
 from . import earth, util, transform
-from .util import (LLA_COLS, VEL_COLS, RPH_COLS, RATE_COLS, NED_COLS,
-                   TRAJECTORY_ERROR_COLS)
+from .util import (
+    LLA_COLS,
+    VEL_COLS,
+    RPH_COLS,
+    RATE_COLS,
+    NED_COLS,
+    TRAJECTORY_ERROR_COLS,
+)
 
 
 def _phi_to_delta_rph(rph):
@@ -78,13 +85,23 @@ class InsErrorModel:
     .. [1] Bruno M. Scherzinger and D.Blake Reid "Modified Strapdown Inertial
            Navigator Error Models"
     """
+
     def __init__(self, with_altitude=True):
         self.with_altitude = with_altitude
         if with_altitude:
-            self.states = ['DR1', 'DR2', 'DR3', 'DV1', 'DV2', 'DV3',
-                           'PHI1', 'PHI2', 'PHI3']
+            self.states = [
+                "DR1",
+                "DR2",
+                "DR3",
+                "DV1",
+                "DV2",
+                "DV3",
+                "PHI1",
+                "PHI2",
+                "PHI3",
+            ]
         else:
-            self.states = ['DR1', 'DR2', 'DV1', 'DV2', 'PHI1', 'PHI2', 'PHI3']
+            self.states = ["DR1", "DR2", "DV1", "DV2", "PHI1", "PHI2", "PHI3"]
 
     DRN = 0
     DRE = 1
@@ -112,15 +129,17 @@ class InsErrorModel:
     DV = [DV1, DV2, DV3]
     PHI = [PHI1, PHI2, PHI3]
 
-    TRANSFORM_2D_3D = np.array([
-        [1, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 1, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 1, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 1, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 1, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 1, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 1],
-    ])
+    TRANSFORM_2D_3D = np.array(
+        [
+            [1, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 1, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 1, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 1, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 1, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 1, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 1],
+        ]
+    )
 
     def _transform_3d_2d(self, VN, VE):
         is_series = isinstance(VN, pd.Series)
@@ -184,11 +203,13 @@ class InsErrorModel:
         F[np.ix_(samples, self.DV, self.PHI)] = -util.skew_matrix(g_n)
         F[:, self.DV3, self.DR3] = 2 * earth.gravity(trajectory.lat, 0) / earth.A
 
-        F[np.ix_(samples, self.PHI, self.DR)] = util.mm_prod(util.skew_matrix(Omega_n),
-                                                             R)
+        F[np.ix_(samples, self.PHI, self.DR)] = util.mm_prod(
+            util.skew_matrix(Omega_n), R
+        )
         F[np.ix_(samples, self.PHI, self.DV)] = R
-        F[np.ix_(samples, self.PHI, self.PHI)] = (-util.skew_matrix(rho_n + Omega_n) +
-                                                  util.mm_prod(R, V_skew))
+        F[np.ix_(samples, self.PHI, self.PHI)] = -util.skew_matrix(
+            rho_n + Omega_n
+        ) + util.mm_prod(R, V_skew)
 
         B_gyro = np.zeros((n_samples, 9, 3))
         B_gyro[np.ix_(samples, self.DV, [0, 1, 2])] = util.mm_prod(V_skew, mat_nb)
@@ -222,9 +243,11 @@ class InsErrorModel:
         result[np.ix_(samples, cls.DR_OUT, cls.DR)] = np.eye(3)
         result[np.ix_(samples, cls.DV_OUT, cls.DV)] = np.eye(3)
         result[np.ix_(samples, cls.DV_OUT, cls.PHI)] = util.skew_matrix(
-            trajectory[VEL_COLS])
+            trajectory[VEL_COLS]
+        )
         result[np.ix_(samples, cls.DRPH, cls.PHI)] = _phi_to_delta_rph(
-            trajectory[RPH_COLS])
+            trajectory[RPH_COLS]
+        )
 
         if series:
             result = result[0]
@@ -249,8 +272,9 @@ class InsErrorModel:
         """
         result = self._transform_to_output_3d(trajectory)
         if not self.with_altitude:
-            result = util.mm_prod(result,
-                                  self._transform_3d_2d(trajectory.VN, trajectory.VE))
+            result = util.mm_prod(
+                result, self._transform_3d_2d(trajectory.VN, trajectory.VE)
+            )
         return result
 
     def transform_to_internal(self, pva):
@@ -306,8 +330,10 @@ class InsErrorModel:
         """
         left = left.values
         right = right.values
-        rot_diff = (Rotation.from_euler('xyz', right[6:], True) *
-                    Rotation.from_euler('xyz', left[6:], True).inv())
+        rot_diff = (
+            Rotation.from_euler("xyz", right[6:], True)
+            * Rotation.from_euler("xyz", left[6:], True).inv()
+        )
         position_diff = transform.compute_lla_difference(left[:3], right[:3])
         velocity_diff = left[3:6] - rot_diff.apply(right[3:6].copy(), True)
         diff_vector = np.hstack([position_diff, velocity_diff, rot_diff.as_rotvec()])
@@ -400,9 +426,13 @@ class InsErrorModel:
         return result
 
 
-def propagate_errors(trajectory, pva_error=None,
-                     gyro_error=np.zeros(3), accel_error=np.zeros(3),
-                     with_altitude=True):
+def propagate_errors(
+    trajectory,
+    pva_error=None,
+    gyro_error=np.zeros(3),
+    accel_error=np.zeros(3),
+    with_altitude=True,
+):
     """Deterministic linear propagation of INS errors.
 
     Parameters
@@ -433,8 +463,9 @@ def propagate_errors(trajectory, pva_error=None,
 
     gyro_error = util.mv_prod(Fig, gyro_error)
     accel_error = util.mv_prod(Fia, accel_error)
-    delta_sensor = 0.5 * (gyro_error[1:] + gyro_error[:-1] +
-                          accel_error[1:] + accel_error[:-1])
+    delta_sensor = 0.5 * (
+        gyro_error[1:] + gyro_error[:-1] + accel_error[1:] + accel_error[:-1]
+    )
 
     if pva_error is None:
         pva_error = pd.Series(data=np.zeros(9), index=TRAJECTORY_ERROR_COLS)
@@ -447,10 +478,12 @@ def propagate_errors(trajectory, pva_error=None,
     for i in range(n_samples - 1):
         x[i + 1] = Phi[i].dot(x[i]) + delta_sensor[i] * dt[i]
 
-    model_error = pd.DataFrame(data=x, index=trajectory.index,
-                               columns=error_model.states)
+    model_error = pd.DataFrame(
+        data=x, index=trajectory.index, columns=error_model.states
+    )
     T = error_model.transform_to_output(trajectory)
-    trajectory_error = pd.DataFrame(data=util.mv_prod(T, x), index=trajectory.index,
-                                    columns=TRAJECTORY_ERROR_COLS)
+    trajectory_error = pd.DataFrame(
+        data=util.mv_prod(T, x), index=trajectory.index, columns=TRAJECTORY_ERROR_COLS
+    )
 
     return trajectory_error, model_error

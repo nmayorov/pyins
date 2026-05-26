@@ -15,6 +15,7 @@ References
 ----------
 .. [1] P\. S\. Maybeck, "Stochastic Models, Estimation and Control", volume 1
 """
+
 import numpy as np
 from scipy.linalg import cholesky, cho_solve, solve_triangular, expm
 
@@ -85,5 +86,8 @@ def correct(x, P, z, H, R):
     K = cho_solve((L, True), HP, overwrite_b=True).T
     U = np.eye(len(x)) - K.dot(H)
 
-    return (x + K @ (z - H @ x), U.dot(P).dot(U.T) + K.dot(R).dot(K.T),
-            solve_triangular(L, e, lower=True))
+    return (
+        x + K @ (z - H @ x),
+        U.dot(P).dot(U.T) + K.dot(R).dot(K.T),
+        solve_triangular(L, e, lower=True),
+    )

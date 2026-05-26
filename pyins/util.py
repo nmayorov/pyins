@@ -12,24 +12,25 @@ Functions
     compute_rms
     to_180_range
 """
+
 import numpy as np
 import pandas as pd
 
 
-LLA_COLS = ['lat', 'lon', 'alt']
-VEL_COLS = ['VN', 'VE', 'VD']
-RPH_COLS = ['roll', 'pitch', 'heading']
-RATE_COLS = ['rate_x', 'rate_y', 'rate_z']
-GYRO_COLS = ['gyro_x', 'gyro_y', 'gyro_z']
-ACCEL_COLS = ['accel_x', 'accel_y', 'accel_z']
-THETA_COLS = ['theta_x', 'theta_y', 'theta_z']
-DV_COLS = ['dv_x', 'dv_y', 'dv_z']
+LLA_COLS = ["lat", "lon", "alt"]
+VEL_COLS = ["VN", "VE", "VD"]
+RPH_COLS = ["roll", "pitch", "heading"]
+RATE_COLS = ["rate_x", "rate_y", "rate_z"]
+GYRO_COLS = ["gyro_x", "gyro_y", "gyro_z"]
+ACCEL_COLS = ["accel_x", "accel_y", "accel_z"]
+THETA_COLS = ["theta_x", "theta_y", "theta_z"]
+DV_COLS = ["dv_x", "dv_y", "dv_z"]
 NED_COLS = ["north", "east", "down"]
 TRAJECTORY_COLS = LLA_COLS + VEL_COLS + RPH_COLS
 TRAJECTORY_ERROR_COLS = NED_COLS + VEL_COLS + RPH_COLS
 INCREMENT_COLS = ["dt"] + THETA_COLS + DV_COLS
-XYZ_TO_INDEX = {'x': 0, 'y': 1, 'z': 2}
-INDEX_TO_XYZ = {0: 'x', 1: 'y', 2: 'z'}
+XYZ_TO_INDEX = {"x": 0, "y": 1, "z": 2}
+INDEX_TO_XYZ = {0: "x", 1: "y", 2: "z"}
 
 
 def mm_prod(a, b, at=False, bt=False):
@@ -189,8 +190,9 @@ class Bunch(dict):
     def __repr__(self):
         if self.keys():
             m = max(map(len, list(self.keys()))) + 1
-            return '\n'.join(['{}: {}'.format(k.rjust(m), type(v))
-                              for k, v in self.items()])
+            return "\n".join(
+                ["{}: {}".format(k.rjust(m), type(v)) for k, v in self.items()]
+            )
         else:
             return self.__class__.__name__ + "()"
 

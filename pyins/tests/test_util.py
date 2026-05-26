@@ -52,25 +52,15 @@ def test_mv_prod():
 
     b = np.random.randn(10, 3)
     assert_allclose(util.mv_prod(a, b), (a @ b[:, :, None]).reshape(10, 3))
-    assert_allclose(util.mv_prod(a, b, at=True),
-                   (at @ b[:, :, None]).reshape(10, 3))
+    assert_allclose(util.mv_prod(a, b, at=True), (at @ b[:, :, None]).reshape(10, 3))
 
 
 def test_skew_matrix():
-    vec = np.array([
-        [0, 1, 2],
-        [-2, 3, 5]
-    ])
-    check = np.array([
-        [-2, 3, 6],
-        [0, -2, 3]
-    ])
-    assert_allclose(util.skew_matrix(vec[0]) @ check[0],
-                    np.cross(vec[0], check[0]))
-    assert_allclose(util.skew_matrix(vec[1]) @ check[1],
-                    np.cross(vec[1], check[1]))
-    assert_allclose(util.mv_prod(util.skew_matrix(vec), check),
-                    np.cross(vec, check))
+    vec = np.array([[0, 1, 2], [-2, 3, 5]])
+    check = np.array([[-2, 3, 6], [0, -2, 3]])
+    assert_allclose(util.skew_matrix(vec[0]) @ check[0], np.cross(vec[0], check[0]))
+    assert_allclose(util.skew_matrix(vec[1]) @ check[1], np.cross(vec[1], check[1]))
+    assert_allclose(util.mv_prod(util.skew_matrix(vec), check), np.cross(vec, check))
 
 
 def test_compute_rms():
@@ -99,11 +89,11 @@ def test_to_180_range():
 
 
 def test_bunch():
-    dict = {'a': 1, 'b': None, 'c': 3 * np.ones(3)}
+    dict = {"a": 1, "b": None, "c": 3 * np.ones(3)}
     bunch = util.Bunch(dict)
-    assert(bunch.a == 1)
-    assert(bunch.b == None)
-    assert((bunch.c == 3).all())
+    assert bunch.a == 1
+    assert bunch.b == None
+    assert (bunch.c == 3).all()
 
-    assert(dir(bunch) == ['a', 'b', 'c'])
-    assert(isinstance(repr(bunch), str))
+    assert dir(bunch) == ["a", "b", "c"]
+    assert isinstance(repr(bunch), str)

@@ -29,6 +29,7 @@ Functions
     mat_from_rph
     mat_to_rph
 """
+
 import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
@@ -120,7 +121,7 @@ def ecef_to_lla(r_e):
     zp = abs(z)
     w2 = w * w
     r2 = z * z + w2
-    r = r2 ** 0.5
+    r = r2**0.5
     s2 = z * z / r2
     c2 = w2 / r2
     u = a2 / r
@@ -251,11 +252,13 @@ def translate_trajectory(trajectory, translation_b):
     """
     mat_nb = mat_from_rph(trajectory[RPH_COLS])
     result = trajectory.copy()
-    result[LLA_COLS] = perturb_lla(result[LLA_COLS],
-                                   util.mv_prod(mat_nb, translation_b))
+    result[LLA_COLS] = perturb_lla(
+        result[LLA_COLS], util.mv_prod(mat_nb, translation_b)
+    )
     if all(col in trajectory for col in RATE_COLS):
-        result[VEL_COLS] += util.mv_prod(mat_nb,
-            np.cross(trajectory[RATE_COLS], translation_b))
+        result[VEL_COLS] += util.mv_prod(
+            mat_nb, np.cross(trajectory[RATE_COLS], translation_b)
+        )
     return result
 
 
@@ -277,8 +280,9 @@ def compute_lla_difference(lla1, lla2):
     single = lla1.ndim == 1 and lla2.ndim == 1
     lla1 = np.atleast_2d(lla1)
     lla2 = np.atleast_2d(lla2)
-    rn, _, rp = earth.principal_radii(0.5 * (lla1[:, 0] + lla2[:, 0]),
-                                      0.5 * (lla1[:, 2] + lla2[:, 2]))
+    rn, _, rp = earth.principal_radii(
+        0.5 * (lla1[:, 0] + lla2[:, 0]), 0.5 * (lla1[:, 2] + lla2[:, 2])
+    )
     diff = lla1 - lla2
     result = np.empty_like(diff)
     result[:, 0] = np.deg2rad(diff[:, 0]) * rn
@@ -319,8 +323,8 @@ def resample_state(state, times):
 
     result = pd.DataFrame(index=times)
     if _has_rph(state):
-        slerp = Slerp(state.index, Rotation.from_euler('xyz', state[RPH_COLS], True))
-        result[RPH_COLS] = slerp(times).as_euler('xyz', True)
+        slerp = Slerp(state.index, Rotation.from_euler("xyz", state[RPH_COLS], True))
+        result[RPH_COLS] = slerp(times).as_euler("xyz", True)
 
     other_columns = state.columns.difference(RPH_COLS)
     interpolator = interp1d(state.index, state[other_columns].values, axis=0)
@@ -369,14 +373,17 @@ def compute_state_difference(first, second):
 
     difference = first - second
     if _has_lla(difference):
-        rn, _, rp = earth.principal_radii(0.5 * (first.lat + second.lat),
-                                          0.5 * (first.alt + second.alt))
+        rn, _, rp = earth.principal_radii(
+            0.5 * (first.lat + second.lat), 0.5 * (first.alt + second.alt)
+        )
         difference.lat *= rn * DEG_TO_RAD
         difference.lon *= rp * DEG_TO_RAD
         difference.alt *= -1
-        difference.rename({'lat': 'north', 'lon': 'east', 'alt': 'down'},
-                          axis=1 if isinstance(difference, pd.DataFrame) else 0,
-                          inplace=True)
+        difference.rename(
+            {"lat": "north", "lon": "east", "alt": "down"},
+            axis=1 if isinstance(difference, pd.DataFrame) else 0,
+            inplace=True,
+        )
 
     if _has_rph(difference):
         difference[RPH_COLS] = util.to_180_range(difference[RPH_COLS])
@@ -425,7 +432,7 @@ def smooth_rotations(rotations, dt, smoothing_time):
     if rotations.single:
         raise ValueError("`rotations` must contain multiple rotations.")
     q = rotations.as_quat()
-    coefficients = np.einsum('...i,...j->...ij', q, q).reshape(-1, 16)
+    coefficients = np.einsum("...i,...j->...ij", q, q).reshape(-1, 16)
     coefficients, num_taps = _apply_smoothing(coefficients, dt, smoothing_time)
     _, v = np.linalg.eigh(coefficients.reshape(-1, 4, 4))
     return Rotation.from_quat(v[:, :, -1]), num_taps
@@ -462,17 +469,20 @@ def smooth_state(state, smoothing_time):
         Smoothed data.
     """
     dt = np.min(np.diff(state.index))
-    resampled_state = resample_state(state,
-                                     np.arange(state.index[0], state.index[-1], dt))
+    resampled_state = resample_state(
+        state, np.arange(state.index[0], state.index[-1], dt)
+    )
     smoothed = pd.DataFrame(index=resampled_state.index)
     if _has_rph(state):
-        rotations = Rotation.from_euler('xyz', resampled_state[RPH_COLS], True)
-        smoothed[RPH_COLS] = smooth_rotations(
-            rotations, dt, smoothing_time)[0].as_euler('xyz', True)
+        rotations = Rotation.from_euler("xyz", resampled_state[RPH_COLS], True)
+        smoothed[RPH_COLS] = smooth_rotations(rotations, dt, smoothing_time)[
+            0
+        ].as_euler("xyz", True)
     other_columns = state.columns.difference(RPH_COLS)
     smoothed[other_columns], num_taps = _apply_smoothing(
-        resampled_state[other_columns].values, dt, smoothing_time)
-    smoothed = smoothed.iloc[num_taps - 1:]
+        resampled_state[other_columns].values, dt, smoothing_time
+    )
+    smoothed = smoothed.iloc[num_taps - 1 :]
     smoothed.index -= dt * (num_taps // 2)
     return resample_state(smoothed[state.columns], state.index)
 
@@ -494,7 +504,7 @@ def mat_en_from_ll(lat, lon):
     lon = np.asarray(lon)
 
     if lat.ndim == 0 and lon.ndim == 0:
-        return Rotation.from_euler('ZY', [lon, -90 - lat], degrees=True).as_matrix()
+        return Rotation.from_euler("ZY", [lon, -90 - lat], degrees=True).as_matrix()
 
     lat = np.atleast_1d(lat)
     lon = np.atleast_1d(lon)
@@ -503,7 +513,7 @@ def mat_en_from_ll(lat, lon):
     angles = np.empty((n, 2))
     angles[:, 0] = lon
     angles[:, 1] = -90 - lat
-    return Rotation.from_euler('ZY', angles, degrees=True).as_matrix()
+    return Rotation.from_euler("ZY", angles, degrees=True).as_matrix()
 
 
 def mat_from_rph(rph):
@@ -519,7 +529,7 @@ def mat_from_rph(rph):
     ndarray, shape (3, 3) or (n, 3, 3)
         Rotation matrices.
     """
-    return Rotation.from_euler('xyz', rph, degrees=True).as_matrix()
+    return Rotation.from_euler("xyz", rph, degrees=True).as_matrix()
 
 
 def mat_to_rph(mat):
@@ -535,7 +545,7 @@ def mat_to_rph(mat):
     ndarray, with shape (3,) or (n, 3)
         Roll, pitch and heading angles.
     """
-    return Rotation.from_matrix(mat).as_euler('xyz', degrees=True)
+    return Rotation.from_matrix(mat).as_euler("xyz", degrees=True)
 
 
 def compute_mean_state(state, weights=None):
@@ -546,12 +556,26 @@ def compute_mean_state(state, weights=None):
     result = []
     if _has_lla(state):
         position_e = lla_to_ecef(state[LLA_COLS])
-        result.append(pd.Series(ecef_to_lla(
-            np.sum(weights[:, None] * position_e, axis=0)), index=LLA_COLS))
+        result.append(
+            pd.Series(
+                ecef_to_lla(np.sum(weights[:, None] * position_e, axis=0)),
+                index=LLA_COLS,
+            )
+        )
     if _has_rph(state):
-        result.append(pd.Series(Rotation.from_euler('xyz', state[RPH_COLS], True)
-                                .mean(weights).as_euler('xyz', True), index=RPH_COLS))
+        result.append(
+            pd.Series(
+                Rotation.from_euler("xyz", state[RPH_COLS], True)
+                .mean(weights)
+                .as_euler("xyz", True),
+                index=RPH_COLS,
+            )
+        )
     other_columns = state.columns.difference(LLA_COLS + RPH_COLS)
-    result.append(pd.Series(np.sum(weights[:, None] * state[other_columns].values,
-                                   axis=0), index=other_columns))
+    result.append(
+        pd.Series(
+            np.sum(weights[:, None] * state[other_columns].values, axis=0),
+            index=other_columns,
+        )
+    )
     return pd.concat(result)[state.columns]

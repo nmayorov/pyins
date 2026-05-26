@@ -15,7 +15,7 @@ def test_kalman_correct():
     H = np.identity(2)
 
     x_true = np.array([1 * 2 / (2 + 3), 2 * 1 / (1 + 2)])
-    P_true = np.diag([1 / (1/2 + 1/3), 1 / (1/1 + 1/2)])
+    P_true = np.diag([1 / (1 / 2 + 1 / 3), 1 / (1 / 1 + 1 / 2)])
 
     x = x0.copy()
     P = P0.copy()
@@ -31,9 +31,16 @@ def test_process_matrices():
     dt = 10
     Phi, Qd = kalman.compute_process_matrices(F, Q, dt)
     assert_allclose(Phi, np.array([[1, dt], [0, 1]]))
-    assert_allclose(Qd, np.array([
-        [Q[0, 0] + Q[1, 1] * dt ** 2 / 3, Q[1, 1] * dt / 2],
-        [Q[1, 1] * dt / 2, Q[1, 1]]]) * dt)
+    assert_allclose(
+        Qd,
+        np.array(
+            [
+                [Q[0, 0] + Q[1, 1] * dt**2 / 3, Q[1, 1] * dt / 2],
+                [Q[1, 1] * dt / 2, Q[1, 1]],
+            ]
+        )
+        * dt,
+    )
 
     np.random.seed(0)
     F = np.random.randn(15, 15)
@@ -42,4 +49,4 @@ def test_process_matrices():
 
     Phi, Qd = kalman.compute_process_matrices(F, Q, 0.5)
     test = F.dot(Qd) + Qd.dot(F.T) + Q - Phi.dot(Q).dot(Phi.T)
-    assert_allclose(test, 0, atol=1E-12)
+    assert_allclose(test, 0, atol=1e-12)
