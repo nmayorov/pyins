@@ -225,18 +225,25 @@ def run_gaussian_mixture_filter(
                     ret = measurement.compute_matrices(
                         measurement_time, pva, error_model
                     )
-                    if ret is not None:
-                        z, H, R = ret
-                        H_full = np.zeros((len(z), n_states))
-                        H_full[:, ins_block] = H
-                        x_new, P_new, innovation, evidence = kalman.correct(
-                            x, P, z, H_full, R
-                        )
-                        chi2 = np.sum(innovation**2)
-                        if scipy.stats.chi2.cdf(chi2, len(z)) < critical_p:
-                            x = x_new
-                            P = P_new
-                        state.weight *= evidence
+                    if ret is None:
+                        continue
+
+                    z, H, R = ret
+                    H_full = np.zeros((len(z), n_states))
+                    H_full[:, ins_block] = H
+                    x_new, P_new, innovation, evidence = kalman.correct(
+                        x, P, z, H_full, R
+                    )
+                    chi2 = np.sum(innovation**2)
+                    if scipy.stats.chi2.cdf(chi2, len(z)) < critical_p:
+                        x = x_new
+                        P = P_new
+                    state.weight *= evidence
+
+                    if len(states) == 1:
+                        name = measurement.__class__.__name__
+                        innovations[name].append(innovation)
+                        innovations_times[name].append(measurement_time)
 
                 state.integrator.set_pva(
                     error_model.correct_pva(state.integrator.get_pva(), x[ins_block])
@@ -353,6 +360,17 @@ def run_gaussian_mixture_filter(
     trajectory_sd, gyro_sd, accel_sd = compute_sd(
         np.asarray(P_result), trajectory, error_model, gyro_model, accel_model
     )
+
+    for measurement in measurements:
+        name = measurement.__class__.__name__
+        innovation = innovations[name]
+        if innovation:
+            columns = measurement.data.columns[: len(innovation[0])]
+        else:
+            columns = measurement.data.columns
+        innovations[name] = pd.DataFrame(
+            innovations[name], innovations_times[name], columns=columns
+        )
 
     return util.Bunch(
         weights=pd.Series(weights_result, times_result),
