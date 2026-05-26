@@ -304,12 +304,12 @@ class InsErrorModel:
 
         The result is returned as error vector in internal format.
         """
-        rot_diff = (Rotation.from_euler('xyz', right[RPH_COLS], True) *
-                    Rotation.from_euler('xyz', left[RPH_COLS], True).inv())
-        position_diff = transform.compute_lla_difference(
-            left[LLA_COLS], right[LLA_COLS])
-        velocity_diff = left[VEL_COLS] - rot_diff.apply(right[VEL_COLS].values.copy(),
-                                                        True)
+        left = left.values
+        right = right.values
+        rot_diff = (Rotation.from_euler('xyz', right[6:], True) *
+                    Rotation.from_euler('xyz', left[6:], True).inv())
+        position_diff = transform.compute_lla_difference(left[:3], right[:3])
+        velocity_diff = left[3:6] - rot_diff.apply(right[3:6].copy(), True)
         diff_vector = np.hstack([position_diff, velocity_diff, rot_diff.as_rotvec()])
         return diff_vector if self.with_altitude else self.TRANSFORM_2D_3D * diff_vector
 
