@@ -19,7 +19,7 @@ def test_kalman_correct():
 
     x = x0.copy()
     P = P0.copy()
-    x, P, _ = kalman.correct(x, P, z, H, R)
+    x, P, _, _ = kalman.correct(x, P, z, H, R)
     assert_allclose(x, x_true)
     assert_allclose(P, P_true)
 

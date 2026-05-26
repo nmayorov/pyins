@@ -77,17 +77,20 @@ def correct(x, P, z, H, R):
     innovation : ndarray, shape (n_obs,)
         Standardized innovation vector with theoretical zero mean and identity
         covariance matrix.
+    evidence : float
+        Probability of the observation z given the distribution of x.
     """
     HP = H @ P
     S = HP @ H.T + R
-
     e = z - H.dot(x)
     L = cholesky(S, lower=True)
     K = cho_solve((L, True), HP, overwrite_b=True).T
     U = np.eye(len(x)) - K.dot(H)
-
+    innovation = solve_triangular(L, e, lower=True)
     return (
         x + K @ (z - H @ x),
         U.dot(P).dot(U.T) + K.dot(R).dot(K.T),
-        solve_triangular(L, e, lower=True),
+        innovation,
+        np.exp(-0.5 * np.sum(innovation**2))
+        / ((2 * np.pi) ** (0.5 * len(z)) * np.prod(np.diag(L))),
     )

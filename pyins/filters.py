@@ -201,7 +201,7 @@ def run_feedback_filter(
                     z, H, R = ret
                     H_full = np.zeros((len(z), n_states))
                     H_full[:, ins_block] = H
-                    x, P, innovation = kalman.correct(x, P, z, H_full, R)
+                    x, P, innovation, _ = kalman.correct(x, P, z, H_full, R)
                     name = measurement.__class__.__name__
                     innovations[name].append(innovation)
                     innovations_times[name].append(measurement_time)
@@ -430,7 +430,7 @@ def run_feedforward_filter(
                     z, H, R = ret
                     H_full = np.zeros((len(z), n_states))
                     H_full[:, inertial_block] = H
-                    x, P, innovation = kalman.correct(x, P, z, H_full, R)
+                    x, P, innovation, _ = kalman.correct(x, P, z, H_full, R)
                     name = measurement.__class__.__name__
                     innovations[name].append(innovation)
                     innovations_times[name].append(time)

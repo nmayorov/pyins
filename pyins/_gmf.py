@@ -228,7 +228,7 @@ def run_gaussian_mixture_filter(
                         z, H, R = ret
                         H_full = np.zeros((len(z), n_states))
                         H_full[:, ins_block] = H
-                        x_new, P_new, innovation = kalman.correct(x, P, z, H_full, R)
+                        x_new, P_new, innovation, _ = kalman.correct(x, P, z, H_full, R)
                         chi2 = np.sum(innovation**2)
                         p = scipy.stats.chi2.cdf(chi2, len(z))
                         if p < critical_p:
