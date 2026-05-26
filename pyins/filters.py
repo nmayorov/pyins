@@ -12,6 +12,7 @@ Functions
 .. autosummary::
     :toctree: generated/
 
+    GmfSettings
     run_feedback_filter
     run_feedforward_filter
 
@@ -24,6 +25,7 @@ References
 import numpy as np
 import pandas as pd
 from . import inertial_sensor, kalman, util, strapdown
+from ._gmf import GmfSettings, run_gaussian_mixture_filter
 from .error_model import InsErrorModel
 from .util import THETA_COLS, DV_COLS
 from ._filter_common import (
@@ -48,10 +50,12 @@ def run_feedback_filter(
     measurements=None,
     time_step=0.1,
     with_altitude=True,
+    gmf_settings=GmfSettings(),
 ):
     """Run navigation filter with feedback corrections.
 
-    Also known as extended Kalman filter (EKF).
+    Also known as extended Kalman filter (EKF). It can be run as Gaussian Mixture Filter
+    with complete heading uncertainty as well.
 
     Parameters
     ----------
@@ -63,8 +67,11 @@ def run_feedback_filter(
         Initial assumed velocity standard deviation in m/s.
     level_sd : float
         Initial assumed roll and pitch standard deviation in degrees.
-    azimuth_sd : float
+    azimuth_sd : float or None
         Initial assumed heading standard deviation in degrees.
+        If None, complete 360 degrees heading uncertainty is assumed and
+        Gaussian Mixture Filter (GMF) is run. See `GmfSettings` for a short description
+        of the algorithm.
     increments : Increments
         IMU increments.
     gyro_model, accel_model : `pyins.inertial_sensor.EstimationModel`, optional
@@ -77,6 +84,9 @@ def run_feedback_filter(
         The value typically should not exceed 1 second. Default is 0.1 second.
     with_altitude : bool, optional
         Whether to estimate altitude or vertical velocity. Default is True.
+    gmf_settings : `GmfSettings`, optional
+        Settings for GMF to be used when heading is estimated from total uncertainty.
+        Contains sensible parameters by default.
 
     Returns
     -------
@@ -84,9 +94,11 @@ def run_feedback_filter(
 
         trajectory, trajectory_sd : DataFrame
             Estimated trajectory and its error standard deviations.
-            Note that `trajectory` will contain rows for each time moment, whereas
-            `trajectory_sd` will contain rows only for some time moments (controlled
-            by `time_step` parameter).
+            When run in normal mode, `trajectory` contains rows for each time
+            moment and when run in GMF mode -- only for the time moments where
+            the covariance was computed (controlled by `time_step`).
+            And `trajectory_sd` always contains rows only for time moments where
+            the covariance was computed.
         gyro, gyro_sd : DataFrame
             Estimated gyro model parameters and its standard deviations.
         accel, accel_sd : DataFrame
@@ -95,6 +107,21 @@ def run_feedback_filter(
             For each measurement class name contains DataFrame with normalized
             measurement innovations.
     """
+    if azimuth_sd is None:
+        return run_gaussian_mixture_filter(
+            initial_pva,
+            position_sd,
+            velocity_sd,
+            level_sd,
+            azimuth_sd,
+            gmf_settings,
+            gyro_model,
+            accel_model,
+            measurements,
+            time_step,
+            with_altitude,
+        )
+
     error_model = InsErrorModel(with_altitude)
     if gyro_model is None:
         gyro_model = inertial_sensor.EstimationModel()

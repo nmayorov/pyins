@@ -90,7 +90,6 @@ from . import (
     strapdown,
     transform,
     util,
-    gmf,
 )
 
 __version__ = "1.0"

@@ -28,6 +28,36 @@ class FilterState:
 
 @dataclass
 class GmfSettings:
+    """Settings for Gaussian Mixture Filter for heading estimation.
+
+    The initial complete heading uncertainty of 360 degrees is split into even segments
+    such that each component has small expected heading error and can be propagated
+    with small error assumption. The component probabilities (weights) are adjusted
+    based on how measurements evidence support a component's hypothesis. Components
+    with very small weights are removed such that eventually a single component
+    remains and the filter operates as a standard EKF.
+
+    Attributes
+    ----------
+    n_components : int
+        Number of mixture components.
+    critical_sigma: float
+        Measurement gating threshold expressed as a z-score of normal distribution.
+        A component's state correction is skipped if the normalized innovation exceeds
+        this value, indicating the measurement contradicts the component hypothesis.
+        Prevents erroneous EKF corrections which can cause unpredictable results due
+        to violation of inherent EKF assumptions.
+    minimal_relative_weight:
+        Weight threshold for component removal. If component weight becomes less
+        that `minimal_relative_weight / n_components` the component is removed
+        from the mixture.
+    components_collapse_threshold:
+        Threshold for collapsing the mixture to a single component.
+        When the per-variable standard deviation from inter-component spread is less
+        than this fraction of the total standard deviation for all state variables,
+        all components are merged into one. Prevents the filter from maintaining several
+        essentially identical components unnecessarily.
+    """
     n_components = 12
     critical_sigma = 3.0
     minimal_relative_weight = 0.01
