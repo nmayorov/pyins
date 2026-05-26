@@ -262,20 +262,22 @@ def run_gaussian_mixture_filter(
         if len(states) == 1:
             state = states[0]
             mean_pva = state.integrator.get_pva()
-            mean_gyro_state = state.gyro_model.get_estimates()
-            mean_accel_state = state.accel_model.get_estimates()
+            mean_gyro_estimates = state.gyro_model.get_estimates()
+            mean_accel_estimates = state.accel_model.get_estimates()
             P_total = state.P
         else:
             pvas = pd.DataFrame([state.integrator.get_pva() for state in states])
             mean_pva = transform.compute_mean_state(pvas, weights)
-            gyro_states = pd.DataFrame(
+            gyro_estimates = pd.DataFrame(
                 [state.gyro_model.get_estimates() for state in states]
             )
-            mean_gyro_state = transform.compute_mean_state(gyro_states, weights)
-            accel_states = pd.DataFrame(
+            mean_gyro_estimates = transform.compute_mean_state(gyro_estimates, weights)
+            accel_estimates = pd.DataFrame(
                 [state.accel_model.get_estimates() for state in states]
             )
-            mean_accel_state = transform.compute_mean_state(accel_states, weights)
+            mean_accel_estimates = transform.compute_mean_state(
+                accel_estimates, weights
+            )
 
             Ps = [state.P for state in states]
 
@@ -284,14 +286,14 @@ def run_gaussian_mixture_filter(
                 weights,
                 Ps,
                 pvas.iterrows(),
-                gyro_states.iterrows(),
-                accel_states.iterrows(),
+                gyro_estimates.iterrows(),
+                accel_estimates.iterrows(),
             ):
                 diff_vector = np.hstack(
                     [
                         error_model.subtract_pva(pva, mean_pva),
-                        gyro_state - mean_gyro_state,
-                        accel_state - mean_accel_state,
+                        gyro_state - mean_gyro_estimates,
+                        accel_state - mean_accel_estimates,
                     ]
                 )
                 P_total += weight * (P + np.outer(diff_vector, diff_vector))
@@ -303,16 +305,16 @@ def run_gaussian_mixture_filter(
                 state = states[0]
                 state.weight = 1.0
                 state.integrator.set_pva(mean_pva)
-                state.gyro_model.set_estimates(mean_gyro_state)
-                state.accel_model.set_estimates(mean_accel_state)
+                state.gyro_model.set_estimates(mean_gyro_estimates)
+                state.accel_model.set_estimates(mean_accel_estimates)
                 state.P = P_total
                 states = [state]
 
         times_result.append(time)
         weights_result.append(weights)
         pva_result.append(mean_pva)
-        gyro_result.append(mean_gyro_state)
-        accel_result.append(mean_accel_state)
+        gyro_result.append(mean_gyro_estimates)
+        accel_result.append(mean_accel_estimates)
         P_result.append(P_total)
 
         next_time = min(time + time_step, measurement_times[measurement_time_index])
